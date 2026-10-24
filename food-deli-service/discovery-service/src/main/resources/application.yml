@@ -1,0 +1,26 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: discovery-service
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    # Do not register eureka server with itself
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    wait-time-in-ms-when-sync-empty: 0
+    enable-self-preservation: false
+    response-cache-update-interval-ms: 3000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

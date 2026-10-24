@@ -1,0 +1,69 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  # Optionally fetch centralized configuration from Config Server
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: false
+          lower-case-service-id: true
+      routes:
+        # 1. Auth & User Microservice (Load balanced across auth-service instances)
+        - id: auth-service-route
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/auth/**, /api/v1/users/**
+
+        # 2. Restaurant & Catalog Microservice (Load balanced)
+        - id: restaurant-service-route
+          uri: lb://restaurant-service
+          predicates:
+            - Path=/api/v1/shops/**, /api/v1/categories/**, /api/v1/products/**, /api/v1/toppings/**, /api/v1/vouchers/**
+
+        # 3. Order & Cart Microservice (Load balanced)
+        - id: order-service-route
+          uri: lb://order-service
+          predicates:
+            - Path=/api/v1/orders/**, /api/v1/cart/**
+
+        # 4. Delivery & Shipper Hub Microservice (Load balanced)
+        - id: delivery-service-route
+          uri: lb://delivery-service
+          predicates:
+            - Path=/api/v1/deliveries/**, /api/v1/shippers/**
+
+        # 5. Review & Rating Microservice (Load balanced)
+        - id: review-service-route
+          uri: lb://review-service
+          predicates:
+            - Path=/api/v1/reviews/**
+
+        # 6. Realtime Chat & Notification WebSocket & HTTP (Load balanced)
+        - id: chat-notification-service-route
+          uri: lb://chat-notification-service
+          predicates:
+            - Path=/api/v1/chat/**, /ws/**
+
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    gateway:
+      enabled: true
