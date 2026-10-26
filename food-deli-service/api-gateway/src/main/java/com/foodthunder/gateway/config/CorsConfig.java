@@ -26,7 +26,8 @@ public class CorsConfig {
                 "Origin",
                 "X-Requested-With",
                 "X-User-Id",
-                "X-User-Role"
+                "X-User-Role",
+                "X-User-Phone"
         ));
         corsConfig.setExposedHeaders(Arrays.asList(
                 "Authorization",

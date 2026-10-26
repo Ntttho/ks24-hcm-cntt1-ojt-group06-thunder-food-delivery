@@ -9,6 +9,7 @@ Welcome to the **Food Thunder Deli** Spring Boot 3 Microservices Platform.
 | **API Gateway** | `api-gateway` | `8080` | Unified client entry point, JWT validation & dynamic client-side load balancing (`lb://`) |
 | **Discovery Service** | `discovery-service` | `8761` | Netflix Eureka Service Registry & Instance Discovery Dashboard |
 | **Config Server** | `config-server` | `8888` | Centralized Spring Cloud Configuration Server (`classpath:/config`) |
+| **Auth & User Service** | `auth-service` | `8081` | Authentication (JWT 24h, BCrypt), User Profiles, and Delivery Address Book |
 
 ---
  
@@ -52,6 +53,9 @@ Using the included Maven Wrapper:
 
 # Run API Gateway
 .\mvnw.cmd -pl api-gateway spring-boot:run
+
+# Run Auth & User Service
+.\mvnw.cmd -pl auth-service spring-boot:run
 ```
 
 Or via Docker Compose:

@@ -73,12 +73,18 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
 
 ---
 
-## PHÂN HỆ 1: XÁC THỰC & HỒ SƠ CÁ NHÂN
+## PHÂN HỆ 1: XÁC THỰC & HỒ SƠ CÁ NHÂN `[ĐÃ HOÀN THÀNH - SPRINT 1 (SP1-02)]`
 
-### 1.1. Đăng nhập tài khoản
-* **Endpoint:** `POST /api/v1/auth/login`
+### 1.1. Đăng nhập tài khoản (Hỗ trợ phân theo vai trò Portal) `[COMPLETED]`
+* **Endpoints:**
+  * `POST /api/v1/auth/login` — Đăng nhập chung (có thể truyền trường `"role"` mong muốn).
+  * `POST /api/v1/auth/login/customer` — Dành riêng cho App Khách hàng (`role = CUSTOMER`).
+  * `POST /api/v1/auth/login/merchant` — Dành riêng cho Kênh Nhà hàng (`role = MERCHANT`).
+  * `POST /api/v1/auth/login/driver` & `POST /api/v1/auth/login/shipper` — Dành cho Shipper Hub (`role = DRIVER`).
+  * `POST /api/v1/auth/login/admin` — Dành riêng cho Cổng Quản trị (`role = ADMIN`).
 * **Quyền hạn:** `Public`
-* **Mô tả:** Đăng nhập hệ thống bằng SĐT và mật khẩu, trả về thông tin user và JWT Access Token (đồng thời đặt Set-Cookie HttpOnly).
+* **Mô tả:** Đăng nhập hệ thống bằng SĐT và mật khẩu, kiểm tra quyền truy cập đúng vai trò yêu cầu, cấp JWT Access Token thời hạn 24h chứa claims (`userId`, `phone`, `role`, `roles`).
+* **Bảo vệ Phân quyền RBAC:** Nếu tài khoản không sở hữu vai trò truy cập vào cổng được yêu cầu, API từ chối HTTP `401 Unauthorized` kèm thông báo *"Tài khoản chưa được cấp quyền truy cập với vai trò: ..."*.
 * **Request Body:**
 ```json
 {
@@ -98,32 +104,37 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
       "id": 1,
       "fullName": "Nguyễn Văn A",
       "phone": "0987654321",
-      "ratingAvg": 4.9,
+      "ratingAvg": 5.00,
       "roles": ["CUSTOMER"],
       "role": "CUSTOMER",
-      "createdAt": "2026-10-20T10:00:00"
+      "createdAt": "2026-10-26T17:28:38.203"
     }
   },
-  "timestamp": "2026-10-24T05:15:30.123Z"
+  "timestamp": "2026-10-26T17:28:38.203Z"
 }
 ```
 
-### 1.2. Đăng ký tài khoản
-* **Endpoint:** `POST /api/v1/auth/register`
+### 1.2. Đăng ký tài khoản (Hỗ trợ phân theo vai trò) `[COMPLETED]`
+* **Endpoints:**
+  * `POST /api/v1/auth/register` — Đăng ký chung (nhận trường `"role"`: `CUSTOMER`, `MERCHANT`, `DRIVER` hoặc `SHIPPER`).
+  * `POST /api/v1/auth/register/customer` — Đăng ký nhanh Khách hàng (`role = CUSTOMER`).
+  * `POST /api/v1/auth/register/merchant` — Đăng ký nhanh Đối tác Quán ăn (`role = MERCHANT`).
+  * `POST /api/v1/auth/register/driver` & `POST /api/v1/auth/register/shipper` — Đăng ký nhanh Tài xế (`role = DRIVER`).
 * **Quyền hạn:** `Public`
-* **Mô tả:** Đăng ký tài khoản người dùng mới. Mật khẩu được mã hóa an toàn bằng BCrypt.
+* **Mô tả:** Đăng ký tài khoản người dùng mới. Mật khẩu được mã hóa một chiều bằng `BCryptPasswordEncoder`. Chặn tự đăng ký vai trò `ADMIN` từ public (HTTP 400).
 * **Request Body:**
 ```json
 {
   "fullName": "Trần Thị B",
   "phone": "0912345678",
-  "password": "SecurePassword@123"
+  "password": "SecurePassword@123",
+  "role": "CUSTOMER"
 }
 ```
-* **Response (200 OK / 201 Created):**
+* **Response (201 Created):**
 ```json
 {
-  "status": 200,
+  "status": 201,
   "message": "Registered",
   "data": {
     "token": "eyJhbGciOiJIUzI1NiIsIn...",
@@ -131,18 +142,19 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
       "id": 2,
       "fullName": "Trần Thị B",
       "phone": "0912345678",
+      "ratingAvg": 5.00,
       "roles": ["CUSTOMER"],
       "role": "CUSTOMER",
-      "createdAt": "2026-10-24T05:16:00"
+      "createdAt": "2026-10-26T17:28:38.203"
     }
   },
-  "timestamp": "2026-10-24T05:16:00.123Z"
+  "timestamp": "2026-10-26T17:28:38.203Z"
 }
 ```
 
-### 1.3. Lấy thông tin tài khoản hiện tại
-* **Endpoint:** `GET /api/v1/auth/me`
-* **Quyền hạn:** `Authenticated` (Yêu cầu Header Authorization Bearer)
+### 1.3. Lấy thông tin tài khoản hiện tại `[COMPLETED]`
+* **Endpoints:** `GET /api/v1/auth/me` và `GET /api/v1/users/me`
+* **Quyền hạn:** `Authenticated` (Yêu cầu Header `Authorization: Bearer <token>` hoặc Gateway header `X-User-Id`)
 * **Response (200 OK):**
 ```json
 {
@@ -152,17 +164,17 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
     "id": 1,
     "fullName": "Nguyễn Văn A",
     "phone": "0987654321",
-    "ratingAvg": 5.0,
-    "roles": ["CUSTOMER", "MERCHANT"],
-    "role": "MERCHANT",
-    "createdAt": "2026-10-20T10:00:00"
+    "ratingAvg": 5.00,
+    "roles": ["CUSTOMER"],
+    "role": "CUSTOMER",
+    "createdAt": "2026-10-26T17:28:38.203"
   },
-  "timestamp": "2026-10-24T05:16:30.123Z"
+  "timestamp": "2026-10-26T17:28:38.203Z"
 }
 ```
 
-### 1.4. Cập nhật hồ sơ cá nhân
-* **Endpoint:** `PUT /api/v1/auth/profile`
+### 1.4. Cập nhật hồ sơ cá nhân `[COMPLETED]`
+* **Endpoints:** `PUT /api/v1/auth/profile` và `PUT /api/v1/users/me`
 * **Quyền hạn:** `Authenticated`
 * **Request Body:**
 ```json
@@ -170,7 +182,7 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
   "fullName": "Nguyễn Văn A (Cập nhật)"
 }
 ```
-* **Response (200 OK):** Trả về đối tượng `AuthUserDto` đã cập nhật.
+* **Response (200 OK):** Trả về đối tượng `UserDto` đã cập nhật.
 
 ### 1.5. Đổi mật khẩu
 * **Endpoint:** `PUT /api/v1/auth/password`
@@ -273,20 +285,97 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
 * **Quyền hạn:** `Public`
 * **Endpoint:** `GET /api/v1/addresses/reverse?lat=21.007&lng=105.843` (Geocoding ngược từ tọa độ ra tên đường).
 
-### 3.3. Quản lý Sổ địa chỉ cá nhân của Khách hàng
-* **Endpoint:** `GET /api/v1/addresses/mine` (Quyền: `Authenticated`) — Danh sách địa chỉ đã lưu.
-* **Endpoint:** `POST /api/v1/addresses/mine` (Quyền: `Authenticated`) — Thêm mới địa chỉ:
+### 3.3. Quản lý Sổ địa chỉ cá nhân của Khách hàng `[ĐÃ HOÀN THÀNH - SPRINT 1 (SP1-02)]`
+* **Quy chuẩn URL:** Hỗ trợ đồng thời 2 định dạng: `/api/v1/users/addresses` (chuẩn RESTful tài nguyên con) và `/api/v1/addresses/mine` (tương thích Frontend).
+* **Quyền hạn:** `Authenticated` (Yêu cầu Header `Authorization: Bearer <token>` hoặc Gateway header `X-User-Id`).
+
+#### 3.3.1. Danh sách sổ địa chỉ nhận hàng
+* **Endpoint:** `GET /api/v1/users/addresses` hoặc `GET /api/v1/addresses/mine`
+* **Mô tả:** Trả về danh sách địa chỉ nhận hàng của người dùng, tự động sắp xếp ưu tiên địa chỉ mặc định lên đầu (`isDefault = true`).
+* **Response (200 OK):**
 ```json
 {
-  "address": "Phòng 802, Toà nhà Landmark 72, Cầu Giấy, Hà Nội",
-  "latitude": 21.0169,
-  "longitude": 105.7839,
-  "isDefault": true,
-  "label": "Văn phòng"
+  "status": 200,
+  "message": "Success",
+  "data": [
+    {
+      "id": 1,
+      "userId": 1,
+      "address": "144 Xuân Thủy, Dịch Vọng Hậu, Cầu Giấy, Hà Nội",
+      "latitude": 21.0368,
+      "longitude": 105.7827,
+      "isDefault": true,
+      "label": "Nhà riêng",
+      "createdAt": "2026-10-26T17:28:38.203"
+    }
+  ],
+  "timestamp": "2026-10-26T17:28:38.203Z"
 }
 ```
-* **Endpoint:** `PUT /api/v1/addresses/mine/{id}` (Quyền: `Authenticated`) — Cập nhật địa chỉ.
-* **Endpoint:** `DELETE /api/v1/addresses/mine/{id}` (Quyền: `Authenticated`) — Xóa địa chỉ.
+
+#### 3.3.2. Thêm mới địa chỉ nhận hàng
+* **Endpoint:** `POST /api/v1/users/addresses` hoặc `POST /api/v1/addresses/mine`
+* **Mô tả:** Tạo mới địa chỉ. Nếu là địa chỉ đầu tiên của người dùng hoặc gửi kèm `"isDefault": true`, hệ thống tự động gỡ trạng thái mặc định của các địa chỉ cũ và đặt địa chỉ mới làm mặc định.
+* **Request Body:**
+```json
+{
+  "address": "Keangnam Landmark 72, Phạm Hùng, Mễ Trì, Nam Từ Liêm, Hà Nội",
+  "latitude": 21.0173,
+  "longitude": 105.7838,
+  "isDefault": true,
+  "label": "Công ty"
+}
+```
+* **Response (201 Created):**
+```json
+{
+  "status": 201,
+  "message": "Address created successfully",
+  "data": {
+    "id": 2,
+    "userId": 1,
+    "address": "Keangnam Landmark 72, Phạm Hùng, Mễ Trì, Nam Từ Liêm, Hà Nội",
+    "latitude": 21.0173,
+    "longitude": 105.7838,
+    "isDefault": true,
+    "label": "Công ty",
+    "createdAt": "2026-10-26T17:28:38.203"
+  },
+  "timestamp": "2026-10-26T17:28:38.203Z"
+}
+```
+
+#### 3.3.3. Cập nhật nội dung địa chỉ
+* **Endpoint:** `PUT /api/v1/users/addresses/{id}` hoặc `PUT /api/v1/addresses/mine/{id}`
+* **Request Body:**
+```json
+{
+  "address": "Số 264 Bà Hạt, Phường 9, Quận 10, TP.HCM",
+  "latitude": 10.7650,
+  "longitude": 106.6710,
+  "isDefault": true,
+  "label": "Nhà riêng"
+}
+```
+* **Response (200 OK):** Trả về đối tượng `AddressResponse` đã cập nhật.
+
+#### 3.3.4. Đặt địa chỉ làm mặc định
+* **Endpoint:** `PATCH /api/v1/users/addresses/{id}/default` hoặc `PATCH /api/v1/addresses/mine/{id}/default`
+* **Mô tả:** Đặt nhanh địa chỉ chỉ định làm mặc định (`isDefault = true`) và tự động chuyển các địa chỉ khác về `false`.
+* **Response (200 OK):** Trả về `AddressResponse` đã được gán mặc định.
+
+#### 3.3.5. Xóa địa chỉ
+* **Endpoint:** `DELETE /api/v1/users/addresses/{id}` hoặc `DELETE /api/v1/addresses/mine/{id}`
+* **Mô tả:** Xóa địa chỉ. Nếu địa chỉ vừa xóa là mặc định, hệ thống tự động thăng hạng địa chỉ kế tiếp làm mặc định mới.
+* **Response (200 OK):**
+```json
+{
+  "status": 200,
+  "message": "Address deleted successfully",
+  "data": null,
+  "timestamp": "2026-10-26T17:28:38.203Z"
+}
+```
 
 ---
 
