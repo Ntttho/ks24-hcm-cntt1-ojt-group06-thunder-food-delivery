@@ -26,7 +26,7 @@ docker compose up --build -d
 - **Web Frontend (Nginx):** `http://localhost` (Port 80)
 - **Backend API (Spring Boot):** `http://localhost:3000`
 - **Tài liệu API (Swagger UI):** `http://localhost:3000/swagger-ui.html`
-- **Cơ sở dữ liệu (MySQL 8):** `localhost:3306` (`grabfood_db`, tự động nạp `seed_all.sql`)
+- **Cơ sở dữ liệu (MySQL 8):** `localhost:3306` (`grabfood_db`, tự động nạp `seed_all.sql` hoặc nạp thủ công bằng DBeaver - xem chi tiết tại [food-deli-service/README.md](file:///d:/ojt-food-deli-start/food-deli-service/README.md#hướng-dẫn-sử-dụng-dbeaver-quản-lý-database--import-seed-data))
 
 ---
 
