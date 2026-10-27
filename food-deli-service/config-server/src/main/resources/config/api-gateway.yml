@@ -16,7 +16,7 @@ spring:
         - id: auth-service-route
           uri: lb://auth-service
           predicates:
-            - Path=/api/v1/auth/**, /api/v1/users/**
+            - Path=/api/v1/auth/**, /api/v1/users/**, /api/v1/addresses/**
 
         # 2. Restaurant & Catalog Service Route
         - id: restaurant-service-route

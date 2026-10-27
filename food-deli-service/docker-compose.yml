@@ -53,6 +53,23 @@ services:
     networks:
       - foodthunder-network
 
+  # 4. Auth & User Microservice
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: ft-auth-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+    networks:
+      - foodthunder-network
+
 networks:
   foodthunder-network:
     name: foodthunder-microservices-net
