@@ -1,6 +1,26 @@
 version: '3.8'
 
 services:
+  # 0. MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: ft-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "root"
+      MYSQL_DATABASE: "grabfood_db"
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - ../database/seed_all.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   # 1. Netflix Eureka Service Registry
   discovery-service:
     build:
@@ -64,9 +84,15 @@ services:
     depends_on:
       discovery-service:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=root
     networks:
       - foodthunder-network
 
