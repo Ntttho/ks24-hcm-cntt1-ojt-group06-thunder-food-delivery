@@ -39,6 +39,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.foodthunder.configserver.ConfigServerApplication</mainClass>
+                </configuration>
             </plugin>
         </plugins>
     </build>
