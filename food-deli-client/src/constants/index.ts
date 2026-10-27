@@ -16,6 +16,7 @@ export const APP_ROUTES = {
   ORDERS: '/orders',
   ORDER_DETAIL: '/orders/:id',
   PROFILE: '/profile',
+  ADDRESSES: '/profile/addresses',
   ADMIN_DASHBOARD: '/admin',
   MERCHANT_DASHBOARD: '/merchant',
   SHIPPER_DASHBOARD: '/shipper',
@@ -26,5 +27,6 @@ export const ROLES = {
   ADMIN: 'ROLE_ADMIN',
   MERCHANT: 'ROLE_MERCHANT',
   SHIPPER: 'ROLE_SHIPPER',
+  DRIVER: 'ROLE_DRIVER',
   CUSTOMER: 'ROLE_CUSTOMER',
 } as const;
