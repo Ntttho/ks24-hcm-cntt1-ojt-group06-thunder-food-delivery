@@ -1,3 +1,8 @@
 TRELLO_BACKLOG_PLAN.md
 /screenshots
 /older
+
+# Ignore documentation files not meant for repository
+Nhóm 6 - Food ThunderDeli.docx
+*.docx
+extracted_doc.txt
