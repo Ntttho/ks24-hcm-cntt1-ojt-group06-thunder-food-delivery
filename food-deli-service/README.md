@@ -58,8 +58,78 @@ Using the included Maven Wrapper:
 .\mvnw.cmd -pl auth-service spring-boot:run
 ```
 
-Or via Docker Compose:
+### Chạy qua Docker Compose:
 
 ```bash
+# Bước 1: Build các file JAR trước (bắt buộc vì Dockerfile dùng COPY target/*.jar)
+.\mvnw.cmd clean package -DskipTests
+
+# Bước 2: Khởi động toàn bộ container
 docker compose up --build
 ```
+
+---
+
+## 💡 Lưu Ý Quan Trọng Khi Chạy Docker (Docker Tips)
+
+> [!IMPORTANT]
+> **1. Bắt buộc build file JAR trước khi build Docker Image**
+> - Các file `Dockerfile` của từng service (`auth-service`, `api-gateway`, `discovery-service`, ...) sử dụng câu lệnh:
+>   ```dockerfile
+>   COPY target/*.jar app.jar
+>   ```
+> - Nếu bạn chạy `docker compose up --build` mà thư mục `target/` chưa có file `.jar`, Docker sẽ báo lỗi `COPY failed: no source files were specified`. Hãy luôn chạy `mvn clean package -DskipTests` hoặc `.\mvnw.cmd clean package -DskipTests` trước.
+
+> [!TIP]
+> **2. Kết nối Database MySQL từ bên trong Docker Container**
+> - Mặc định trong `application.yml`, các service kết nối đến DB qua `localhost:3306`.
+> - Khi chạy service trong Docker container, `localhost` trỏ vào chính container đó chứ không phải máy tính của bạn.
+> - Nếu MySQL chạy trực tiếp trên máy host của bạn, hãy truyền biến môi trường:
+>   - `MYSQL_HOST=host.docker.internal` (dành cho Windows / Mac)
+>   - Hoặc chỉnh trực tiếp trong file `docker-compose.yml`:
+>     ```yaml
+>     environment:
+>       - MYSQL_HOST=host.docker.internal
+>       - MYSQL_PORT=3306
+>       - MYSQL_USER=root
+>       - MYSQL_PASSWORD=123456
+>     extra_hosts:
+>       - "host.docker.internal:host-gateway"
+>     ```
+
+---
+
+## 🐬 Hướng Dẫn Sử Dụng DBeaver (Quản lý Database & Import Seed Data)
+
+DBeaver là công cụ giao diện trực quan miễn phí để quản trị MySQL. Dưới đây là các bước kết nối và nạp dữ liệu mẫu cho hệ thống:
+
+### Bước 1: Tạo kết nối mới (New Database Connection)
+1. Mở **DBeaver** $\rightarrow$ chọn biểu tượng **New Database Connection** (phím tắt `Ctrl + Shift + N` hoặc menu `Database > New Database Connection...`).
+2. Chọn loại cơ sở dữ liệu: **MySQL** $\rightarrow$ nhấn **Next**.
+
+### Bước 2: Điền thông tin kết nối
+- **Host:** `localhost`
+- **Port:** `3306`
+- **Database:** `grabfood_db` *(hoặc để trống nếu chưa tạo)*
+- **Username:** `root`
+- **Password:** nhập mật khẩu MySQL của bạn (mặc định cấu hình dự án là `123456`).
+
+### Bước 3: Cấu hình Driver Properties (Khắc phục lỗi xác thực MySQL 8)
+1. Trong cửa sổ cấu hình kết nối, chuyển sang tab **Driver properties**.
+2. Tìm và chỉnh 2 thuộc tính quan trọng:
+   - `allowPublicKeyRetrieval` $\rightarrow$ đổi thành `TRUE`.
+   - `useSSL` $\rightarrow$ đổi thành `FALSE` (khi chạy môi trường dev local).
+3. Bấm nút **Test Connection** ở góc dưới bên trái:
+   - Nếu DBeaver yêu cầu tải driver MySQL, nhấn **Download**.
+   - Khi hiện thông báo `Connected` màu xanh lá $\rightarrow$ Nhấn **Finish**.
+
+### Bước 4: Thực thi nạp dữ liệu mẫu (`seed_all.sql`)
+1. Trên thanh menu DBeaver, chọn **File** $\rightarrow$ **Open File...** (hoặc `Ctrl + O`).
+2. Điều hướng đến thư mục dự án và chọn file:
+   ```
+   d:\ojt-food-deli-start\database\seed_all.sql
+   ```
+3. File SQL sẽ hiển thị trong trình soạn thảo của DBeaver. Nhấn tổ hợp phím **`Alt + X`** (hoặc bấm biểu tượng **Execute SQL Script** trên thanh công cụ bên trái) để chạy toàn bộ kịch bản.
+4. Quá trình chạy sẽ tự động tạo cơ sở dữ liệu `grabfood_db`, toàn bộ bảng và dữ liệu mẫu đầy đủ (users, shops, products, vouchers, categories,...).
+5. Sau khi hoàn tất, click chuột phải vào Connection ở cây thư mục bên trái $\rightarrow$ chọn **Refresh** (`F5`) để xem cơ sở dữ liệu `grabfood_db`.
+
