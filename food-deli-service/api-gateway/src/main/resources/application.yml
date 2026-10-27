@@ -24,7 +24,7 @@ spring:
         - id: restaurant-service-route
           uri: lb://restaurant-service
           predicates:
-            - Path=/api/v1/shops/**, /api/v1/categories/**, /api/v1/products/**, /api/v1/toppings/**, /api/v1/vouchers/**
+            - Path=/api/v1/restaurants/**, /api/v1/shops/**, /api/v1/categories/**, /api/v1/products/**, /api/v1/toppings/**, /api/v1/vouchers/**
 
         # 3. Order & Cart Microservice (Load balanced)
         - id: order-service-route
