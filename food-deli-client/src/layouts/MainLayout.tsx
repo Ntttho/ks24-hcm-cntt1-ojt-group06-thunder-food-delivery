@@ -79,11 +79,14 @@ export const MainLayout: React.FC = () => {
           {/* Right actions: Cart & User profile */}
           <div className="flex items-center gap-3">
             {/* Cart Preview Badge */}
-            <div className="p-2.5 rounded-xl text-gray-700 bg-gray-100/80 transition-colors relative cursor-default">
-              <Badge count={totalQuantity} offset={[2, -2]} color="#f97316">
+            <Link
+              to={APP_ROUTES.CART}
+              className="p-2.5 rounded-xl text-gray-700 bg-gray-100/80 hover:bg-orange-50 hover:text-orange-600 transition-colors relative cursor-pointer block"
+            >
+              <Badge count={totalQuantity || 3} offset={[2, -2]} color="#00b14f">
                 <ShoppingCartOutlined className="text-xl" />
               </Badge>
-            </div>
+            </Link>
 
             {/* Auth actions */}
             {isAuthenticated && user ? (
