@@ -1,6 +1,13 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
-import { HomePage, LoginPage, RegisterPage, NotFoundPage } from '@/pages';
+import {
+  HomePage,
+  LoginPage,
+  RegisterPage,
+  NotFoundPage,
+  CartPage,
+  CheckoutPage,
+} from '@/pages';
 import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
@@ -18,6 +25,15 @@ export const router = createBrowserRouter([
         element: <NotFoundPage />,
       },
     ],
+  },
+  // Dedicated Cart & Checkout Screens (with full mobile-first sticky bars)
+  {
+    path: APP_ROUTES.CART,
+    element: <CartPage />,
+  },
+  {
+    path: APP_ROUTES.CHECKOUT,
+    element: <CheckoutPage />,
   },
   // Auth Layout: Login & Register
   {
