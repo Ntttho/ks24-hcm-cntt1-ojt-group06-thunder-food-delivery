@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   # 0. MySQL Database
   mysql:
     image: mysql:8.0
     container_name: ft-mysql
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT:-3307}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "root"
       MYSQL_DATABASE: "grabfood_db"
@@ -16,10 +14,11 @@ services:
     networks:
       - foodthunder-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot" ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   # 1. Netflix Eureka Service Registry
   discovery-service:
@@ -30,14 +29,15 @@ services:
     ports:
       - "8761:8761"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - EUREKA_INSTANCE_HOSTNAME=discovery-service
     networks:
       - foodthunder-network
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1"]
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   # 2. Centralized Configuration Server
   config-server:
@@ -53,8 +53,15 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=native
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     networks:
       - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # 3. API Gateway with Dynamic Load Balancing
   api-gateway:
@@ -67,9 +74,12 @@ services:
     depends_on:
       discovery-service:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
     networks:
       - foodthunder-network
 
@@ -84,15 +94,43 @@ services:
     depends_on:
       discovery-service:
         condition: service_healthy
+      config-server:
+        condition: service_healthy
       mysql:
         condition: service_healthy
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=root
       - MYSQL_PASSWORD=root
+    networks:
+      - foodthunder-network
+
+  # 5. Restaurant & Catalog Microservice
+  restaurant-service:
+    build:
+      context: ./restaurant-service
+      dockerfile: Dockerfile
+    container_name: ft-restaurant-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_HOST=discovery-service
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=grabfood_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
     networks:
       - foodthunder-network
 

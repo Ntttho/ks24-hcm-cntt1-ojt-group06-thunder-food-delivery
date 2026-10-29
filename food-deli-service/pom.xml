@@ -23,6 +23,7 @@
         <module>config-server</module>
         <module>api-gateway</module>
         <module>auth-service</module>
+        <module>restaurant-service</module>
     </modules>
 
     <properties>

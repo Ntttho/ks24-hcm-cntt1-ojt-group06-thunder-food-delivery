@@ -7,8 +7,11 @@ import {
   AddressManagementPage,
   ProfilePage,
   NotFoundPage,
+  CartPage,
+  CheckoutPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
+import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
   // Main Layout
@@ -49,6 +52,15 @@ export const router = createBrowserRouter([
         element: <NotFoundPage />,
       },
     ],
+  },
+  // Dedicated Cart & Checkout Screens (with full mobile-first sticky bars)
+  {
+    path: APP_ROUTES.CART,
+    element: <CartPage />,
+  },
+  {
+    path: APP_ROUTES.CHECKOUT,
+    element: <CheckoutPage />,
   },
   // Auth Layout: Login & Register
   {
