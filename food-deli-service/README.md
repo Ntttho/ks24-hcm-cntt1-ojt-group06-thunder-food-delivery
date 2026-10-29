@@ -10,6 +10,7 @@ Welcome to the **Food Thunder Deli** Spring Boot 3 Microservices Platform.
 | **Discovery Service** | `discovery-service` | `8761` | Netflix Eureka Service Registry & Instance Discovery Dashboard |
 | **Config Server** | `config-server` | `8888` | Centralized Spring Cloud Configuration Server (`classpath:/config`) |
 | **Auth & User Service** | `auth-service` | `8081` | Authentication (JWT 24h, BCrypt), User Profiles, and Delivery Address Book |
+| **Restaurant & Catalog Service** | `restaurant-service` | `8082` | Multi-shop management, menu categories, products, toppings & vouchers |
 
 ---
  
@@ -92,7 +93,7 @@ docker compose up --build
 >       - MYSQL_HOST=host.docker.internal
 >       - MYSQL_PORT=3306
 >       - MYSQL_USER=root
->       - MYSQL_PASSWORD=123456
+>       - MYSQL_PASSWORD=root
 >     extra_hosts:
 >       - "host.docker.internal:host-gateway"
 >     ```

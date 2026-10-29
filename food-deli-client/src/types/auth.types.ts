@@ -1,13 +1,27 @@
-export type UserRole = 'ROLE_ADMIN' | 'ROLE_MERCHANT' | 'ROLE_SHIPPER' | 'ROLE_CUSTOMER' | 'ADMIN' | 'MERCHANT' | 'SHIPPER' | 'CUSTOMER';
+export type UserRole =
+  | 'ROLE_ADMIN'
+  | 'ROLE_MERCHANT'
+  | 'ROLE_SHIPPER'
+  | 'ROLE_DRIVER'
+  | 'ROLE_CUSTOMER'
+  | 'ADMIN'
+  | 'MERCHANT'
+  | 'SHIPPER'
+  | 'DRIVER'
+  | 'CUSTOMER';
 
 export interface User {
   id: number | string;
-  email: string;
+  phone: string;
   fullName: string;
+  email?: string;
   phoneNumber?: string;
   avatarUrl?: string;
+  ratingAvg?: number;
+  roles?: string[];
   role: UserRole;
   status?: string;
+  createdAt?: string;
 }
 
 export interface AuthTokens {
@@ -18,16 +32,21 @@ export interface AuthTokens {
 }
 
 export interface LoginRequest {
-  email: string;
+  phone: string;
   password: string;
+  role?: string;
 }
 
 export interface RegisterRequest {
-  email: string;
+  phone: string;
   password: string;
   fullName: string;
-  phoneNumber?: string;
-  role?: 'CUSTOMER' | 'MERCHANT' | 'SHIPPER';
+  email?: string;
+  role?: 'CUSTOMER' | 'MERCHANT' | 'SHIPPER' | 'DRIVER';
+}
+
+export interface UpdateProfileRequest {
+  fullName: string;
 }
 
 export interface AuthResponse {

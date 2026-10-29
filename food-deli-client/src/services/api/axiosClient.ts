@@ -47,20 +47,17 @@ axiosInstance.interceptors.response.use(
 
     switch (status) {
       case 401:
-        // Unauthorized: token expired or invalid
         storage.removeToken();
         storage.removeUser();
-        // Notify user if not on login page
         if (!window.location.pathname.includes('/login')) {
           message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-          // Optional redirect: window.location.href = '/login';
         }
         break;
       case 403:
         message.error('Bạn không có quyền thực hiện thao tác này (403 Forbidden).');
         break;
       case 404:
-        console.warn('[API 404 Not Found]:', error.config?.url);
+        console.warn('[API 404 Not Found]:', error.config?.url, errorMessage);
         break;
       case 500:
       case 502:

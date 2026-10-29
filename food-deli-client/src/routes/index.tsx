@@ -4,14 +4,17 @@ import {
   HomePage,
   LoginPage,
   RegisterPage,
+  AddressManagementPage,
+  ProfilePage,
   NotFoundPage,
   CartPage,
   CheckoutPage,
 } from '@/pages';
+import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
-  // Main Layout: Index Route
+  // Main Layout
   {
     path: '/',
     element: <MainLayout />,
@@ -19,6 +22,30 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />,
+      },
+      {
+        path: 'profile',
+        element: (
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'profile/addresses',
+        element: (
+          <ProtectedRoute>
+            <AddressManagementPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'addresses',
+        element: (
+          <ProtectedRoute>
+            <AddressManagementPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: '*',

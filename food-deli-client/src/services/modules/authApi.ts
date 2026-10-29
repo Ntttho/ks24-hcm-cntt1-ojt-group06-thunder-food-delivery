@@ -1,5 +1,12 @@
 import { apiClient, API_ENDPOINTS } from '@/services/api';
-import type { ApiResponse, AuthResponse, LoginRequest, RegisterRequest, User } from '@/types';
+import type {
+  ApiResponse,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  UpdateProfileRequest,
+  User,
+} from '@/types';
 
 export const authApi = {
   login: async (credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
@@ -12,6 +19,10 @@ export const authApi = {
 
   getProfile: async (): Promise<ApiResponse<User>> => {
     return apiClient.get<User>(API_ENDPOINTS.AUTH.PROFILE);
+  },
+
+  updateProfile: async (data: UpdateProfileRequest): Promise<ApiResponse<User>> => {
+    return apiClient.put<User>(API_ENDPOINTS.AUTH.UPDATE_PROFILE, data);
   },
 
   logout: async (): Promise<ApiResponse<void>> => {

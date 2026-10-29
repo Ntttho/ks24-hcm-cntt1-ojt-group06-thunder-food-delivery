@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Input, Button, Card, Tag, Typography, Row, Col, Space } from 'antd';
+import { Input, Button, Card, Tag, Row, Col, message } from 'antd';
 import {
-  SearchOutlined,
   ThunderboltFilled,
   FireOutlined,
   ClockCircleOutlined,
@@ -12,9 +11,6 @@ import {
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { addToCart } from '@/store/slices/cartSlice';
 import { formatCurrency } from '@/utils/formatters';
-import { message } from 'antd';
-
-const { Title, Text, Paragraph } = Typography;
 
 // Mock featured foods for demonstration of base setup
 const FEATURED_ITEMS = [
@@ -72,7 +68,7 @@ export const HomePage: React.FC = () => {
   const dispatch = useAppDispatch();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleQuickAdd = (item: typeof FEATURED_ITEMS[0]) => {
+  const handleQuickAdd = (item: (typeof FEATURED_ITEMS)[0]) => {
     dispatch(
       addToCart({
         id: item.id,

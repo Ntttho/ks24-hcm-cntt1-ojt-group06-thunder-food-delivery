@@ -5,8 +5,16 @@ export const API_ENDPOINTS = {
     REGISTER: '/auth/register',
     REFRESH_TOKEN: '/auth/refresh',
     LOGOUT: '/auth/logout',
-    PROFILE: '/users/me',
-    UPDATE_PROFILE: '/users/me',
+    PROFILE: '/auth/me',
+    USERS_ME: '/users/me',
+    UPDATE_PROFILE: '/auth/profile',
+  },
+  // Customer User Addresses (Sổ địa chỉ)
+  ADDRESSES: {
+    MINE: '/users/addresses',
+    ALTERNATIVE_MINE: '/addresses/mine',
+    DETAIL: (id: number | string) => `/users/addresses/${id}`,
+    SET_DEFAULT: (id: number | string) => `/users/addresses/${id}/default`,
   },
   // Restaurant & Catalog Service
   RESTAURANTS: {
