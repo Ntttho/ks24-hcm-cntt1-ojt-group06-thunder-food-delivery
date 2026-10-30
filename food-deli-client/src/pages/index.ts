@@ -1,4 +1,6 @@
 export * from './public/home/HomePage';
+export * from './public/explore/ExplorePage';
+export * from './public/restaurant/RestaurantDetailPage';
 export * from './auth/LoginPage';
 export * from './auth/RegisterPage';
 export * from './profile/AddressManagementPage';

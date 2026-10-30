@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout, AuthLayout } from '@/layouts';
 import {
   HomePage,
+  ExplorePage,
   LoginPage,
   RegisterPage,
   AddressManagementPage,
@@ -9,19 +10,28 @@ import {
   NotFoundPage,
   CartPage,
   CheckoutPage,
+  RestaurantDetailPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <HomePage />,
+  },
   // Main Layout
   {
     path: '/',
     element: <MainLayout />,
     children: [
       {
-        index: true,
-        element: <HomePage />,
+        path: 'explore',
+        element: <ExplorePage />,
+      },
+      {
+        path: APP_ROUTES.RESTAURANT_DETAIL.slice(1),
+        element: <RestaurantDetailPage />,
       },
       {
         path: 'profile',

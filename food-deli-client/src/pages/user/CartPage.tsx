@@ -155,7 +155,7 @@ export const CartPage: React.FC = () => {
             </div>
             <div className="flex flex-col min-w-0 ml-space-xs">
               <h1 className="font-headline-sm text-headline-sm text-on-surface truncate leading-tight">
-                Order Basket
+                Giỏ hàng
               </h1>
               <div className="flex items-center gap-1 text-on-surface-variant truncate">
                 <span className="material-symbols-outlined text-[14px] text-primary">storefront</span>
@@ -221,7 +221,7 @@ export const CartPage: React.FC = () => {
                 <span>•</span>
                 <button
                   type="button"
-                  onClick={() => navigate(APP_ROUTES.HOME)}
+                  onClick={() => navigate(APP_ROUTES.EXPLORE)}
                   className="text-primary font-label-md hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                 >
                   Thêm món khác

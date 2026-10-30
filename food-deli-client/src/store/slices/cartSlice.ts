@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { storage } from '@/utils/storage';
 import { STORAGE_KEYS } from '@/constants';
+import { buildMockCartState } from '@/data/mockCart';
 
 export interface CartItem {
   id: string; // unique item id (productId + topping combo)
@@ -24,13 +25,8 @@ export interface CartState {
 
 const savedCart = storage.get<CartState>(STORAGE_KEYS.CART);
 
-const initialState: CartState = savedCart || {
-  items: [],
-  shopId: null,
-  shopName: null,
-  totalQuantity: 0,
-  totalAmount: 0,
-};
+const initialState: CartState =
+  savedCart && savedCart.items?.length > 0 ? savedCart : buildMockCartState();
 
 const calculateTotals = (items: CartItem[]) => {
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
