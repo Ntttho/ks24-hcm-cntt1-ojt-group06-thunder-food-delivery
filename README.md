@@ -1,55 +1,72 @@
 # 🍔 Food Thunder Deli (ShopeeFood / GrabFood Clone 4.0)
 
-Hệ thống đặt & giao đồ ăn trực tuyến chuẩn doanh nghiệp theo tài liệu đặc tả [Srs.md](file:///d:/ojt-food-deli/Srs.md).
+Hệ thống đặt & giao đồ ăn trực tuyến chuẩn doanh nghiệp theo tài liệu đặc tả [Srs.md](Srs.md).
 
 ---
 
-## 🏛️ Kiến trúc Hệ thống Hiện tại (Production Tech Stack)
+## 🏛️ Kiến trúc Hệ thống Hiện tại (Production Microservices Tech Stack)
 
 | Thành phần | Thư mục chính | Công nghệ sử dụng | Cổng mặc định (Port) |
 | :--- | :--- | :--- | :---: |
-| **Backend Chính** | [`grab-food-springboot/`](file:///d:/ojt-food-deli/nhom-17-dam-bao-chat-luong-phan-mem/shoopeFood-clone-main/grab-food-springboot) | **Java 21**, **Spring Boot 3.3.5**, Spring Security 6 (JWT + BCrypt), Spring Data JPA, Hibernate, MySQL 8.0, OpenAPI Swagger | `3000` |
-| **Frontend Chính** | [`client/fe-flash-food/`](file:///d:/ojt-food-deli/nhom-17-dam-bao-chat-luong-phan-mem/shoopeFood-clone-main/client/fe-flash-food) | **React 19**, **TypeScript**, Vite 6, Tailwind CSS, Framer Motion, Lucide Icons, Sonner | `5173` |
-| **Container & CI/CD** | [`docker-compose.yml`](file:///d:/ojt-food-deli/nhom-17-dam-bao-chat-luong-phan-mem/shoopeFood-clone-main/docker-compose.yml) | Docker Compose 3-Container (MySQL 8 + Spring Boot + Nginx React), GitHub Actions CI | `80` (Web) / `3000` (API) |
-
-> ℹ️ *Ghi chú:* Toàn bộ mã nguồn cũ (`grab-food-monolith` Node.js và `client/fe_fegrapfood`) đã được dọn dẹp và loại bỏ hoàn toàn. Hệ thống chính thức duy nhất hiện tại gồm **`grab-food-springboot`** (Backend) và **`client/fe-flash-food`** (Frontend React TypeScript).
+| **Web Frontend** | [`food-deli-client/`](food-deli-client/) | **React 19**, **TypeScript**, Vite 6, Tailwind CSS, Nginx Reverse Proxy | `80` (hoặc cấu hình tùy ý) |
+| **API Gateway** | [`food-deli-service/api-gateway/`](food-deli-service/api-gateway/) | **Spring Cloud Gateway**, JWT Filter, Dynamic Load Balancing (`lb://`) | `8080` |
+| **Discovery Service** | [`food-deli-service/discovery-service/`](food-deli-service/discovery-service/) | **Netflix Eureka Server**, Service Registry & Discovery Dashboard | `8761` |
+| **Config Server** | [`food-deli-service/config-server/`](food-deli-service/config-server/) | **Spring Cloud Config Server**, Centralized Configuration | `8888` |
+| **Auth & User Service** | [`food-deli-service/auth-service/`](food-deli-service/auth-service/) | **Spring Boot 3.3.5**, Spring Security 6 (JWT + BCrypt), JPA | `8081` |
+| **Restaurant & Catalog** | [`food-deli-service/restaurant-service/`](food-deli-service/restaurant-service/) | **Spring Boot 3.3.5**, JPA, Hibernate, Catalog, Toppings, Vouchers | `8082` |
+| **Cơ sở dữ liệu** | [`database/seed_all.sql`](database/seed_all.sql) | **MySQL 8.0**, Auto-seed schema & sample data, Named Volume | `3306` |
 
 ---
 
-## 🚀 Hướng Dẫn Khởi Chạy Toàn Bộ Hệ Thống
+## 🚀 Hướng Dẫn Khởi Chạy Toàn Bộ Hệ Thống (Deploy Lên Server)
 
-### Cách 1: Khởi chạy bằng Docker Compose (Khuyên dùng - 1 lệnh duy nhất)
+> 📖 **Xem tài liệu hướng dẫn đầy đủ từ A-Z tại:** [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) (Bao gồm cài đặt Docker, mở Firewall UFW, tạo Swap RAM, cấu hình .env, sao lưu database và xử lý sự cố).
+
+### Cách 1: Khởi chạy bằng Docker Compose (Khuyên dùng khi đẩy lên Server)
+
+Chỉ cần cài đặt **Docker** & **Docker Compose** trên máy chủ (Linux / Ubuntu / Debian / VPS):
 
 ```bash
-docker compose up --build -d
+# 1. Tạo file cấu hình môi trường từ template
+cp .env.example .env
+
+# 2. Khởi chạy toàn bộ hệ thống (Frontend + 5 Microservices + MySQL)
+docker compose up -d --build
 ```
-- **Web Frontend (Nginx):** `http://localhost` (Port 80)
-- **Backend API (Spring Boot):** `http://localhost:3000`
-- **Tài liệu API (Swagger UI):** `http://localhost:3000/swagger-ui.html`
-- **Cơ sở dữ liệu (MySQL 8):** `localhost:3306` (`grabfood_db`, tự động nạp `seed_all.sql` hoặc nạp thủ công bằng DBeaver - xem chi tiết tại [food-deli-service/README.md](file:///d:/ojt-food-deli-start/food-deli-service/README.md#hướng-dẫn-sử-dụng-dbeaver-quản-lý-database--import-seed-data))
+
+#### Các cổng và đường dẫn dịch vụ:
+- **Web Frontend (React UI):** `http://<SERVER_IP>` (Cổng 80)
+- **API Gateway (Swagger & API):** `http://<SERVER_IP>:8080`
+- **Eureka Service Registry Dashboard:** `http://<SERVER_IP>:8761`
+- **Spring Cloud Config Server:** `http://<SERVER_IP>:8888`
+- **Cơ sở dữ liệu MySQL 8:** `<SERVER_IP>:3306` (Database: `grabfood_db`, tự động nạp `seed_all.sql` vào volume `mysql_data`)
 
 ---
 
-### Cách 2: Khởi chạy Trực tiếp trên máy Local
+### Cách 2: Khởi chạy Trực tiếp trên máy Local (Development)
 
-#### 1. Khởi động Backend (Spring Boot 3.3.5)
-Đảm bảo MySQL server local đang chạy với mật khẩu cấu hình trong `application.yml` (mặc định `root / 123456`).
+#### 1. Khởi động Backend (Spring Boot 3.3.5 Microservices)
+Khởi động theo thứ tự:
+1. `discovery-service` (Port 8761)
+2. `config-server` (Port 8888)
+3. `api-gateway` (Port 8080)
+4. `auth-service` (Port 8081) & `restaurant-service` (Port 8082)
 
 ```powershell
-cd grab-food-springboot
-.\mvnw.cmd spring-boot:run
+cd food-deli-service
+.\mvnw.cmd clean package -DskipTests
+.\mvnw.cmd -pl discovery-service spring-boot:run
 ```
-> Server sẽ khởi động tại `http://localhost:3000`.
 
 #### 2. Khởi động Frontend (React 19 + TypeScript + Vite)
 Mở một terminal mới:
 
 ```powershell
-cd client/fe-flash-food
+cd food-deli-client
 npm install
 npm run dev
 ```
-> Giao diện sẽ hiển thị tại `http://localhost:5173`, tự động kết nối vào Backend tại `http://localhost:3000/api`.
+> Giao diện sẽ hiển thị tại `http://localhost:3000`, tự động kết nối vào API Gateway tại `http://localhost:8080/api/v1`.
 
 ---
 

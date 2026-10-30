@@ -1,0 +1,226 @@
+# ==============================================================================
+# Food Thunder Deli - Unified Production Docker Compose
+# Architecture: React 19 Frontend + Spring Boot 3 Microservices + MySQL 8.0
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 0. MySQL 8.0 Database (Shared Relational Store)
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: ft-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-grabfood_db}"
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/seed_all.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  # ----------------------------------------------------------------------------
+  # 1. Discovery Service (Netflix Eureka Registry - Port 8761)
+  # ----------------------------------------------------------------------------
+  discovery-service:
+    build:
+      context: ./food-deli-service
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: discovery-service
+    container_name: ft-discovery-service
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
+    environment:
+      - EUREKA_INSTANCE_HOSTNAME=discovery-service
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 35s
+
+  # ----------------------------------------------------------------------------
+  # 2. Config Server (Spring Cloud Centralized Configuration - Port 8888)
+  # ----------------------------------------------------------------------------
+  config-server:
+    build:
+      context: ./food-deli-service
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: config-server
+    container_name: ft-config-server
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=native
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 35s
+
+  # ----------------------------------------------------------------------------
+  # 3. API Gateway (Dynamic Client-Side Routing & JWT Filter - Port 8080)
+  # ----------------------------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./food-deli-service
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: api-gateway
+    container_name: ft-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 35s
+
+  # ----------------------------------------------------------------------------
+  # 4. Auth & User Service (Port 8081)
+  # ----------------------------------------------------------------------------
+  auth-service:
+    build:
+      context: ./food-deli-service
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: auth-service
+    container_name: ft-auth-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 35s
+
+  # ----------------------------------------------------------------------------
+  # 5. Restaurant & Catalog Service (Port 8082)
+  # ----------------------------------------------------------------------------
+  restaurant-service:
+    build:
+      context: ./food-deli-service
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: restaurant-service
+    container_name: ft-restaurant-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_HOST=discovery-service
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE:-grabfood_db}
+      - DB_USERNAME=root
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-root}
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 35s
+
+  # ----------------------------------------------------------------------------
+  # 6. Food Deli Client (React 19 + TypeScript + Nginx - Port 80)
+  # ----------------------------------------------------------------------------
+  food-deli-client:
+    build:
+      context: ./food-deli-client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_APP_TITLE: "Thunder Food Delivery"
+    container_name: ft-client
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-80}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - foodthunder-network
+
+# ------------------------------------------------------------------------------
+# Persistent Volumes & Network Definitions
+# ------------------------------------------------------------------------------
+volumes:
+  mysql_data:
+    name: ft_mysql_data
+    driver: local
+
+networks:
+  foodthunder-network:
+    name: foodthunder-microservices-net
+    driver: bridge
+

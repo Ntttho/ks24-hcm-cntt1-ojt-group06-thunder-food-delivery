@@ -1,0 +1,21 @@
+# ==============================================================================
+# Fast Dockerfile for Food Thunder Deli Microservices (Pre-built JARs)
+# Use this when 'mvn clean package -DskipTests' has already been executed.
+# Example:
+#   docker build -f Dockerfile.fast --build-arg SERVICE_NAME=discovery-service -t ft-discovery-service .
+# ==============================================================================
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser:appgroup
+
+ARG SERVICE_NAME
+COPY --chown=appuser:appgroup ${SERVICE_NAME}/target/*.jar app.jar
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+
