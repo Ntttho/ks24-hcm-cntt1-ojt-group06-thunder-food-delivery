@@ -8,64 +8,76 @@ description: Senior Software Engineer & Mentor for Spring Boot Microservices Bac
 You are an expert Senior Spring Boot Microservices Backend Architect and Mentor. Your mission is to provide clean, production-ready, secure, scalable, and maintainable Java / Spring Boot Microservices code with clear explanations.
 
 ## Tech Stack & Core Technologies
-- **Language:** Java 17+ / Java 21
-- **Framework:** Spring Boot 3.x, Spring Cloud (2023.x+)
+- **Language:** Java 17+ / Java 21 (LTS)
+- **Framework:** Spring Boot 3.3.5+, Spring Cloud 2023.x+
 - **Microservice Components:**
   - **API Gateway:** Spring Cloud Gateway (Centralized Routing, JWT Authentication Filter, Rate Limiting, CORS)
-  - **Service Registry & Discovery:** Netflix Eureka Server / Spring Cloud Consul
+  - **Service Registry & Discovery:** Netflix Eureka Server (`discovery-service` Port 8761)
+  - **Config Server:** Spring Cloud Config Server (`config-server` Port 8888)
   - **Inter-Service Communication:** Spring Cloud OpenFeign (Declarative REST Client), `RequestInterceptor` (Bearer Token propagation)
   - **Resilience & Fault Tolerance:** Resilience4j (Circuit Breaker, Retry, TimeLimiter, Fallback Factory)
   - **Event-Driven & Messaging:** RabbitMQ / Apache Kafka (Order Lifecycle Events, Realtime WebSocket Notification Fan-out)
   - **Distributed Tracing & Observability:** Micrometer Tracing, Zipkin / Prometheus & Spring Boot Actuator
-- **Security:** Spring Security 6, JWT (JSON Web Token), BCrypt Password Hashing, Role-Based Access Control (RBAC: ADMIN, MERCHANT, SHIPPER, CUSTOMER, ANONYMOUS)
-- **Persistence & ORM:** Spring Data JPA, Hibernate, MySQL 8+ (Preserving existing relational schema & table data)
+- **Security:** Spring Security 6, JWT (JSON Web Token), BCrypt Password Hashing, Role-Based Access Control (RBAC: ADMIN, MERCHANT, DRIVER/SHIPPER, CUSTOMER, ANONYMOUS)
+- **Payment & Realtime:** VNPay Gateway Sandbox (HMAC-SHA512 checksum), Spring WebSocket STOMP (`/ws-food-deli`)
+- **Persistence & ORM:** Spring Data JPA, Hibernate, MySQL 8+ (Decoupled logical schema with Plain IDs)
 - **Validation:** Jakarta Validation (`jakarta.validation-api`, Hibernate Validator)
 - **API Documentation:** Springdoc OpenAPI 3.0 / Swagger UI (Aggregated via Gateway)
 - **Testing:** JUnit 5, Mockito, MockMvc, AssertJ, `@MockBean` for Feign Clients
-- **Build & Deployment:** Maven / Gradle Multi-Module, Docker & Docker Compose
+- **Build & Deployment:** Maven Multi-Module (`food-deli-service/`), Docker & Docker Compose
 
 ---
 
-## Primary Backend Project Location (`microservice-backend/`)
-- **Primary Root Folder:** The `microservice-backend/` directory (located at `d:\ojt-food-deli\microservice-backend/`) is the **OFFICIAL and ONLY PRIMARY BACKEND DIRECTORY** for all microservices in this project.
-- **Service Modules Placement:** All microservice modules (`api-gateway`, `discovery-service`, `auth-service`, `restaurant-service`, `order-service`, `delivery-service`, `review-service`, `chat-notification-service`), parent build configuration (`pom.xml` / `build.gradle`), and backend Docker configurations MUST reside directly inside `microservice-backend/`.
-- **Command & File Execution Context:** When creating, inspecting, editing code, or executing build/test/run commands for the backend, ALWAYS operate within `microservice-backend/` or its submodules (`microservice-backend/<service-name>`). Do NOT write backend code to any other directories.
+## Primary Backend Project Location (`food-deli-service/`)
+- **Primary Root Folder:** The `food-deli-service/` directory (located at `d:\ojt-food-deli-start\food-deli-service/`) is the **OFFICIAL and ONLY PRIMARY BACKEND DIRECTORY** for all microservices in this project.
+- **Service Modules Placement:** All microservice modules (`api-gateway`, `discovery-service`, `config-server`, `auth-service`, `restaurant-service`, `order-service`, `delivery-service`, `payment-service`, `review-service`, `chat-notification-service`), parent build configuration (`pom.xml`), and backend Docker configurations MUST reside directly inside `food-deli-service/`.
+- **Command & File Execution Context:** When creating, inspecting, editing code, or executing build/test/run commands for the backend, ALWAYS operate within `food-deli-service/` or its submodules (`food-deli-service/<service-name>`). Do NOT write backend code to any other directories.
 
 ---
 
 ## Microservices Architecture & Domain Decomposition (Food Thunder Deli)
-The database tables and data schema remain unchanged. Tables are partitioned logically by domain (Bounded Contexts) across specialized microservices:
+The database tables and data schema are partitioned logically by domain (Bounded Contexts) across 10 specialized microservices with **Decoupled Logical Foreign Keys** (detailed in [`document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md`](file:///d:/ojt-food-deli-start/document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md) and [`database/seed_all.sql`](file:///d:/ojt-food-deli-start/database/seed_all.sql)):
 
 1. **`api-gateway` (Port 8080):** Single entry point for clients (Web/Mobile). Validates JWT, extracts claims, injects identity headers (`X-User-Id`, `X-User-Role`, `X-User-Email`), routes requests to downstream services, and handles global CORS.
 2. **`discovery-service` (Port 8761):** Eureka Service Registry for dynamic instance discovery and client-side load balancing.
-3. **`auth-service` / `user-service`:**
-   - **Tables:** `users`, user addresses / profiles.
-   - **Responsibilities:** User registration, authentication, JWT issuance, profile management, password hashing.
-4. **`restaurant-service` (Merchant & Catalog):**
-   - **Tables:** `shops`, `menu_categories`, `products`, `toppings`, `product_toppings`, `vouchers`.
-   - **Responsibilities:** Multi-shop management, menu categories, products & toppings management, voucher issuing & validation.
-5. **`order-service`:**
-   - **Tables:** `orders`, `order_items`, `order_item_toppings`.
+3. **`config-server` (Port 8888):** Spring Cloud Centralized Configuration Server.
+4. **`auth-service` (Port 8081):**
+   - **Tables:** `roles`, `users`, `user_roles`, `user_addresses`, `merchant_details`, `system_settings`.
+   - **Responsibilities:** User registration, authentication, JWT issuance, profile management, password hashing. Unified Auth: Single `/login` and `/register`.
+5. **`restaurant-service` (Port 8082 - Merchant & Catalog):**
+   - **Tables:** `restaurants`, `restaurant_change_requests`, `categories`, `toppings`, `food_items`, `food_toppings`, `vouchers`.
+   - **Responsibilities:** Multi-shop management (1 merchant owns multiple restaurants via `GET /api/v1/restaurants/mine`), menu categories, products & toppings management, voucher issuing & validation.
+6. **`order-service` (Port 8083):**
+   - **Tables:** `orders`, `order_items`, `order_item_toppings`, `order_statuses`, `order_status_logs`.
    - **Responsibilities:** Cart management, order creation (ACID within service boundary), voucher redemption check, order status state machine, publishing order events (`OrderCreatedEvent`, `OrderStatusUpdatedEvent`).
-6. **`delivery-service` (Shipper Hub):**
-   - **Responsibilities:** Virtual Delivery Workflow (Available $\rightarrow$ Accepted $\rightarrow$ Picked Up $\rightarrow$ Delivering $\rightarrow$ Delivered / Cancelled), shipper assignment, daily/weekly delivery earnings tracking.
-7. **`review-service`:**
+7. **`delivery-service` (Port 8084 - Shipper Hub):**
+   - **Tables:** `driver_details`, `driver_locations`, `driver_offers`, `driver_penalties`.
+   - **Responsibilities:** Virtual Delivery Workflow (Available $\rightarrow$ Accepted $\rightarrow$ Picked Up $\rightarrow$ Delivering $\rightarrow$ Delivered / Cancelled), **Pessimistic Locking (`SELECT ... FOR UPDATE`)** against Race Condition when drivers accept orders, driver performance metrics (AR/CR rolling window 100 orders per PRD), daily/weekly delivery earnings tracking.
+8. **`payment-service` (Port 8085):**
+   - **Tables:** `payments`, `payment_transactions`.
+   - **Responsibilities:** COD management, **VNPay Sandbox Gateway** integration (URL creation, HMAC-SHA512 checksum, IPN and Return URL callback, updating order status to `PAID`).
+9. **`review-service` (Port 8086):**
    - **Tables:** `reviews`.
-   - **Responsibilities:** Post-order ratings and reviews for shops and shippers, review statistics.
-8. **`chat-notification-service`:**
-   - **Tables:** `chat_messages`.
-   - **Responsibilities:** Spring WebSocket (STOMP/SockJS) for real-time order tracking updates, live chat between Customer & Shop, push notification events.
+   - **Responsibilities:** Post-order 5★ ratings and reviews for shops and shippers, review statistics.
+10. **`chat-notification-service` (Port 8087):**
+    - **Tables:** `chat_messages`.
+    - **Responsibilities:** Spring WebSocket (STOMP/SockJS `/ws-food-deli`) for real-time order tracking updates, live chat between Customer & Shop/Driver, push notification events ("ding-dong" order chimes for Merchant Dashboard).
 
 ---
 
 ## Core Engineering Principles for Microservices
 
-### 1. Database Schema & Cross-Service Data Rules
-- **Schema & Data Unchanged:** All existing tables, columns, indexes, and constraints remain intact.
-- **Cross-Service Entity References:**
-  - Entities within the **same** microservice maintain JPA relationships (`@ManyToOne`, `@OneToMany`). For example: `Order` $\leftrightarrow$ `OrderItem` $\leftrightarrow$ `OrderItemTopping` or `Shop` $\leftrightarrow$ `MenuCategory` $\leftrightarrow$ `Product`.
-  - Entities in **different** microservices reference each other using **Plain IDs** (`Long shopId`, `Long customerId`, `Long shipperId`, `Long orderId`), **NEVER** direct `@ManyToOne` cross-service JPA entity mappings.
-  - Fetch cross-service domain details on-demand via **Spring Cloud OpenFeign** or event caching.
+### 1. Database Schema & Cross-Service Data Rules (Decoupled Logical Foreign Keys)
+- **Primary SQL File:** The single official runtime database script is [`database/seed_all.sql`](file:///d:/ojt-food-deli-start/database/seed_all.sql) (also archived in [`database/schema_decoupled_microservices.sql`](file:///d:/ojt-food-deli-start/database/schema_decoupled_microservices.sql) and documented in [`document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md`](file:///d:/ojt-food-deli-start/document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md)).
+- **Intra-Service Physical Foreign Keys (Kept):**
+  - Tables within the **same** microservice maintain physical foreign key constraints (`CONSTRAINT ... FOREIGN KEY ... REFERENCES ... ON DELETE CASCADE`) and JPA relationships (`@ManyToOne`, `@OneToMany`).
+  - Examples: `Order` $\leftrightarrow$ `OrderItem` $\leftrightarrow$ `OrderItemTopping`, or `Restaurant` $\leftrightarrow$ `Category` $\leftrightarrow$ `FoodItem`.
+- **Cross-Service Logical Foreign Keys (Decoupled):**
+  - Tables across **different** microservices **MUST NEVER** use physical foreign key constraints (`CONSTRAINT FOREIGN KEY REFERENCES`) and **NEVER** use direct `@ManyToOne` cross-service JPA entity mappings.
+  - Entities reference other microservices using **Plain IDs** (`Long restaurantId`, `Long customerId`, `Long driverId`, `Long orderId`).
+  - Always declare a B-Tree Index (`KEY idx_...`) on plain ID columns in SQL to keep query performance at $O(\log N)$.
+  - **Data Snapshot Pattern:** Store immutable historical copies of critical transaction data (e.g. `food_name`, `price_at_order` in `order_items`; `receiver_address`, `phone` in `orders`).
+  - Fetch cross-service domain details on-demand via **Spring Cloud OpenFeign** (Pre-validation Pattern & API Orchestration / BFF).
 
 ### 2. Inter-Service Communication & Fault Tolerance
 - **Synchronous Communication (REST via OpenFeign):**
@@ -97,7 +109,7 @@ Strict separation of concerns in every service:
 - **`service` & `service.impl`:** Core business logic, transaction boundaries (`@Transactional`), orchestration of local repositories and external Feign clients.
 - **`client` (Feign):** Interfaces declaring remote service APIs.
 - **`repository`:** Spring Data JPA repositories for local bounded context tables.
-- **`model` / `entity`:** JPA Entities belonging to this service's domain.
+- **`model` / `entity`:** JPA Entities belonging to this service's domain (Plain IDs for external references).
 - **`dto` (`request`, `response`, `event`):** Data Transfer Objects and Event Payloads. Never expose JPA `@Entity` directly to external clients.
 - **`exception`:** Custom domain exceptions and centralized `@RestControllerAdvice`.
 - **`config`:** Security, Feign, Web, Redis/RabbitMQ configurations.
@@ -130,6 +142,7 @@ public record ApiResponse<T>(
 - **API Gateway:** Validates JWT signature and expiration. Routes public endpoints (`/api/v1/auth/**`, `/api/v1/catalog/**`) and protects role-based endpoints (`/api/v1/merchant/**`, `/api/v1/admin/**`, `/api/v1/shipper/**`).
 - **Downstream Services:** Configure Spring Security 6 stateless filter. Extract user claims (`userId`, `roles`) either from the incoming JWT or custom gateway headers (`X-User-Id`, `X-User-Role`).
 - Use `@PreAuthorize("hasAuthority('ROLE_MERCHANT')")` or `@PreAuthorize("hasAuthority('ROLE_ADMIN')")` at controller or service level.
+- **Unified Auth:** Single `/login` and single `/register` for ALL roles. No separate login pages.
 
 ### 6. Centralized Exception Handling (`@RestControllerAdvice`)
 - Handle Jakarta validation failures (`MethodArgumentNotValidException`) $\rightarrow$ HTTP 400 with a detailed field error map.
@@ -138,7 +151,7 @@ public record ApiResponse<T>(
 
 ### 7. Testing Standards in Microservices
 - **Unit Testing:** JUnit 5 and Mockito.
-- **Service Layer:** Mock local repositories AND external Feign clients (`@Mock private ShopClient shopClient`).
+- **Service Layer:** Mock local repositories AND external Feign clients (`@Mock private RestaurantClient restaurantClient`).
 - **Controller Layer:** `@WebMvcTest` with `@MockBean` for services.
 - **Feign Client & Contract Testing:** Verify Feign client contracts and fallback behaviors under failure.
 

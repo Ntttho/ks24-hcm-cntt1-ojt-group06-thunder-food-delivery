@@ -101,8 +101,9 @@ Toàn bộ 26 bảng trong file SQL gốc [`database/seed_all.sql`](file:///d:/o
 | **`chat-notification-service`** | `chat_messages` | `ChatMessage.java` | `ChatController.java` |
 
 > ⚠️ **NGUYÊN TẮC LIÊN KẾT BẢNG GIỮA CÁC MICROSERVICES:**
-> - Trong **cùng một service**: Giữ nguyên quan hệ JPA (`@ManyToOne`, `@OneToMany`, `@ManyToMany`). Ví dụ: `Order` $\leftrightarrow$ `OrderItem` $\leftrightarrow$ `OrderItemTopping`.
-> - **Giữa các service khác nhau**: **TUYỆT ĐỐI KHÔNG** dùng `@ManyToOne` hay Join Table. Chỉ lưu **Plain ID** (`Long customerId`, `Long restaurantId`, `Long driverId`, `Long orderId`). Dữ liệu chi tiết cần hiển thị sẽ được truy vấn động qua **Spring Cloud OpenFeign** hoặc mang theo trong Event.
+> - Trong **cùng một service**: Giữ nguyên quan hệ JPA (`@ManyToOne`, `@OneToMany`, `@ManyToMany`) và Foreign Key vật lý (`ON DELETE CASCADE`). Ví dụ: `Order` $\leftrightarrow$ `OrderItem` $\leftrightarrow$ `OrderItemTopping`.
+> - **Giữa các service khác nhau**: **TUYỆT ĐỐI KHÔNG** dùng `@ManyToOne`, `@JoinColumn` hay Foreign Key vật lý. Chỉ lưu **Plain ID** (`Long customerId`, `Long restaurantId`, `Long driverId`, `Long orderId`) kèm **INDEX B-Tree** (`KEY idx_...`). Dữ liệu chi tiết cần hiển thị sẽ được truy vấn động qua **Spring Cloud OpenFeign** hoặc mang theo trong Event.
+> - Chi tiết phân rã và kịch bản SQL đã tách rời: xem tài liệu [`document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md`](file:///d:/ojt-food-deli-start/document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md) và file SQL [`database/schema_decoupled_microservices.sql`](file:///d:/ojt-food-deli-start/database/schema_decoupled_microservices.sql).
 
 ---
 

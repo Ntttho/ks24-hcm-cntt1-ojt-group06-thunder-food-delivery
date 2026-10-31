@@ -1,9 +1,8 @@
 -- =================================================================================
--- GRABFOOD_DB - PRODUCTION BACKUP & SEED SCRIPT (Spring Boot 3 + MySQL 8)
--- Version: 3.0.0
--- Generated: 2026-10-22
--- Compatible with: Spring Boot 3.3.5 JPA Entities, React 19 Frontend, Docker Compose
--- Character Set: utf8mb4 / Collation: utf8mb4_unicode_ci
+-- FOOD THUNDER DELI - MICROSERVICES DECOUPLED DATABASE SCHEMA & SEED SCRIPT
+-- Version: 4.0.0 (Decoupled Logical Foreign Keys Architecture)
+-- Target: Spring Boot 3 Microservices + MySQL 8.0
+-- Architecture: Domain-Driven Design (DDD) - Plain IDs & Logical References
 -- =================================================================================
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
@@ -19,7 +18,7 @@ CREATE DATABASE IF NOT EXISTS `grabfood_db`
 USE `grabfood_db`;
 
 -- ---------------------------------------------------------------------------------
--- DROP EXISTING TABLES IN REVERSE DEPENDENCY ORDER
+-- DROP EXISTING TABLES
 -- ---------------------------------------------------------------------------------
 DROP TABLE IF EXISTS `chat_messages`;
 DROP TABLE IF EXISTS `reviews`;
@@ -49,7 +48,7 @@ DROP TABLE IF EXISTS `roles`;
 DROP TABLE IF EXISTS `users`;
 
 -- =================================================================================
--- 1. CORE AUTHENTICATION & RBAC (roles, users, user_roles, user_addresses)
+-- 📦 MODULE 1: AUTH-SERVICE (Identity, Roles, Addresses & Merchant Profiles)
 -- =================================================================================
 
 CREATE TABLE `roles` (
@@ -71,6 +70,7 @@ CREATE TABLE `users` (
   UNIQUE KEY `uniq_users_phone` (`phone`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ auth-service: Giữ Physical FK
 CREATE TABLE `user_roles` (
   `user_id` INT NOT NULL,
   `role_id` INT NOT NULL,
@@ -80,6 +80,7 @@ CREATE TABLE `user_roles` (
   CONSTRAINT `fk_user_roles_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ auth-service: Giữ Physical FK
 CREATE TABLE `user_addresses` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `user_id` INT NOT NULL,
@@ -94,18 +95,7 @@ CREATE TABLE `user_addresses` (
   CONSTRAINT `fk_user_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `driver_details` (
-  `user_id` INT NOT NULL,
-  `license_plate` VARCHAR(20) DEFAULT NULL,
-  `id_card_number` VARCHAR(20) DEFAULT NULL,
-  `vehicle_type` VARCHAR(50) DEFAULT NULL,
-  `approval_status` VARCHAR(20) DEFAULT 'PENDING',
-  `reject_reason` TEXT,
-  `is_online` TINYINT(1) DEFAULT '0',
-  PRIMARY KEY (`user_id`),
-  CONSTRAINT `fk_driver_details_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+-- Quan hệ NỘI BỘ auth-service: Giữ Physical FK
 CREATE TABLE `merchant_details` (
   `user_id` INT NOT NULL,
   `business_license` VARCHAR(100) DEFAULT NULL,
@@ -113,10 +103,6 @@ CREATE TABLE `merchant_details` (
   PRIMARY KEY (`user_id`),
   CONSTRAINT `fk_merchant_details_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =================================================================================
--- 2. SYSTEM CONFIG & PROMOTIONS (system_settings, vouchers)
--- =================================================================================
 
 CREATE TABLE `system_settings` (
   `id` INT NOT NULL AUTO_INCREMENT,
@@ -127,24 +113,14 @@ CREATE TABLE `system_settings` (
   UNIQUE KEY `uniq_system_settings_config_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE `vouchers` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `code` VARCHAR(20) NOT NULL,
-  `discount_amount` DECIMAL(10,2) NOT NULL,
-  `min_order_value` DECIMAL(10,2) DEFAULT '0.00',
-  `expiry_date` DATETIME DEFAULT NULL,
-  `is_active` TINYINT(1) DEFAULT '1',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_vouchers_code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 -- =================================================================================
--- 3. RESTAURANTS & MENU (restaurants, change_requests, categories, toppings, food_items)
+-- 🏪 MODULE 2: RESTAURANT-SERVICE (Shops, Menus, Food Items, Toppings, Vouchers)
 -- =================================================================================
 
+-- ĐÃ TÁCH LOGIC: owner_id và approved_by chỉ lưu Plain ID trỏ sang auth-service
 CREATE TABLE `restaurants` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `owner_id` INT NOT NULL,
+  `owner_id` INT NOT NULL,                -- [Logical FK] trỏ sang auth-service: users.id
   `name` VARCHAR(255) NOT NULL,
   `address` TEXT,
   `latitude` DOUBLE NOT NULL DEFAULT '0',
@@ -158,24 +134,23 @@ CREATE TABLE `restaurants` (
   `image_url` VARCHAR(255) DEFAULT NULL,
   `rating_avg` DECIMAL(3,2) DEFAULT '5.00',
   `approval_status` VARCHAR(20) DEFAULT 'APPROVED',
-  `approved_by` INT DEFAULT NULL,
+  `approved_by` INT DEFAULT NULL,         -- [Logical FK] trỏ sang auth-service: users.id
   `approved_at` DATETIME DEFAULT NULL,
   `reject_reason` TEXT,
   `deleted_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_restaurants_owner_id` (`owner_id`),
-  KEY `idx_restaurants_approved_by` (`approved_by`),
-  CONSTRAINT `fk_restaurants_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `fk_restaurants_approved_by` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`)
+  KEY `idx_restaurants_approved_by` (`approved_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: requested_by, reviewed_by là Logical FK; restaurant_id là Physical FK nội bộ
 CREATE TABLE `restaurant_change_requests` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT NOT NULL,
-  `requested_by` INT NOT NULL,
+  `requested_by` INT NOT NULL,            -- [Logical FK] trỏ sang auth-service: users.id
   `payload` JSON NOT NULL,
   `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-  `reviewed_by` INT DEFAULT NULL,
+  `reviewed_by` INT DEFAULT NULL,         -- [Logical FK] trỏ sang auth-service: users.id
   `reviewed_at` DATETIME DEFAULT NULL,
   `reject_reason` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -183,11 +158,10 @@ CREATE TABLE `restaurant_change_requests` (
   KEY `idx_change_requests_restaurant_id` (`restaurant_id`),
   KEY `idx_change_requests_requested_by` (`requested_by`),
   KEY `idx_change_requests_reviewed_by` (`reviewed_by`),
-  CONSTRAINT `fk_change_requests_restaurant` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_change_requests_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_change_requests_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_change_requests_restaurant` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ restaurant-service: Giữ Physical FK
 CREATE TABLE `categories` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT NOT NULL,
@@ -197,6 +171,7 @@ CREATE TABLE `categories` (
   CONSTRAINT `fk_categories_restaurant` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ restaurant-service: Giữ Physical FK
 CREATE TABLE `toppings` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT NOT NULL,
@@ -208,6 +183,7 @@ CREATE TABLE `toppings` (
   CONSTRAINT `fk_toppings_restaurant` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ restaurant-service: Giữ Physical FK
 CREATE TABLE `food_items` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `category_id` INT DEFAULT NULL,
@@ -227,6 +203,7 @@ CREATE TABLE `food_items` (
   CONSTRAINT `chk_food_items_current_qty` CHECK (`current_quantity` >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Quan hệ NỘI BỘ restaurant-service: Giữ Physical FK
 CREATE TABLE `food_toppings` (
   `food_id` INT NOT NULL,
   `topping_id` INT NOT NULL,
@@ -236,8 +213,19 @@ CREATE TABLE `food_toppings` (
   CONSTRAINT `fk_food_toppings_topping` FOREIGN KEY (`topping_id`) REFERENCES `toppings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `vouchers` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(20) NOT NULL,
+  `discount_amount` DECIMAL(10,2) NOT NULL,
+  `min_order_value` DECIMAL(10,2) DEFAULT '0.00',
+  `expiry_date` DATETIME DEFAULT NULL,
+  `is_active` TINYINT(1) DEFAULT '1',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_vouchers_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =================================================================================
--- 4. ORDER MANAGEMENT (order_statuses, orders, order_items, order_item_toppings)
+-- 📦 MODULE 3: ORDER-SERVICE (Order Fulfillment, Cart, State Machine, Audit Logs)
 -- =================================================================================
 
 CREATE TABLE `order_statuses` (
@@ -250,15 +238,16 @@ CREATE TABLE `order_statuses` (
   UNIQUE KEY `uniq_order_statuses_code` (`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: customer_id, restaurant_id, driver_id, voucher_id là Logical Plain IDs
 CREATE TABLE `orders` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_code` VARCHAR(50) NOT NULL,
   `idempotency_key` VARCHAR(100) NOT NULL,
-  `customer_id` INT NOT NULL,
-  `restaurant_id` INT NOT NULL,
-  `driver_id` INT DEFAULT NULL,
-  `voucher_id` INT DEFAULT NULL,
-  `receiver_address` TEXT,
+  `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
+  `restaurant_id` INT NOT NULL,           -- [Logical FK] trỏ sang restaurant-service: restaurants.id
+  `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
+  `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
+  `receiver_address` TEXT,                -- Snapshot dữ liệu lúc đặt đơn
   `receiver_lat` DOUBLE DEFAULT NULL,
   `receiver_lng` DOUBLE DEFAULT NULL,
   `distance_km` DOUBLE DEFAULT NULL,
@@ -267,11 +256,11 @@ CREATE TABLE `orders` (
   `shipping_fee` DECIMAL(10,2) DEFAULT NULL,
   `discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `total_amount` DECIMAL(10,2) DEFAULT NULL,
-  `status_id` INT NOT NULL,
-  `version` INT NOT NULL DEFAULT '0',
+  `status_id` INT NOT NULL,               -- [Physical FK] trỏ sang order_statuses nội bộ
+  `version` INT NOT NULL DEFAULT '0',     -- Optimistic Locking version
   `cancel_reason` TEXT,
   `cancelled_by_role` VARCHAR(20) DEFAULT NULL,
-  `cancelled_by_user_id` INT DEFAULT NULL,
+  `cancelled_by_user_id` INT DEFAULT NULL,-- [Logical FK] trỏ sang auth-service: users.id
   `cancelled_at` DATETIME DEFAULT NULL,
   `deleted_at` DATETIME DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -285,98 +274,73 @@ CREATE TABLE `orders` (
   KEY `idx_orders_status_id` (`status_id`),
   KEY `idx_orders_created_at` (`created_at`),
   KEY `idx_orders_cancelled_by_user_id` (`cancelled_by_user_id`),
-  CONSTRAINT `fk_orders_customer` FOREIGN KEY (`customer_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `fk_orders_restaurant` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`),
-  CONSTRAINT `fk_orders_driver` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `fk_orders_voucher` FOREIGN KEY (`voucher_id`) REFERENCES `vouchers` (`id`),
-  CONSTRAINT `fk_orders_status` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`),
-  CONSTRAINT `fk_orders_cancelled_by` FOREIGN KEY (`cancelled_by_user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_orders_status` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: food_id là Logical FK; order_id là Physical FK nội bộ
 CREATE TABLE `order_items` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_id` BIGINT NOT NULL,
-  `food_id` INT NOT NULL,
-  `food_name` VARCHAR(255) NOT NULL,
+  `food_id` INT NOT NULL,                 -- [Logical FK] trỏ sang restaurant-service: food_items.id
+  `food_name` VARCHAR(255) NOT NULL,      -- Snapshot tên món lúc đặt hàng
   `quantity` INT NOT NULL,
-  `price_at_order` DECIMAL(10,2) NOT NULL,
+  `price_at_order` DECIMAL(10,2) NOT NULL,-- Snapshot giá tiền lúc đặt hàng
   PRIMARY KEY (`id`),
   KEY `idx_order_items_order_id` (`order_id`),
   KEY `idx_order_items_food_id` (`food_id`),
   CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_order_items_food` FOREIGN KEY (`food_id`) REFERENCES `food_items` (`id`),
   CONSTRAINT `chk_order_items_quantity` CHECK (`quantity` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: topping_id là Logical FK; order_item_id là Physical FK nội bộ
 CREATE TABLE `order_item_toppings` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_item_id` BIGINT NOT NULL,
-  `topping_id` INT NOT NULL,
+  `topping_id` INT NOT NULL,              -- [Logical FK] trỏ sang restaurant-service: toppings.id
   `quantity` INT NOT NULL DEFAULT 1,
-  `price` DECIMAL(10,2) NOT NULL,
+  `price` DECIMAL(10,2) NOT NULL,         -- Snapshot giá topping lúc đặt hàng
   PRIMARY KEY (`id`),
   KEY `idx_order_item_toppings_order_item_id` (`order_item_id`),
   KEY `idx_order_item_toppings_topping_id` (`topping_id`),
-  CONSTRAINT `fk_oit_order_item` FOREIGN KEY (`order_item_id`) REFERENCES `order_items` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_oit_topping` FOREIGN KEY (`topping_id`) REFERENCES `toppings` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_oit_order_item` FOREIGN KEY (`order_item_id`) REFERENCES `order_items` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- =================================================================================
--- 5. PAYMENTS & AUDIT LOGS (payments, payment_transactions, order_status_logs)
--- =================================================================================
-
-CREATE TABLE `payments` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `order_id` BIGINT NOT NULL,
-  `idempotency_key` VARCHAR(100) NOT NULL,
-  `payment_method` ENUM('CASH','E_WALLET','CREDIT_CARD') NOT NULL,
-  `status` ENUM('PENDING','PROCESSING','SUCCESS','FAILED') DEFAULT 'PENDING',
-  `amount` DECIMAL(10,2) NOT NULL,
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_payments_order_id` (`order_id`),
-  UNIQUE KEY `uniq_payments_idempotency_key` (`idempotency_key`),
-  CONSTRAINT `fk_payments_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `payment_transactions` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `payment_id` BIGINT NOT NULL,
-  `attempt_number` INT NOT NULL DEFAULT '1',
-  `status` ENUM('PENDING','PROCESSING','SUCCESS','FAILED','RETRYING') DEFAULT 'PENDING',
-  `transaction_ref` VARCHAR(100) DEFAULT NULL,
-  `gateway_response` JSON DEFAULT NULL,
-  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_payment_transactions_payment_id` (`payment_id`),
-  CONSTRAINT `fk_payment_transactions_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+-- ĐÃ TÁCH LOGIC: changed_by là Logical FK; order_id là Physical FK nội bộ
 CREATE TABLE `order_status_logs` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_id` BIGINT NOT NULL,
   `previous_status` VARCHAR(50) DEFAULT NULL,
   `new_status` VARCHAR(50) NOT NULL,
-  `changed_by` INT DEFAULT NULL,
+  `changed_by` INT DEFAULT NULL,          -- [Logical FK] trỏ sang auth-service: users.id
   `reason` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_order_status_logs_order_id` (`order_id`),
   KEY `idx_order_status_logs_changed_by` (`changed_by`),
-  CONSTRAINT `fk_order_status_logs_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_order_status_logs_changed_by` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`)
+  CONSTRAINT `fk_order_status_logs_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
--- 6. DRIVER TELEMETRY, DISPATCH & PENALTIES
+-- 🛵 MODULE 4: DELIVERY-SERVICE (Driver Telemetry, Dispatch Radar, Penalties)
 -- =================================================================================
 
+-- ĐÃ TÁCH LOGIC: user_id là Logical Plain ID trỏ sang auth-service
+CREATE TABLE `driver_details` (
+  `user_id` INT NOT NULL,                 -- [Logical FK] trỏ sang auth-service: users.id
+  `license_plate` VARCHAR(20) DEFAULT NULL,
+  `id_card_number` VARCHAR(20) DEFAULT NULL,
+  `vehicle_type` VARCHAR(50) DEFAULT NULL,
+  `approval_status` VARCHAR(20) DEFAULT 'PENDING',
+  `reject_reason` TEXT,
+  `is_online` TINYINT(1) DEFAULT '0',
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ĐÃ TÁCH LOGIC: driver_id và order_id là Logical Plain IDs
 CREATE TABLE `driver_locations` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `driver_id` INT NOT NULL,
-  `order_id` BIGINT DEFAULT NULL,
+  `driver_id` INT NOT NULL,               -- [Logical FK] trỏ sang auth-service: users.id
+  `order_id` BIGINT DEFAULT NULL,         -- [Logical FK] trỏ sang order-service: orders.id
   `latitude` DOUBLE NOT NULL,
   `longitude` DOUBLE NOT NULL,
   `heading` DOUBLE NOT NULL DEFAULT '0',
@@ -385,14 +349,14 @@ CREATE TABLE `driver_locations` (
   PRIMARY KEY (`id`),
   KEY `idx_driver_locations_driver_id` (`driver_id`),
   KEY `idx_driver_locations_order_id` (`order_id`),
-  KEY `idx_driver_locations_created_at` (`created_at`),
-  CONSTRAINT `fk_driver_locations_driver` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  KEY `idx_driver_locations_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: order_id và driver_id là Logical Plain IDs
 CREATE TABLE `driver_offers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `order_id` BIGINT NOT NULL,
-  `driver_id` INT NOT NULL,
+  `order_id` BIGINT NOT NULL,             -- [Logical FK] trỏ sang order-service: orders.id
+  `driver_id` INT NOT NULL,               -- [Logical FK] trỏ sang auth-service: users.id
   `status` VARCHAR(30) NOT NULL,
   `algorithm` VARCHAR(50) DEFAULT NULL,
   `search_radius_km` DOUBLE DEFAULT NULL,
@@ -408,13 +372,13 @@ CREATE TABLE `driver_offers` (
   `updated_at` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_driver_offers_order_id` (`order_id`),
-  KEY `idx_driver_offers_driver_id` (`driver_id`),
-  CONSTRAINT `fk_driver_offers_driver` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  KEY `idx_driver_offers_driver_id` (`driver_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ĐÃ TÁCH LOGIC: driver_id là Logical Plain ID
 CREATE TABLE `driver_penalties` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `driver_id` INT NOT NULL,
+  `driver_id` INT NOT NULL,               -- [Logical FK] trỏ sang auth-service: users.id
   `type` VARCHAR(30) NOT NULL,
   `status` VARCHAR(20) NOT NULL,
   `reason` TEXT,
@@ -423,36 +387,75 @@ CREATE TABLE `driver_penalties` (
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_driver_penalties_driver_id` (`driver_id`),
-  CONSTRAINT `fk_driver_penalties_driver` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  KEY `idx_driver_penalties_driver_id` (`driver_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
--- 7. REVIEWS & CHAT MESSAGES
+-- 💳 MODULE 5: PAYMENT-SERVICE (Transactions & Gateway Callbacks)
 -- =================================================================================
 
+-- ĐÃ TÁCH LOGIC: order_id là Logical Plain ID
+CREATE TABLE `payments` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `order_id` BIGINT NOT NULL,             -- [Logical FK] trỏ sang order-service: orders.id
+  `idempotency_key` VARCHAR(100) NOT NULL,
+  `payment_method` ENUM('CASH','E_WALLET','CREDIT_CARD') NOT NULL,
+  `status` ENUM('PENDING','PROCESSING','SUCCESS','FAILED') DEFAULT 'PENDING',
+  `amount` DECIMAL(10,2) NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_payments_order_id` (`order_id`),
+  UNIQUE KEY `uniq_payments_idempotency_key` (`idempotency_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Quan hệ NỘI BỘ payment-service: Giữ Physical FK
+CREATE TABLE `payment_transactions` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `payment_id` BIGINT NOT NULL,
+  `attempt_number` INT NOT NULL DEFAULT '1',
+  `status` ENUM('PENDING','PROCESSING','SUCCESS','FAILED','RETRYING') DEFAULT 'PENDING',
+  `transaction_ref` VARCHAR(100) DEFAULT NULL,
+  `gateway_response` JSON DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_payment_transactions_payment_id` (`payment_id`),
+  CONSTRAINT `fk_payment_transactions_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =================================================================================
+-- ⭐ MODULE 6: REVIEW-SERVICE (Ratings & Post-Order Feedback)
+-- =================================================================================
+
+-- ĐÃ TÁCH LOGIC: order_id, customer_id, target_id là Logical Plain IDs
 CREATE TABLE `reviews` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `order_id` BIGINT NOT NULL,
-  `customer_id` INT NOT NULL,
+  `order_id` BIGINT NOT NULL,             -- [Logical FK] trỏ sang order-service: orders.id
+  `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
   `target_type` ENUM('RESTAURANT','DRIVER') NOT NULL,
-  `target_id` INT NOT NULL,
+  `target_id` INT NOT NULL,               -- [Logical FK] trỏ sang restaurants.id hoặc users.id
   `rating` TINYINT DEFAULT NULL,
   `comment` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_order_target` (`order_id`, `target_type`),
+  KEY `idx_reviews_order_id` (`order_id`),
   KEY `idx_reviews_customer_id` (`customer_id`),
-  CONSTRAINT `fk_reviews_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_reviews_customer` FOREIGN KEY (`customer_id`) REFERENCES `users` (`id`),
+  KEY `idx_reviews_target` (`target_type`, `target_id`),
   CONSTRAINT `chk_reviews_rating` CHECK (`rating` BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- =================================================================================
+-- 💬 MODULE 7: CHAT-NOTIFICATION-SERVICE (Realtime STOMP WebSocket Messages)
+-- =================================================================================
+
+-- ĐÃ TÁCH LOGIC: sender_id, shop_id, order_id là Logical Plain IDs
 CREATE TABLE `chat_messages` (
   `id` INT NOT NULL AUTO_INCREMENT,
-  `sender_id` INT NOT NULL,
-  `shop_id` INT NOT NULL,
-  `order_id` INT DEFAULT NULL,
+  `sender_id` INT NOT NULL,               -- [Logical FK] trỏ sang auth-service: users.id
+  `shop_id` INT NOT NULL,                 -- [Logical FK] trỏ sang restaurant-service: restaurants.id
+  `order_id` INT DEFAULT NULL,            -- [Logical FK] trỏ sang order-service: orders.id
   `message` VARCHAR(1000) NOT NULL,
   `sender_role` VARCHAR(20) NOT NULL,
   `is_read` TINYINT(1) DEFAULT '0',
@@ -460,23 +463,21 @@ CREATE TABLE `chat_messages` (
   PRIMARY KEY (`id`),
   KEY `idx_chat_messages_sender_id` (`sender_id`),
   KEY `idx_chat_messages_shop_id` (`shop_id`),
-  KEY `idx_chat_messages_order_id` (`order_id`),
-  CONSTRAINT `fk_chat_messages_sender` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_chat_messages_shop` FOREIGN KEY (`shop_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE
+  KEY `idx_chat_messages_order_id` (`order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
--- 8. INITIAL DATA INSERTION (SEED DATA)
+-- 🚀 DATA SEEDING (DỮ LIỆU MẪU BAN ĐẦU - TỰ DO INSERT KHÔNG SỢ LỖI RÀNG BUỘC)
 -- =================================================================================
 
--- 8.1 Roles
+-- 1. Roles
 INSERT INTO `roles` (`id`, `name`) VALUES
 (1, 'CUSTOMER'),
 (2, 'DRIVER'),
 (3, 'MERCHANT'),
 (4, 'ADMIN');
 
--- 8.2 Users (Password: 123456)
+-- 2. Users (Password: 123456)
 INSERT INTO `users` (`id`, `phone`, `password`, `full_name`, `rating_avg`, `created_at`, `deleted_at`) VALUES
 (1, '0900000001', '123456', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
 (2, '0900000002', '123456', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
@@ -485,7 +486,7 @@ INSERT INTO `users` (`id`, `phone`, `password`, `full_name`, `rating_avg`, `crea
 (5, '0900000005', '123456', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
 (6, '0944495653', '123456', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
 
--- 8.3 User Roles
+-- 3. User Roles
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
 (1, 1),
 (2, 2),
@@ -495,34 +496,34 @@ INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
 (5, 4),
 (6, 3);
 
--- 8.4 User Addresses
+-- 4. User Addresses
 INSERT INTO `user_addresses` (`id`, `user_id`, `address`, `latitude`, `longitude`, `is_default`, `label`, `created_at`) VALUES
 (1, 1, '144 Xuân Thủy, Dịch Vọng Hậu, Cầu Giấy, Hà Nội', 21.0368, 105.7827, 1, 'Nhà riêng', '2026-06-10 08:00:00'),
 (2, 1, 'Keangnam Landmark 72, Phạm Hùng, Mễ Trì, Nam Từ Liêm, Hà Nội', 21.0173, 105.7838, 0, 'Công ty', '2026-06-10 08:30:00'),
 (3, 2, '264 Bà Hạt, Phường 9, Quận 10, TP.HCM', 10.765, 106.671, 1, 'Nhà riêng', '2026-06-10 09:00:00');
 
--- 8.5 Driver Details
+-- 5. Driver Details
 INSERT INTO `driver_details` (`user_id`, `license_plate`, `id_card_number`, `vehicle_type`, `approval_status`, `reject_reason`, `is_online`) VALUES
 (2, '59A1-12345', '079123456789', 'Motorbike', 'APPROVED', NULL, 1),
 (4, '51B2-67890', '079987654321', 'Motorbike', 'APPROVED', NULL, 0);
 
--- 8.6 Merchant Details
+-- 6. Merchant Details
 INSERT INTO `merchant_details` (`user_id`, `business_license`, `tax_code`) VALUES
 (3, 'GPKD-123456789', 'MST-987654321'),
 (6, 'GPKD-987654321', 'MST-123456789');
 
--- 8.7 System Settings
+-- 7. System Settings
 INSERT INTO `system_settings` (`id`, `config_key`, `config_value`, `description`) VALUES
 (1, 'shipping_config', '{"base_km": 2, "base_fee": 15000, "extra_per_km": 5000}', 'Cấu hình tính phí giao hàng'),
 (2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT');
 
--- 8.8 Vouchers
+-- 8. Vouchers
 INSERT INTO `vouchers` (`id`, `code`, `discount_amount`, `min_order_value`, `expiry_date`, `is_active`) VALUES
 (1, 'FREESHIP', 15000.00, 50000.00, '2026-12-31 23:59:59', 1),
 (2, 'FLASHFOOD20', 20000.00, 80000.00, '2026-12-31 23:59:59', 1),
 (3, 'WELCOME50', 50000.00, 150000.00, '2026-12-31 23:59:59', 1);
 
--- 8.9 Restaurants
+-- 9. Restaurants
 INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `longitude`, `opening_time`, `closing_time`, `is_open`, `is_open_today`, `temporary_closed_reason`, `temporary_closed_until`, `image_url`, `rating_avg`, `approval_status`, `approved_by`, `approved_at`, `reject_reason`, `deleted_at`) VALUES
 (1, 3, 'Hanh Dung - Am Thuc Chay Man', '111-113 Au Co, P.14, Q.11', 10.771, 106.649, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', '4.80', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
 (2, 3, 'Quan Chay Thanh Ai', '264 Ba Hat, P.9, Q.10', 10.765, 106.671, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/99/2f/11/getlstd-property-photo.jpg?w=1000&h=-1&s=1', '4.70', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
@@ -535,13 +536,13 @@ INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `lon
 (9, 6, 'Pizza Pho Mai 4P Mini', '17 Phan Xich Long, P.2, Q. Phu Nhuan, TP.HCM', 10.7993, 106.6865, '10:00:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1513104890138-7c749659a591', '4.90', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
 (10, 3, 'Ga Ran Gion Rum', '62 Le Van Sy, P.11, Q.3, TP.HCM', 10.7874, 106.6742, '09:30:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1562967916-eb82221dfb92', '4.65', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL);
 
--- 8.10 Restaurant Change Requests
+-- 10. Restaurant Change Requests
 INSERT INTO `restaurant_change_requests` (`id`, `restaurant_id`, `requested_by`, `payload`, `status`, `reviewed_by`, `reviewed_at`, `reject_reason`, `created_at`) VALUES
 (1, 1, 1, '{"name":"Hanh Dung - Am Thuc Chay Man","address":"111-113 Au Co, P.14, Q.11","ownerId":5,"imageUrl":null,"latitude":10.771,"longitude":106.649,"ratingAvg":4.8}', 'PENDING', NULL, NULL, NULL, '2026-06-10 01:53:52'),
 (2, 3, 1, '{"name":"Cơm Tấm TL","address":"300A Phu chanh Phu Hung","ownerId":6,"imageUrl":"https://tse3.mm.bing.net/th/id/OIP.YO6ZnE23qqs6g_8FvlITewHaFS?rs=1&pid=ImgDetMain&o=7&rm=3","latitude":10.229067,"longitude":106.40525,"ratingAvg":5}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:00:21'),
 (3, 2, 1, '{"name":"Quan Chay Thanh Ai","address":"264 Ba Hat, P.9, Q.10","ownerId":3,"imageUrl":null,"latitude":10.765,"longitude":106.671,"ratingAvg":4.7}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:04:21');
 
--- 8.11 Categories
+-- 11. Categories
 INSERT INTO `categories` (`id`, `restaurant_id`, `name`) VALUES
 (1, 1, 'Mon chinh'),
 (2, 1, 'Nuoc uong'),
@@ -565,7 +566,7 @@ INSERT INTO `categories` (`id`, `restaurant_id`, `name`) VALUES
 (25, 10, 'Burger'),
 (26, 10, 'Combo');
 
--- 8.12 Toppings
+-- 12. Toppings
 INSERT INTO `toppings` (`id`, `restaurant_id`, `name`, `price`, `is_available`) VALUES
 (1, 1, 'Thêm chả lụa chay', 10000.00, 1),
 (2, 1, 'Thêm sườn non chay', 12000.00, 1),
@@ -578,7 +579,7 @@ INSERT INTO `toppings` (`id`, `restaurant_id`, `name`, `price`, `is_available`) 
 (9, 8, 'Thạch phô mai', 9000.00, 1),
 (10, 8, 'Pudding trứng', 8000.00, 1);
 
--- 8.13 Food Items
+-- 13. Food Items
 INSERT INTO `food_items` (`id`, `category_id`, `name`, `price`, `is_available`, `default_quantity`, `current_quantity`, `quantity_reset_date`, `deleted_at`, `image_url`) VALUES
 (1, 1, 'Com Tam Chay', 45000.00, 1, 40, 38, '2026-06-18', NULL, 'https://i.ytimg.com/vi/I7IO_xMc4yA/maxresdefault.jpg'),
 (2, 2, 'Tra Da', 5000.00, 1, 120, 120, '2026-06-18', NULL, 'https://tse1.mm.bing.net/th/id/OIP.UmpBdKB2TIJmZIcyRXsY0AHaFj?rs=1&pid=ImgDetMain&o=7&rm=3'),
@@ -623,7 +624,7 @@ INSERT INTO `food_items` (`id`, `category_id`, `name`, `price`, `is_available`, 
 (44, 26, 'Combo ga ran burger nuoc', 99000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b'),
 (45, 26, 'Combo gia dinh 6 mieng ga', 189000.00, 1, 20, 20, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f');
 
--- 8.14 Food Toppings Junction
+-- 14. Food Toppings Junction
 INSERT INTO `food_toppings` (`food_id`, `topping_id`) VALUES
 (1, 1),
 (1, 2),
@@ -647,7 +648,7 @@ INSERT INTO `food_toppings` (`food_id`, `topping_id`) VALUES
 (27, 8),
 (27, 9);
 
--- 8.15 Order Statuses
+-- 15. Order Statuses
 INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`) VALUES
 (1, 'PENDING', 'Chờ xác nhận', 'Đơn hàng vừa được tạo, đang chờ xử lý', 1),
 (2, 'DRIVER_ACCEPTED', 'Tài xế đã nhận', 'Tài xế đã chấp nhận cuốc xe', 2),
@@ -659,56 +660,56 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 (8, 'CANCELLED', 'Đã huỷ', 'Đơn hàng đã bị huỷ', 8),
 (9, 'TIMEOUT', 'Quá thời gian', 'Quá thời hạn tiếp nhận đơn', 9);
 
--- 8.16 Orders
+-- 16. Orders
 INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `restaurant_id`, `driver_id`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
 (1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 1, 2, 1, '12 Nguyen Hue, Quan 1', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
 (2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
 (3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
 
--- 8.17 Order Items
+-- 17. Order Items
 INSERT INTO `order_items` (`id`, `order_id`, `food_id`, `food_name`, `quantity`, `price_at_order`) VALUES
 (1, 1, 1, 'Com Tam Chay', 2, 45000.00),
 (2, 1, 2, 'Tra Da', 1, 5000.00),
 (3, 2, 1, 'Com Tam Chay', 1, 45000.00),
 (4, 3, 1, 'Com Tam Chay', 1, 45000.00);
 
--- 8.18 Order Item Toppings
+-- 18. Order Item Toppings
 INSERT INTO `order_item_toppings` (`id`, `order_item_id`, `topping_id`, `quantity`, `price`) VALUES
 (1, 1, 1, 1, 10000.00),
 (2, 1, 3, 1, 5000.00);
 
--- 8.19 Payments
+-- 19. Payments
 INSERT INTO `payments` (`id`, `order_id`, `idempotency_key`, `payment_method`, `status`, `amount`, `created_at`, `updated_at`) VALUES
 (1, 1, 'PAY-IDEM-20260324-001', 'E_WALLET', 'SUCCESS', 108600.00, '2026-06-10 08:08:00', '2026-06-10 08:08:00'),
 (2, 3, 'pay-1781084695071', 'E_WALLET', 'PENDING', 52000.00, '2026-06-10 02:44:55', '2026-06-10 02:44:55');
 
--- 8.20 Payment Transactions
+-- 20. Payment Transactions
 INSERT INTO `payment_transactions` (`id`, `payment_id`, `attempt_number`, `status`, `transaction_ref`, `gateway_response`, `created_at`, `updated_at`) VALUES
 (1, 1, 1, 'SUCCESS', 'MOMO-9988776655', '{"code": "0", "message": "Thanh toán ví thành công"}', '2026-06-10 08:08:00', '2026-06-10 08:08:00');
 
--- 8.21 Order Status Logs
+-- 21. Order Status Logs
 INSERT INTO `order_status_logs` (`id`, `order_id`, `previous_status`, `new_status`, `changed_by`, `reason`, `created_at`) VALUES
 (1, 1, 'DELIVERING', 'COMPLETED', 2, 'Giao hàng thành công', '2026-06-10 08:08:00');
 
--- 8.22 Driver Locations (Historical telemetry)
+-- 22. Driver Locations
 INSERT INTO `driver_locations` (`id`, `driver_id`, `order_id`, `latitude`, `longitude`, `heading`, `speed_kmh`, `created_at`) VALUES
 (1, 2, 1, 10.771, 106.649, 90, 24, '2026-06-10 08:08:00'),
 (2, 2, NULL, 10.7757, 106.6868, 90, 24, '2026-06-10 08:09:00');
 
--- 8.23 Driver Offers
+-- 23. Driver Offers
 INSERT INTO `driver_offers` (`id`, `order_id`, `driver_id`, `status`, `algorithm`, `search_radius_km`, `distance_km`, `pickup_eta_minutes`, `dispatch_score`, `offered_at`, `responded_at`, `expires_at`, `response_reason`, `cancellation_chargeable`, `created_at`, `updated_at`) VALUES
 (1, 1, 2, 'ACCEPTED', 'NEAREST_NEIGHBOR', 5.0, 1.8, 8.5, 95.0, '2026-03-24 10:01:00', '2026-03-24 10:01:20', '2026-03-24 10:02:00', NULL, 0, '2026-03-24 10:01:00', '2026-03-24 10:01:20');
 
--- 8.24 Driver Penalties
+-- 24. Driver Penalties
 INSERT INTO `driver_penalties` (`id`, `driver_id`, `type`, `status`, `reason`, `starts_at`, `ends_at`, `created_at`, `updated_at`) VALUES
 (1, 4, 'LATE_PICKUP', 'RESOLVED', 'Trễ lấy hàng 15 phút do kẹt xe', '2026-06-01 10:00:00', '2026-06-01 12:00:00', '2026-06-01 10:00:00', '2026-06-01 12:00:00');
 
--- 8.25 Reviews
+-- 25. Reviews
 INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `target_type`, `target_id`, `rating`, `comment`, `created_at`) VALUES
 (1, 1, 1, 'RESTAURANT', 1, 5, 'Cơm tấm rất ngon, phục vụ nhanh!', '2026-06-10 08:08:00'),
 (2, 1, 1, 'DRIVER', 2, 5, 'Tài xế lịch sự, giao hàng nhanh chóng.', '2026-06-10 08:08:00');
 
--- 8.26 Chat Messages
+-- 26. Chat Messages
 INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES
 (1, 1, 1, 1, 'Chào quán, đơn mình có thể làm ít cay được không ạ?', 'CUSTOMER', 1, '2026-03-24 10:02:00'),
 (2, 3, 1, 1, 'Dạ được ạ, quán đã ghi chú cho bếp rồi bạn yên tâm nhé!', 'MERCHANT', 1, '2026-03-24 10:03:00'),
@@ -717,7 +718,7 @@ INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`
 (5, 6, 3, NULL, 'Dạ còn bạn nhé, bạn đặt sớm giúp quán nha!', 'MERCHANT', 0, '2026-06-10 11:16:00');
 
 -- =================================================================================
--- 9. RESET AUTO_INCREMENT VALUES
+-- RESET AUTO_INCREMENT
 -- =================================================================================
 ALTER TABLE `roles`                      AUTO_INCREMENT = 10;
 ALTER TABLE `users`                      AUTO_INCREMENT = 10;
@@ -747,5 +748,6 @@ SET SQL_SAFE_UPDATES = 1;
 COMMIT;
 
 -- =================================================================================
--- END OF SCRIPT
+-- HOÀN TẤT: Toàn bộ 26 bảng đã được tách liên kết logic, sẵn sàng cho Microservices!
 -- =================================================================================
+

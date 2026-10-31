@@ -1,3 +1,8 @@
+-- =================================================================================
+-- GRABFOOD_DB - SEED DATA (MICROSERVICES DECOUPLED SCHEMA)
+-- Version: 4.0.0 (Decoupled Logical Foreign Keys Architecture)
+-- =================================================================================
+
 SET SQL_SAFE_UPDATES = 0;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -27,6 +32,10 @@ DROP TABLE IF EXISTS driver_locations;
 DROP TABLE IF EXISTS restaurant_change_requests;
 DROP TABLE IF EXISTS reviews;
 
+-- =================================================================================
+-- 1. AUTH-SERVICE DOMAIN
+-- =================================================================================
+
 CREATE TABLE `roles` (
   `id` int NOT NULL AUTO_INCREMENT,
   `name` varchar(50) NOT NULL,
@@ -55,6 +64,7 @@ CREATE TABLE `user_roles` (
   CONSTRAINT `user_roles_ibfk_2` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- [Logical FK]: user_id trỏ sang auth-service: users.id
 CREATE TABLE `driver_details` (
   `user_id` int NOT NULL,
   `license_plate` varchar(20) DEFAULT NULL,
@@ -63,8 +73,7 @@ CREATE TABLE `driver_details` (
   `approval_status` varchar(20) DEFAULT 'PENDING',
   `reject_reason` text,
   `is_online` tinyint(1) DEFAULT '0',
-  PRIMARY KEY (`user_id`),
-  CONSTRAINT `driver_details_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+  PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `merchant_details` (
@@ -84,6 +93,10 @@ CREATE TABLE `system_settings` (
   UNIQUE KEY `config_key` (`config_key`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- =================================================================================
+-- 2. RESTAURANT-SERVICE DOMAIN
+-- =================================================================================
+
 CREATE TABLE `vouchers` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(20) NOT NULL,
@@ -95,6 +108,7 @@ CREATE TABLE `vouchers` (
   UNIQUE KEY `code` (`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- [Logical FK]: owner_id, approved_by trỏ sang auth-service
 CREATE TABLE `restaurants` (
   `id` int NOT NULL AUTO_INCREMENT,
   `owner_id` int NOT NULL,
@@ -117,10 +131,27 @@ CREATE TABLE `restaurants` (
   `deleted_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `owner_id` (`owner_id`),
-  KEY `approved_by` (`approved_by`),
-  CONSTRAINT `restaurants_ibfk_1` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `restaurants_ibfk_2` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`)
+  KEY `approved_by` (`approved_by`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- [Physical FK]: restaurant_id nội bộ
+-- [Logical FK]: requested_by, reviewed_by trỏ sang auth-service
+CREATE TABLE `restaurant_change_requests` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int NOT NULL,
+  `requested_by` int NOT NULL,
+  `payload` json NOT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'PENDING',
+  `reviewed_by` int DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `reject_reason` text,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `restaurant_id` (`restaurant_id`),
+  KEY `requested_by` (`requested_by`),
+  KEY `reviewed_by` (`reviewed_by`),
+  CONSTRAINT `restaurant_change_requests_ibfk_1` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `categories` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -150,6 +181,10 @@ CREATE TABLE `food_items` (
   CONSTRAINT `food_items_chk_2` CHECK ((`current_quantity` >= 0))
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- =================================================================================
+-- 3. ORDER-SERVICE DOMAIN
+-- =================================================================================
+
 CREATE TABLE `order_statuses` (
   `id` int NOT NULL AUTO_INCREMENT,
   `code` varchar(50) NOT NULL,
@@ -160,6 +195,8 @@ CREATE TABLE `order_statuses` (
   UNIQUE KEY `code` (`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- [Logical FK]: customer_id, restaurant_id, driver_id, voucher_id, cancelled_by_user_id
+-- [Physical FK]: status_id nội bộ
 CREATE TABLE `orders` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `order_code` varchar(50) NOT NULL,
@@ -196,14 +233,11 @@ CREATE TABLE `orders` (
   KEY `idx_orders_created_at` (`created_at`),
   KEY `idx_orders_cancelled_by_user_id` (`cancelled_by_user_id`),
   KEY `idx_orders_cancelled_at` (`cancelled_at`),
-  CONSTRAINT `orders_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `orders_ibfk_2` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`),
-  CONSTRAINT `orders_ibfk_3` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`),
-  CONSTRAINT `orders_ibfk_4` FOREIGN KEY (`voucher_id`) REFERENCES `vouchers` (`id`),
-  CONSTRAINT `orders_ibfk_5` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`),
-  CONSTRAINT `orders_ibfk_6` FOREIGN KEY (`cancelled_by_user_id`) REFERENCES `users` (`id`)
+  CONSTRAINT `orders_ibfk_5` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- [Logical FK]: food_id trỏ sang restaurant-service
+-- [Physical FK]: order_id nội bộ
 CREATE TABLE `order_items` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `order_id` bigint NOT NULL,
@@ -215,10 +249,50 @@ CREATE TABLE `order_items` (
   KEY `idx_order_items_order_id` (`order_id`),
   KEY `idx_order_items_food_id` (`food_id`),
   CONSTRAINT `order_items_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `order_items_ibfk_2` FOREIGN KEY (`food_id`) REFERENCES `food_items` (`id`),
   CONSTRAINT `order_items_chk_1` CHECK ((`quantity` > 0))
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+-- [Logical FK]: changed_by trỏ sang auth-service
+-- [Physical FK]: order_id nội bộ
+CREATE TABLE `order_status_logs` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `order_id` bigint NOT NULL,
+  `previous_status` varchar(50) DEFAULT NULL,
+  `new_status` varchar(50) NOT NULL,
+  `changed_by` int DEFAULT NULL,
+  `reason` text,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `changed_by` (`changed_by`),
+  KEY `idx_order_status_logs_order_id` (`order_id`),
+  CONSTRAINT `order_status_logs_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- =================================================================================
+-- 4. DELIVERY-SERVICE DOMAIN
+-- =================================================================================
+
+-- [Logical FK]: driver_id, order_id
+CREATE TABLE `driver_locations` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `driver_id` int NOT NULL,
+  `order_id` bigint DEFAULT NULL,
+  `latitude` double NOT NULL,
+  `longitude` double NOT NULL,
+  `heading` double NOT NULL DEFAULT '0',
+  `speed_kmh` double NOT NULL DEFAULT '24',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_driver_locations_driver_id` (`driver_id`),
+  KEY `idx_driver_locations_order_id` (`order_id`),
+  KEY `idx_driver_locations_created_at` (`created_at`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- =================================================================================
+-- 5. PAYMENT-SERVICE DOMAIN
+-- =================================================================================
+
+-- [Logical FK]: order_id
 CREATE TABLE `payments` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `order_id` bigint NOT NULL,
@@ -230,8 +304,7 @@ CREATE TABLE `payments` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `order_id` (`order_id`),
-  UNIQUE KEY `idempotency_key` (`idempotency_key`),
-  CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+  UNIQUE KEY `idempotency_key` (`idempotency_key`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 CREATE TABLE `payment_transactions` (
@@ -248,56 +321,11 @@ CREATE TABLE `payment_transactions` (
   CONSTRAINT `payment_transactions_ibfk_1` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE `order_status_logs` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `order_id` bigint NOT NULL,
-  `previous_status` varchar(50) DEFAULT NULL,
-  `new_status` varchar(50) NOT NULL,
-  `changed_by` int DEFAULT NULL,
-  `reason` text,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `changed_by` (`changed_by`),
-  KEY `idx_order_status_logs_order_id` (`order_id`),
-  CONSTRAINT `order_status_logs_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `order_status_logs_ibfk_2` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+-- =================================================================================
+-- 6. REVIEW-SERVICE DOMAIN
+-- =================================================================================
 
-CREATE TABLE `driver_locations` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
-  `driver_id` int NOT NULL,
-  `order_id` bigint DEFAULT NULL,
-  `latitude` double NOT NULL,
-  `longitude` double NOT NULL,
-  `heading` double NOT NULL DEFAULT '0',
-  `speed_kmh` double NOT NULL DEFAULT '24',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_driver_locations_driver_id` (`driver_id`),
-  KEY `idx_driver_locations_order_id` (`order_id`),
-  KEY `idx_driver_locations_created_at` (`created_at`),
-  CONSTRAINT `driver_locations_ibfk_1` FOREIGN KEY (`driver_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
-CREATE TABLE `restaurant_change_requests` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `restaurant_id` int NOT NULL,
-  `requested_by` int NOT NULL,
-  `payload` json NOT NULL,
-  `status` varchar(20) NOT NULL DEFAULT 'PENDING',
-  `reviewed_by` int DEFAULT NULL,
-  `reviewed_at` datetime DEFAULT NULL,
-  `reject_reason` text,
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `restaurant_id` (`restaurant_id`),
-  KEY `requested_by` (`requested_by`),
-  KEY `reviewed_by` (`reviewed_by`),
-  CONSTRAINT `restaurant_change_requests_ibfk_1` FOREIGN KEY (`restaurant_id`) REFERENCES `restaurants` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `restaurant_change_requests_ibfk_2` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `restaurant_change_requests_ibfk_3` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
+-- [Logical FK]: order_id, customer_id
 CREATE TABLE `reviews` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `order_id` bigint NOT NULL,
@@ -310,10 +338,13 @@ CREATE TABLE `reviews` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_order_target` (`order_id`,`target_type`),
   KEY `customer_id` (`customer_id`),
-  CONSTRAINT `reviews_ibfk_1` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `reviews_ibfk_2` FOREIGN KEY (`customer_id`) REFERENCES `users` (`id`),
+  KEY `idx_reviews_order_id` (`order_id`),
   CONSTRAINT `reviews_chk_1` CHECK ((`rating` between 1 and 5))
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- =================================================================================
+-- 7. INITIAL SEED DATA
+-- =================================================================================
 
 INSERT INTO roles (id, name) VALUES
 (4, 'ADMIN'),

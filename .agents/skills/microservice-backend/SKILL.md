@@ -35,7 +35,9 @@ Master microservices architecture patterns including service boundaries, inter-s
 
 ## Resources
 
-- `resources/implementation-playbook.md` for detailed patterns and examples.
+- `resources/structure-for-microservice.md` for detailed 10-microservice architecture, domain decomposition, and directory structure.
+- `document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md` for decoupled database schema and Plain ID rules.
+- `database/seed_all.sql` for the production 26-table MySQL schema with decoupled logical foreign keys.
 
 ## Limitations
 - Use this skill only when the task clearly matches the scope described above.
