@@ -1,16 +1,31 @@
 import { apiClient, API_ENDPOINTS } from '@/services/api';
 import type { ApiResponse } from '@/types';
 
-export interface CreateOrderPayload {
-  shopId: number;
-  items: Array<{
-    productId: number;
-    quantity: number;
-    toppingIds?: number[];
+export interface CreateOrderItemPayload {
+  foodId: number;
+  quantity: number;
+  toppings?: Array<{
+    toppingId: number;
+    quantity?: number;
   }>;
-  deliveryAddress: string;
-  paymentMethod: 'COD' | 'MOMO' | 'VNPAY' | 'WALLET';
+}
+
+export interface CreateOrderPayload {
+  restaurantId: number;
+  receiverAddress: string;
+  receiverLat?: number;
+  receiverLng?: number;
+  distanceKm?: number;
+  voucherId?: number;
+  idempotencyKey?: string;
+  items: CreateOrderItemPayload[];
+  paymentMethod?: 'COD' | 'MOMO' | 'VNPAY' | 'WALLET';
   note?: string;
+}
+
+export interface UpdateOrderStatusPayload {
+  statusCode: string;
+  reason?: string;
 }
 
 export const orderApi = {
@@ -18,11 +33,19 @@ export const orderApi = {
     return apiClient.post(API_ENDPOINTS.ORDERS.CREATE, data);
   },
 
-  getAll: async (params?: Record<string, any>): Promise<ApiResponse<any[]>> => {
+  getMyOrders: async (params?: { page?: number; size?: number }): Promise<ApiResponse<any>> => {
+    return apiClient.get('/orders/my-orders', { params });
+  },
+
+  getAll: async (params?: Record<string, any>): Promise<ApiResponse<any>> => {
     return apiClient.get(API_ENDPOINTS.ORDERS.LIST, { params });
   },
 
   getById: async (id: number | string): Promise<ApiResponse<any>> => {
     return apiClient.get(API_ENDPOINTS.ORDERS.DETAIL(id));
+  },
+
+  updateStatus: async (id: number | string, data: UpdateOrderStatusPayload): Promise<ApiResponse<any>> => {
+    return apiClient.put(API_ENDPOINTS.ORDERS.STATUS(id), data);
   },
 };
