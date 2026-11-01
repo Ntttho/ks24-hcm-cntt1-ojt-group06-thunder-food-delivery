@@ -134,7 +134,33 @@ services:
     networks:
       - foodthunder-network
 
+  # 6. Order Fulfillment & State Machine Microservice
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: ft-order-service
+    ports:
+      - "8083:8083"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_HOST=discovery-service
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=grabfood_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+    networks:
+      - foodthunder-network
+
 networks:
   foodthunder-network:
     name: foodthunder-microservices-net
     driver: bridge
+
