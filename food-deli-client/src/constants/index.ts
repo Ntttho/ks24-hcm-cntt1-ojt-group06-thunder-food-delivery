@@ -11,6 +11,7 @@ export const APP_ROUTES = {
   REGISTER: '/register',
   RESTAURANTS: '/restaurants',
   RESTAURANT_DETAIL: '/restaurants/:id',
+  RESTAURANT_REVIEWS: '/restaurants/:id/reviews',
   CART: '/cart',
   CHECKOUT: '/checkout',
   ORDERS: '/orders',

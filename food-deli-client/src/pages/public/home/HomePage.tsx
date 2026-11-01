@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Input, Button, Card, Tag, Row, Col, message } from 'antd';
 import {
   ThunderboltFilled,
@@ -7,6 +8,7 @@ import {
   SafetyCertificateOutlined,
   StarFilled,
   PlusOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { addToCart } from '@/store/slices/cartSlice';
@@ -65,10 +67,12 @@ const FEATURED_ITEMS = [
 ];
 
 export const HomePage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const handleQuickAdd = (item: (typeof FEATURED_ITEMS)[0]) => {
+  const handleQuickAdd = (item: (typeof FEATURED_ITEMS)[0], e: React.MouseEvent) => {
+    e.stopPropagation();
     dispatch(
       addToCart({
         id: item.id,
@@ -157,9 +161,11 @@ export const HomePage: React.FC = () => {
             </h2>
             <p className="text-gray-500 text-sm">Các món ngon được đặt nhiều nhất tuần này</p>
           </div>
-          <Button type="link" className="font-semibold text-orange-600 hover:text-orange-700">
-            Xem tất cả &rarr;
-          </Button>
+          <Link to="/restaurants/1">
+            <Button type="link" className="font-semibold text-orange-600 hover:text-orange-700">
+              Khám phá quán ăn &rarr;
+            </Button>
+          </Link>
         </div>
 
         <Row gutter={[20, 20]}>
@@ -167,8 +173,9 @@ export const HomePage: React.FC = () => {
             <Col key={item.id} xs={24} sm={12} lg={6}>
               <Card
                 hoverable
+                onClick={() => navigate(`/restaurants/${item.shopId}`)}
                 cover={
-                  <div className="relative h-48 w-full overflow-hidden">
+                  <div className="relative h-48 w-full overflow-hidden cursor-pointer group">
                     <img
                       alt={item.productName}
                       src={item.imageUrl}
@@ -179,11 +186,13 @@ export const HomePage: React.FC = () => {
                     </div>
                   </div>
                 }
-                className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between h-full"
+                className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between h-full cursor-pointer"
                 bodyStyle={{ padding: 16 }}
               >
                 <div>
-                  <div className="text-xs font-medium text-orange-600 mb-1">{item.shopName}</div>
+                  <div className="text-xs font-medium text-orange-600 mb-1 flex items-center gap-1">
+                    <ShopOutlined /> {item.shopName}
+                  </div>
                   <h3 className="font-bold text-gray-900 text-base line-clamp-1">{item.productName}</h3>
                   <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
                     <ClockCircleOutlined /> {item.prepTime}
@@ -199,7 +208,7 @@ export const HomePage: React.FC = () => {
                     shape="circle"
                     icon={<PlusOutlined />}
                     className="bg-orange-500 hover:bg-orange-600 shadow-xs"
-                    onClick={() => handleQuickAdd(item)}
+                    onClick={(e) => handleQuickAdd(item, e)}
                   />
                 </div>
               </Card>

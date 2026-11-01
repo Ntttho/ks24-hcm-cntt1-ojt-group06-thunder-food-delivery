@@ -9,6 +9,8 @@ import {
   NotFoundPage,
   CartPage,
   CheckoutPage,
+  StoreDetailPage,
+  StoreReviewPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { APP_ROUTES } from '@/constants';
@@ -22,6 +24,14 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />,
+      },
+      {
+        path: 'restaurants/:id',
+        element: <StoreDetailPage />,
+      },
+      {
+        path: 'restaurants/:id/reviews',
+        element: <StoreReviewPage />,
       },
       {
         path: 'profile',
