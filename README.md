@@ -1,4 +1,4 @@
-# 🍔 Food Thunder Deli (ShopeeFood / GrabFood Clone 4.0)
+#  🍔 Food Thunder Deli (ShopeeFood / GrabFood Clone 4.0)
 
 Hệ thống đặt & giao đồ ăn trực tuyến chuẩn doanh nghiệp theo tài liệu đặc tả [Srs.md](file:///d:/ojt-food-deli/Srs.md).
 
