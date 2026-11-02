@@ -10,6 +10,8 @@ export interface FoodItem {
   isNew?: boolean;
   soldCount?: number;
   customizationGroups?: CustomizationGroup[];
+  rating?: number;
+  prepTime?: string;
 }
 
 export interface CustomizationOption {

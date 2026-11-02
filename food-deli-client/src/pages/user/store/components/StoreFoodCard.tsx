@@ -1,6 +1,11 @@
 import React from 'react';
 import { Button, Tag } from 'antd';
-import { PlusOutlined, FireOutlined } from '@ant-design/icons';
+import {
+  PlusOutlined,
+  FireOutlined,
+  ClockCircleOutlined,
+  StarFilled,
+} from '@ant-design/icons';
 import type { FoodItem } from '../types';
 
 interface StoreFoodCardProps {
@@ -10,7 +15,7 @@ interface StoreFoodCardProps {
 
 export const StoreFoodCard: React.FC<StoreFoodCardProps> = ({ food, onAddToCart }) => {
   return (
-    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs hover:shadow-md transition-all flex gap-4 justify-between group">
+    <div className="bg-white rounded-2xl p-3 sm:p-4 border border-gray-100 shadow-xs hover:shadow-md transition-all flex gap-3 sm:gap-4 justify-between group">
       <div className="flex flex-col justify-between flex-1 min-w-0">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -31,6 +36,16 @@ export const StoreFoodCard: React.FC<StoreFoodCardProps> = ({ food, onAddToCart 
           <p className="text-gray-500 text-xs line-clamp-2 leading-relaxed">
             {food.description}
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 font-bold text-amber-700">
+              <StarFilled className="text-[10px] text-amber-500" />
+              {food.rating ?? 4.8}
+            </span>
+            <span className="inline-flex items-center gap-1 text-gray-500">
+              <ClockCircleOutlined />
+              {food.prepTime ?? '15-20 phút'}
+            </span>
+          </div>
         </div>
 
         <div className="flex items-center justify-between mt-3 pt-2">
@@ -47,16 +62,17 @@ export const StoreFoodCard: React.FC<StoreFoodCardProps> = ({ food, onAddToCart 
 
           <Button
             type="primary"
-            shape="circle"
             icon={<PlusOutlined />}
-            className="bg-orange-500 hover:bg-orange-600 shadow-sm active:scale-95 transition-transform"
+            className="h-9 rounded-xl bg-orange-500 px-3 font-bold hover:bg-orange-600 shadow-sm active:scale-95 transition-transform"
             onClick={() => onAddToCart(food)}
-          />
+          >
+            <span className="hidden sm:inline">Thêm</span>
+          </Button>
         </div>
       </div>
 
       {/* Dish Image */}
-      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-inner">
+      <div className="relative w-28 h-28 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 shadow-inner">
         <img
           src={food.imageUrl}
           alt={food.name}
@@ -73,4 +89,3 @@ export const StoreFoodCard: React.FC<StoreFoodCardProps> = ({ food, onAddToCart 
 };
 
 export default StoreFoodCard;
-
