@@ -25,6 +25,20 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), ex.getMessage()));
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
+        log.warn("Unauthorized access: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(HttpStatus.UNAUTHORIZED.value(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
+        log.warn("Forbidden access: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(HttpStatus.FORBIDDEN.value(), ex.getMessage()));
+    }
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
         log.warn("Bad request: {}", ex.getMessage());

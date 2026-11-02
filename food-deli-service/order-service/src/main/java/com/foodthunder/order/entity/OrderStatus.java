@@ -12,6 +12,7 @@ import lombok.*;
 @Builder
 public class OrderStatus {
 
+    public static final String AWAITING_PAYMENT = "AWAITING_PAYMENT";
     public static final String PENDING = "PENDING";
     public static final String CONFIRMED = "CONFIRMED";
     public static final String DRIVER_ACCEPTED = "DRIVER_ACCEPTED";

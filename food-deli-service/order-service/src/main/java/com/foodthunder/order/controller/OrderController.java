@@ -1,6 +1,8 @@
 package com.foodthunder.order.controller;
 
 import com.foodthunder.order.dto.*;
+import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.UnauthorizedException;
 import com.foodthunder.order.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,27 +20,29 @@ public class OrderController {
     private final OrderService orderService;
 
     /**
-     * API Checklist 2: POST /api/v1/orders
+     * API Checklist 2 & 3: POST /api/v1/orders
      * Tạo đơn hàng mới trong ACID Transaction:
-     * 1. Kiểm tra sản phẩm tồn tại và thuộc cùng 1 quán qua OpenFeign restaurant-service.
-     * 2. Tính toán tổng tiền món + tổng tiền topping + phí giao hàng.
-     * 3. Lưu đơn với trạng thái khởi tạo PENDING.
+     * 1. Kiểm tra tính hợp lệ và trạng thái mở cửa của quán qua OpenFeign restaurant-service.
+     * 2. Kiểm tra sản phẩm tồn tại và thuộc cùng 1 quán.
+     * 3. Tính toán tổng tiền món + tổng tiền topping + phí giao hàng.
+     * 4. Lưu đơn với trạng thái ban đầu: PENDING (nếu COD) hoặc AWAITING_PAYMENT (nếu VNPay).
      */
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> createOrder(
             @Valid @RequestBody CreateOrderRequest request,
             @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
     ) {
-        Integer customerId = parseUserId(userIdHeader, 1);
-        log.info("Received create order request from customer: {}, restaurantId: {}", customerId, request.getRestaurantId());
+        Integer customerId = requireUserId(userIdHeader);
+        log.info("Received create order request from customer: {}, restaurantId: {}, paymentMethod: {}",
+                customerId, request.getRestaurantId(), request.getPaymentMethod());
         OrderResponse response = orderService.createOrder(request, customerId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Đơn hàng đã được tạo thành công", response));
     }
 
     /**
-     * API Checklist 3: GET /api/v1/orders/my-orders
-     * Lấy lịch sử đơn hàng của khách hàng đang đăng nhập.
+     * API Checklist 4: GET /api/v1/orders/my-orders
+     * Lấy lịch sử đơn hàng của khách hàng đang đăng nhập theo X-User-Id.
      */
     @GetMapping("/my-orders")
     public ResponseEntity<ApiResponse<PageResponse<OrderResponse>>> getMyOrders(
@@ -46,13 +50,13 @@ public class OrderController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        Integer customerId = parseUserId(userIdHeader, 1);
+        Integer customerId = requireUserId(userIdHeader);
         PageResponse<OrderResponse> response = orderService.getMyOrders(customerId, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đơn hàng thành công", response));
     }
 
     /**
-     * API Checklist 4: GET /api/v1/orders/{id}
+     * GET /api/v1/orders/{id}
      * Xem chi tiết đơn hàng và toàn bộ lịch sử tiến trình (State logs).
      */
     @GetMapping("/{id}")
@@ -68,7 +72,7 @@ public class OrderController {
 
     /**
      * API Checklist 5: PUT /api/v1/orders/{id}/status
-     * Cập nhật trạng thái đơn hàng (Kiểm tra nghiêm ngặt điều kiện State Machine).
+     * Cập nhật trạng thái đơn hàng (Kiểm tra nghiêm ngặt điều kiện State Machine & RBAC).
      */
     @PutMapping("/{id}/status")
     public ResponseEntity<ApiResponse<OrderResponse>> updateOrderStatus(
@@ -96,6 +100,17 @@ public class OrderController {
     ) {
         PageResponse<OrderResponse> response = orderService.getOrders(restaurantId, driverId, status, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đơn hàng thành công", response));
+    }
+
+    private Integer requireUserId(String userIdHeader) {
+        if (userIdHeader == null || userIdHeader.isBlank()) {
+            throw new UnauthorizedException("Yêu cầu thông tin định danh khách hàng (X-User-Id không hợp lệ hoặc thiếu)");
+        }
+        try {
+            return Integer.parseInt(userIdHeader.trim());
+        } catch (NumberFormatException e) {
+            throw new BadRequestException("Định dạng X-User-Id không hợp lệ: " + userIdHeader);
+        }
     }
 
     private Integer parseUserId(String userIdHeader, Integer fallback) {

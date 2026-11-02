@@ -31,6 +31,9 @@ public class CreateOrderRequest {
 
     private String idempotencyKey;
 
+    @Builder.Default
+    private String paymentMethod = "COD";
+
     @NotEmpty(message = "Danh sách món ăn không được để trống")
     @Valid
     @Builder.Default

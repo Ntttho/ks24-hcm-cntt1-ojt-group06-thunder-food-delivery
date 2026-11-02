@@ -159,4 +159,29 @@ class OrderControllerTest {
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.statusCode").value("CONFIRMED"));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/orders trả về 401 Unauthorized khi thiếu header X-User-Id")
+    void testCreateOrderEndpoint_MissingUserId_Returns401() throws Exception {
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("Keangnam Tower")
+                .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(1).build()))
+                .build();
+
+        mockMvc.perform(post("/api/v1/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("X-User-Id")));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/orders/my-orders trả về 401 Unauthorized khi thiếu header X-User-Id")
+    void testGetMyOrdersEndpoint_MissingUserId_Returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/orders/my-orders"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
+    }
 }
