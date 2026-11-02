@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Input, Button, Card, Tag, Row, Col, message } from 'antd';
 import {
@@ -13,6 +13,53 @@ import {
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { addToCart } from '@/store/slices/cartSlice';
 import { formatCurrency } from '@/utils/formatters';
+const CUISINES = [
+  'Tất cả',
+  'Việt Nam',
+  'Đồ ăn nhanh',
+  'Trà sữa',
+  'Hàn Quốc',
+  'Nhật Bản',
+];
+
+const RESTAURANTS = [
+  {
+    id: 1,
+    name: 'Tiệm Cơm Gà Hoàng Gia',
+    cuisine: 'Việt Nam',
+    address: 'Quận 1, TP.HCM',
+    imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600',
+    rating: 4.8,
+    deliveryTime: '15-20 phút',
+  },
+  {
+    id: 2,
+    name: 'The Alley Tea House',
+    cuisine: 'Trà sữa',
+    address: 'Quận 3, TP.HCM',
+    imageUrl: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=600',
+    rating: 4.9,
+    deliveryTime: '10-15 phút',
+  },
+  {
+    id: 3,
+    name: 'Bún Bò Huế O Mai',
+    cuisine: 'Việt Nam',
+    address: 'Quận 5, TP.HCM',
+    imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600',
+    rating: 4.7,
+    deliveryTime: '20-25 phút',
+  },
+  {
+    id: 4,
+    name: 'Thunder Burger & Fries',
+    cuisine: 'Đồ ăn nhanh',
+    address: 'Quận 7, TP.HCM',
+    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600',
+    rating: 4.9,
+    deliveryTime: '15-20 phút',
+  },
+];
 
 // Mock featured foods for demonstration of base setup
 const FEATURED_ITEMS = [
@@ -70,6 +117,19 @@ export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCuisine, setSelectedCuisine] = useState('Tất cả');
+
+  const filteredRestaurants = useMemo(() => {
+    const keyword = searchTerm.trim().toLowerCase();
+    return RESTAURANTS.filter((restaurant) => {
+      const matchesCuisine = selectedCuisine === 'Tất cả' || restaurant.cuisine === selectedCuisine;
+      const matchesKeyword = !keyword ||
+        restaurant.name.toLowerCase().includes(keyword) ||
+        restaurant.cuisine.toLowerCase().includes(keyword) ||
+        restaurant.address.toLowerCase().includes(keyword);
+      return matchesCuisine && matchesKeyword;
+    });
+  }, [searchTerm, selectedCuisine]);
 
   const handleQuickAdd = (item: (typeof FEATURED_ITEMS)[0], e: React.MouseEvent) => {
     e.stopPropagation();
@@ -91,8 +151,19 @@ export const HomePage: React.FC = () => {
   return (
     <div className="space-y-10">
       {/* Hero Banner Section */}
-      <section className="relative overflow-hidden rounded-3xl bg-linear-to-r from-orange-600 via-orange-500 to-amber-500 text-white p-8 sm:p-12 shadow-xl shadow-orange-500/15">
-        <div className="relative z-10 max-w-2xl space-y-4">
+      <section className="relative min-h-[420px] overflow-hidden rounded-3xl bg-linear-to-br from-orange-600 via-orange-500 to-amber-400 text-white p-6 sm:p-10 lg:p-12 shadow-xl shadow-orange-500/20">
+        <div className="absolute inset-y-0 right-0 hidden w-[52%] md:block">
+          <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-orange-600/30 to-transparent z-10" />
+          <img
+            src="https://images.unsplash.com/photo-1547592180-85f173990554?w=1000&auto=format&fit=crop&q=90"
+            alt="Các món ăn hấp dẫn"
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-orange-950/35 via-transparent to-white/10" />
+        </div>
+        <div className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-sm md:hidden" />
+
+        <div className="relative z-20 max-w-2xl space-y-4">
           <Tag color="gold" className="font-bold text-xs uppercase px-3 py-1 rounded-full border-none">
             <ThunderboltFilled className="mr-1" /> Giao hàng siêu tốc trong 20 phút
           </Tag>
@@ -121,7 +192,7 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* Feature Highlights */}
-        <div className="mt-8 pt-6 border-t border-white/20 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="relative z-20 mt-8 pt-6 border-t border-white/20 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-white/10 backdrop-blur-md">
               <ClockCircleOutlined className="text-xl" />
@@ -152,6 +223,65 @@ export const HomePage: React.FC = () => {
         </div>
       </section>
 
+      {/* Restaurant Directory */}
+      <section className="space-y-5">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Nhà hàng gần bạn</h2>
+          <p className="mt-1 text-sm text-gray-500">Tìm quán phù hợp theo loại ẩm thực hoặc tên nhà hàng</p>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {CUISINES.map((cuisine) => (
+            <Button
+              key={cuisine}
+              type={selectedCuisine === cuisine ? 'primary' : 'default'}
+              shape="round"
+              className={selectedCuisine === cuisine ? 'border-orange-500 bg-orange-500' : ''}
+              onClick={() => setSelectedCuisine(cuisine)}
+            >
+              {cuisine}
+            </Button>
+          ))}
+        </div>
+
+        <Row gutter={[20, 20]}>
+          {filteredRestaurants.map((restaurant) => (
+            <Col key={restaurant.id} xs={24} sm={12} lg={6}>
+              <Card
+                hoverable
+                onClick={() => navigate(`/restaurants/${restaurant.id}`)}
+                cover={
+                  <img
+                    alt={restaurant.name}
+                    src={restaurant.imageUrl}
+                    className="h-44 w-full object-cover"
+                  />
+                }
+                className="h-full overflow-hidden rounded-2xl border border-gray-100"
+                bodyStyle={{ padding: 16 }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-bold text-gray-900">{restaurant.name}</h3>
+                    <p className="mt-1 text-xs text-gray-500">{restaurant.cuisine} · {restaurant.address}</p>
+                  </div>
+                  <Tag color="gold" className="m-0 border-none"><StarFilled /> {restaurant.rating}</Tag>
+                </div>
+                <div className="mt-3 flex items-center gap-1 text-xs font-medium text-gray-500">
+                  <ClockCircleOutlined /> {restaurant.deliveryTime}
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+
+        {filteredRestaurants.length === 0 && (
+          <div className="rounded-2xl border border-gray-100 bg-white py-10 text-center text-gray-500">
+            Không tìm thấy nhà hàng phù hợp.
+          </div>
+        )}
+      </section>
+
       {/* Featured Items Grid */}
       <section className="space-y-6">
         <div className="flex items-center justify-between">
@@ -175,18 +305,21 @@ export const HomePage: React.FC = () => {
                 hoverable
                 onClick={() => navigate(`/restaurants/${item.shopId}`)}
                 cover={
-                  <div className="relative h-48 w-full overflow-hidden cursor-pointer group">
+                  <div className="relative h-52 w-full overflow-hidden cursor-pointer group bg-gray-100">
                     <img
                       alt={item.productName}
                       src={item.imageUrl}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
-                      <StarFilled className="text-amber-500" /> {item.rating}
+                    <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
+                    <div className="absolute top-3 left-3 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-gray-800 shadow-md flex items-center gap-1.5">
+                      <StarFilled className="text-amber-500" />
+                      <span>{item.rating}</span>
+                      <span className="font-normal text-gray-400">({item.reviewsCount})</span>
                     </div>
                   </div>
                 }
-                className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow flex flex-col justify-between h-full cursor-pointer"
+                className="food-feature-card rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all flex flex-col justify-between h-full cursor-pointer"
                 bodyStyle={{ padding: 16 }}
               >
                 <div>
@@ -194,22 +327,23 @@ export const HomePage: React.FC = () => {
                     <ShopOutlined /> {item.shopName}
                   </div>
                   <h3 className="font-bold text-gray-900 text-base line-clamp-1">{item.productName}</h3>
-                  <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">
                     <ClockCircleOutlined /> {item.prepTime}
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between gap-3">
                   <div className="font-extrabold text-orange-600 text-lg">
                     {formatCurrency(item.price)}
                   </div>
                   <Button
                     type="primary"
-                    shape="circle"
                     icon={<PlusOutlined />}
-                    className="bg-orange-500 hover:bg-orange-600 shadow-xs"
+                    className="bg-orange-500 hover:bg-orange-600 shadow-sm rounded-xl font-bold px-3"
                     onClick={(e) => handleQuickAdd(item, e)}
-                  />
+                  >
+                    <span className="hidden sm:inline">Thêm</span>
+                  </Button>
                 </div>
               </Card>
             </Col>

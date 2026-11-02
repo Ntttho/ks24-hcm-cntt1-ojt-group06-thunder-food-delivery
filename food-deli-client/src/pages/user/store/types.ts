@@ -9,6 +9,7 @@ export interface FoodItem {
   isPopular?: boolean;
   isNew?: boolean;
   soldCount?: number;
+
 }
 
 export interface StoreDetail {
