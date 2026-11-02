@@ -15,6 +15,10 @@ import {
   StoreMenuCategories,
   StoreFoodCard,
   StoreCartDrawer,
+<<<<<<< HEAD
+=======
+  FoodCustomizationModal,
+>>>>>>> feature/restaurant-list
 } from './components';
 import { StoreReviewSection } from '../store-review';
 import type { FoodItem, StoreDetail } from './types';
@@ -51,6 +55,30 @@ const MOCK_FOODS: FoodItem[] = [
     category: 'Cơm Tấm',
     isPopular: true,
     soldCount: 1240,
+<<<<<<< HEAD
+=======
+    customizationGroups: [
+      {
+        id: 1,
+        name: 'Chọn size',
+        required: true,
+        options: [
+          { id: 11, name: 'Size thường', price: 0 },
+          { id: 12, name: 'Size lớn', price: 15000 },
+        ],
+      },
+      {
+        id: 2,
+        name: 'Topping thêm',
+        multiple: true,
+        options: [
+          { id: 21, name: 'Thêm trứng', price: 8000 },
+          { id: 22, name: 'Thêm phô mai', price: 12000 },
+          { id: 23, name: 'Thêm chả trứng', price: 15000 },
+        ],
+      },
+    ],
+>>>>>>> feature/restaurant-list
   },
   {
     id: 102,
@@ -138,6 +166,14 @@ export const StoreDetailPage: React.FC = () => {
   const [activeCategory, setActiveCategory] = useState<string>('Tất cả');
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
+<<<<<<< HEAD
+=======
+  const [customizingFood, setCustomizingFood] = useState<FoodItem | null>(null);
+  const [pendingCustomization, setPendingCustomization] = useState<{
+    quantity: number;
+    toppings: Array<{ id: number; name: string; price: number }>;
+  } | null>(null);
+>>>>>>> feature/restaurant-list
 
   // Store data with dynamic ID support
   const store: StoreDetail = useMemo(
@@ -154,6 +190,7 @@ export const StoreDetailPage: React.FC = () => {
   }, [activeCategory]);
 
   const handleAddToCart = (food: FoodItem) => {
+<<<<<<< HEAD
     // Check if cart has items from another restaurant
     if (cartState.shopId && cartState.shopId !== Number(store.id)) {
       setPendingFood(food);
@@ -174,10 +211,46 @@ export const StoreDetailPage: React.FC = () => {
       })
     );
     message.success(`Đã thêm "${food.name}" vào giỏ hàng!`);
+=======
+    setCustomizingFood(food);
+  };
+
+  const confirmAddToCart = (
+    food: FoodItem,
+    quantity: number,
+    toppings: Array<{ id: number; name: string; price: number }>
+  ) => {
+    // Check if cart has items from another restaurant
+    if (cartState.shopId && cartState.shopId !== Number(store.id)) {
+      setPendingFood(food);
+      setPendingCustomization({ quantity, toppings });
+      setIsConflictOpen(true);
+      setCustomizingFood(null);
+      return;
+    }
+
+    const toppingKey = toppings.map((item) => item.id).sort((a, b) => a - b).join('-');
+    dispatch(
+      addToCart({
+        id: `food-${food.id}-${toppingKey || 'base'}`,
+        productId: Number(food.id),
+        productName: food.name,
+        price: food.price,
+        quantity,
+        imageUrl: food.imageUrl,
+        shopId: Number(store.id),
+        shopName: store.name,
+        toppings: toppings.length ? toppings : undefined,
+      })
+    );
+    message.success(`Đã thêm "${food.name}" vào giỏ hàng!`);
+    setCustomizingFood(null);
+>>>>>>> feature/restaurant-list
   };
 
   const handleConfirmReplaceCart = () => {
     if (!pendingFood) return;
+<<<<<<< HEAD
     dispatch(
       addToCart({
         id: `food-${pendingFood.id}`,
@@ -188,10 +261,29 @@ export const StoreDetailPage: React.FC = () => {
         imageUrl: pendingFood.imageUrl,
         shopId: Number(store.id),
         shopName: store.name,
+=======
+    const customization = pendingCustomization || { quantity: 1, toppings: [] };
+    const toppingKey = customization.toppings.map((item) => item.id).sort((a, b) => a - b).join('-');
+    dispatch(
+      addToCart({
+        id: `food-${pendingFood.id}-${toppingKey || 'base'}`,
+        productId: Number(pendingFood.id),
+        productName: pendingFood.name,
+        price: pendingFood.price,
+        quantity: customization.quantity,
+        imageUrl: pendingFood.imageUrl,
+        shopId: Number(store.id),
+        shopName: store.name,
+        toppings: customization.toppings.length ? customization.toppings : undefined,
+>>>>>>> feature/restaurant-list
       })
     );
     setIsConflictOpen(false);
     setPendingFood(null);
+<<<<<<< HEAD
+=======
+    setPendingCustomization(null);
+>>>>>>> feature/restaurant-list
     message.success(`Đã tạo giỏ hàng mới tại "${store.name}"!`);
   };
 
@@ -310,6 +402,15 @@ export const StoreDetailPage: React.FC = () => {
         newDishPrice={pendingFood?.price}
         newImageUrl={pendingFood?.imageUrl}
       />
+<<<<<<< HEAD
+=======
+      <FoodCustomizationModal
+        food={customizingFood}
+        open={Boolean(customizingFood)}
+        onClose={() => setCustomizingFood(null)}
+        onConfirm={confirmAddToCart}
+      />
+>>>>>>> feature/restaurant-list
     </div>
   );
 };

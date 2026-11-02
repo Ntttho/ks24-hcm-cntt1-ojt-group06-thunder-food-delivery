@@ -9,6 +9,26 @@ export interface FoodItem {
   isPopular?: boolean;
   isNew?: boolean;
   soldCount?: number;
+<<<<<<< HEAD
+=======
+  customizationGroups?: CustomizationGroup[];
+  rating?: number;
+  prepTime?: string;
+}
+
+export interface CustomizationOption {
+  id: number;
+  name: string;
+  price: number;
+}
+
+export interface CustomizationGroup {
+  id: number;
+  name: string;
+  required?: boolean;
+  multiple?: boolean;
+  options: CustomizationOption[];
+>>>>>>> feature/restaurant-list
 }
 
 export interface StoreDetail {
@@ -28,4 +48,7 @@ export interface StoreDetail {
   tags: string[];
   isVerified?: boolean;
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> feature/restaurant-list
