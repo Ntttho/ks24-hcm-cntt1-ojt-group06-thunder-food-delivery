@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { MainLayout, AuthLayout } from '@/layouts';
+import { MainLayout, AuthLayout, MerchantLayout } from '@/layouts';
 import {
   HomePage,
   LoginPage,
@@ -11,8 +11,11 @@ import {
   CheckoutPage,
   StoreDetailPage,
   StoreReviewPage,
+  MerchantDashboardPage,
+  MerchantMenuPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
+
 import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
@@ -87,4 +90,20 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  // Merchant Layout: Merchant Dashboard & Menu Management
+  {
+    path: '/merchant',
+    element: <MerchantLayout />,
+    children: [
+      {
+        index: true,
+        element: <MerchantDashboardPage />,
+      },
+      {
+        path: 'menu',
+        element: <MerchantMenuPage />,
+      },
+    ],
+  },
 ]);
+

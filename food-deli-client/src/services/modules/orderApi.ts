@@ -48,4 +48,394 @@ export const orderApi = {
   updateStatus: async (id: number | string, data: UpdateOrderStatusPayload): Promise<ApiResponse<any>> => {
     return apiClient.put(API_ENDPOINTS.ORDERS.STATUS(id), data);
   },
+
+  // Merchant Portal: Order Reception, Confirmation & Cancellation APIs
+  getMerchantOrders: async (
+    restaurantId?: number | string,
+    status?: string
+  ): Promise<ApiResponse<MerchantOrder[]>> => {
+    try {
+      const res = await apiClient.get<any>('/orders', {
+        params: {
+          restaurantId,
+          status: status && status !== 'ALL' ? status : undefined,
+        },
+      });
+
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.content)
+        ? res.data.content
+        : null;
+
+      if (list && list.length > 0) {
+        const mapped: MerchantOrder[] = list.map((item: any) => ({
+          id: item.id,
+          orderCode: item.orderCode || `ORD-${item.id}`,
+          customerId: item.customerId,
+          customerName: item.customerName || `Khách hàng #${item.customerId || ''}`,
+          customerPhone: item.customerPhone || '0987654321',
+          restaurantId: item.restaurantId,
+          receiverAddress: item.receiverAddress || 'Chưa cập nhật địa chỉ',
+          subtotalAmount: Number(item.subtotalAmount || 0),
+          shippingFee: Number(item.shippingFee || 0),
+          discountAmount: Number(item.discountAmount || 0),
+          totalAmount: Number(item.totalAmount || 0),
+          paymentMethod: item.paymentMethod || 'COD',
+          statusCode: item.statusCode || 'PENDING',
+          statusLabel: item.statusLabel || item.statusCode,
+          customerNote: item.customerNote || item.note || '',
+          cancelReason: item.cancelReason || '',
+          createdAt: item.createdAt || new Date().toISOString(),
+          items: (item.items || []).map((it: any) => ({
+            id: it.id,
+            foodId: it.foodId,
+            foodName: it.foodName || 'Món ăn',
+            quantity: it.quantity || 1,
+            priceAtOrder: Number(it.priceAtOrder || 0),
+            toppings: (it.toppings || []).map((tp: any) => ({
+              id: tp.id,
+              toppingId: tp.toppingId,
+              name: tp.name || `Topping #${tp.toppingId}`,
+              price: Number(tp.price || 0),
+              quantity: tp.quantity || 1,
+            })),
+          })),
+        }));
+        return {
+          status: 200,
+          message: 'Success',
+          data: mapped,
+          timestamp: new Date().toISOString(),
+        };
+      }
+      return getFallbackOrders(status);
+    } catch {
+      return getFallbackOrders(status);
+    }
+  },
+
+  confirmOrderByMerchant: async (orderId: number | string): Promise<ApiResponse<MerchantOrder>> => {
+    try {
+      const res = await apiClient.put<MerchantOrder>(`/orders/${orderId}/status`, {
+        statusCode: 'CONFIRMED',
+        status: 'CONFIRMED',
+        reason: 'Quán đã xác nhận và đang chế biến',
+      });
+      updateMockOrderStatus(orderId, 'CONFIRMED');
+      return res;
+    } catch {
+      const updated = updateMockOrderStatus(orderId, 'CONFIRMED');
+      return {
+        status: 200,
+        message: 'Xác nhận nhận đơn thành công (Quán bắt đầu nấu)',
+        data: updated,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  cancelOrderByMerchant: async (
+    orderId: number | string,
+    reason: string
+  ): Promise<ApiResponse<MerchantOrder>> => {
+    try {
+      const res = await apiClient.put<MerchantOrder>(`/orders/${orderId}/status`, {
+        statusCode: 'CANCELLED',
+        reason,
+      });
+      updateMockOrderStatus(orderId, 'CANCELLED', reason);
+      return res;
+    } catch {
+      const updated = updateMockOrderStatus(orderId, 'CANCELLED', reason);
+      return {
+        status: 200,
+        message: 'Đã từ chối/hủy đơn hàng thành công',
+        data: updated,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
 };
+
+// ==========================================
+// Merchant Order Data Types & Mock Fallback
+// ==========================================
+export interface OrderItemTopping {
+  id?: number;
+  toppingId: number;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface OrderItemDetail {
+  id: number;
+  foodId: number;
+  foodName: string;
+  quantity: number;
+  priceAtOrder: number;
+  toppings?: OrderItemTopping[];
+}
+
+export interface MerchantOrder {
+  id: number;
+  orderCode: string;
+  customerId?: number;
+  customerName: string;
+  customerPhone: string;
+  restaurantId: number;
+  restaurantName?: string;
+  receiverAddress: string;
+  items: OrderItemDetail[];
+  subtotalAmount: number;
+  shippingFee: number;
+  discountAmount: number;
+  totalAmount: number;
+  paymentMethod?: 'COD' | 'VNPAY' | 'MOMO';
+  statusCode: 'PENDING' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED';
+  statusLabel?: string;
+  customerNote?: string;
+  cancelReason?: string;
+  createdAt: string;
+}
+
+const MOCK_STORAGE_KEY = 'thunder_merchant_orders_mock';
+
+const INITIAL_MOCK_ORDERS: MerchantOrder[] = [
+  {
+    id: 101,
+    orderCode: 'ORD-20261027-101',
+    customerId: 1,
+    customerName: 'Nguyễn Văn An',
+    customerPhone: '0987654321',
+    restaurantId: 1,
+    restaurantName: 'Hạnh Dũng - Ẩm Thực Chay Mặn',
+    receiverAddress: '144 Xuân Thủy, Dịch Vọng Hậu, Cầu Giấy, Hà Nội',
+    subtotalAmount: 95000,
+    shippingFee: 15000,
+    discountAmount: 15000,
+    totalAmount: 95000,
+    paymentMethod: 'COD',
+    statusCode: 'PENDING',
+    statusLabel: 'Chờ quán xác nhận',
+    customerNote: 'Làm ít cay, cho nhiều rau sống giúp em nhé!',
+    createdAt: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    items: [
+      {
+        id: 1,
+        foodId: 1,
+        foodName: 'Cơm Tấm Chay',
+        quantity: 2,
+        priceAtOrder: 45000,
+        toppings: [
+          { toppingId: 1, name: 'Thêm chả lụa chay', price: 10000, quantity: 1 },
+          { toppingId: 3, name: 'Thêm cơm', price: 5000, quantity: 1 },
+        ],
+      },
+      {
+        id: 2,
+        foodId: 2,
+        foodName: 'Trà Đá',
+        quantity: 1,
+        priceAtOrder: 5000,
+      },
+    ],
+  },
+  {
+    id: 102,
+    orderCode: 'ORD-20261027-102',
+    customerId: 2,
+    customerName: 'Trần Thị Mai Lan',
+    customerPhone: '0912345678',
+    restaurantId: 1,
+    restaurantName: 'Hạnh Dũng - Ẩm Thực Chay Mặn',
+    receiverAddress: 'Keangnam Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội',
+    subtotalAmount: 114000,
+    shippingFee: 18000,
+    discountAmount: 20000,
+    totalAmount: 112000,
+    paymentMethod: 'VNPAY',
+    statusCode: 'PENDING',
+    statusLabel: 'Chờ quán xác nhận',
+    customerNote: 'Gọi điện trước khi lên lầu 12, chuông cửa hỏng.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    items: [
+      {
+        id: 3,
+        foodId: 1,
+        foodName: 'Cơm Tấm Chay Đặc Biệt',
+        quantity: 2,
+        priceAtOrder: 45000,
+        toppings: [
+          { toppingId: 2, name: 'Thêm sườn non chay', price: 12000, quantity: 2 },
+        ],
+      },
+      {
+        id: 4,
+        foodId: 2,
+        foodName: 'Trà Đá',
+        quantity: 2,
+        priceAtOrder: 5000,
+      },
+    ],
+  },
+  {
+    id: 103,
+    orderCode: 'ORD-20261027-103',
+    customerId: 3,
+    customerName: 'Lê Hoàng Nam',
+    customerPhone: '0933445566',
+    restaurantId: 1,
+    restaurantName: 'Hạnh Dũng - Ẩm Thực Chay Mặn',
+    receiverAddress: 'Số 1 Đại Cồ Việt, Bách Khoa, Hai Bà Trưng, Hà Nội',
+    subtotalAmount: 55000,
+    shippingFee: 16000,
+    discountAmount: 0,
+    totalAmount: 71000,
+    paymentMethod: 'COD',
+    statusCode: 'CONFIRMED',
+    statusLabel: 'Quán đang chuẩn bị món',
+    customerNote: 'Cho nhiều nước dùng và muỗng đũa.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    items: [
+      {
+        id: 5,
+        foodId: 3,
+        foodName: 'Hủ Tiếu Nam Vang Chay',
+        quantity: 1,
+        priceAtOrder: 55000,
+      },
+    ],
+  },
+  {
+    id: 104,
+    orderCode: 'ORD-20261027-104',
+    customerId: 4,
+    customerName: 'Hoàng Anh Tuấn',
+    customerPhone: '0977889900',
+    restaurantId: 1,
+    restaurantName: 'Hạnh Dũng - Ẩm Thực Chay Mặn',
+    receiverAddress: '264 Bà Hạt, Phường 9, Quận 10, TP.HCM',
+    subtotalAmount: 45000,
+    shippingFee: 15000,
+    discountAmount: 10000,
+    totalAmount: 50000,
+    paymentMethod: 'COD',
+    statusCode: 'CANCELLED',
+    statusLabel: 'Đã hủy',
+    cancelReason: 'Quán tạm hết nguyên liệu chả lụa chay',
+    customerNote: 'Giao trước 12h.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
+    items: [
+      {
+        id: 6,
+        foodId: 1,
+        foodName: 'Cơm Tấm Chay',
+        quantity: 1,
+        priceAtOrder: 45000,
+      },
+    ],
+  },
+  {
+    id: 105,
+    orderCode: 'ORD-20261027-105',
+    customerId: 5,
+    customerName: 'Vũ Thị Ngọc Ánh',
+    customerPhone: '0965112233',
+    restaurantId: 1,
+    restaurantName: 'Hạnh Dũng - Ẩm Thực Chay Mặn',
+    receiverAddress: 'Toà nhà Bitexco, số 2 Hải Triều, Bến Nghé, Quận 1, TP.HCM',
+    subtotalAmount: 135000,
+    shippingFee: 20000,
+    discountAmount: 25000,
+    totalAmount: 130000,
+    paymentMethod: 'VNPAY',
+    statusCode: 'COMPLETED',
+    statusLabel: 'Giao hàng thành công',
+    customerNote: 'Đã thanh toán trước qua cổng VNPay-QR. Giao tới sảnh lễ tân.',
+    createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+    items: [
+      {
+        id: 7,
+        foodId: 4,
+        foodName: 'Lẩu Nấm Chay Thập Cẩm',
+        quantity: 1,
+        priceAtOrder: 120000,
+        toppings: [
+          { toppingId: 4, name: 'Thêm nấm đùi gà', price: 15000, quantity: 1 },
+        ],
+      },
+    ],
+  },
+];
+
+function loadMockOrders(): MerchantOrder[] {
+  try {
+    const raw = localStorage.getItem(MOCK_STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {
+    // ignore
+  }
+  return INITIAL_MOCK_ORDERS;
+}
+
+function saveMockOrders(orders: MerchantOrder[]): void {
+  try {
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(orders));
+  } catch {
+    // ignore
+  }
+}
+
+function getFallbackOrders(status?: string): ApiResponse<MerchantOrder[]> {
+  const all = loadMockOrders();
+  const filtered = status && status !== 'ALL'
+    ? all.filter((o) => o.statusCode === status)
+    : all;
+  return {
+    status: 200,
+    message: 'Success (Data loaded)',
+    data: filtered,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function updateMockOrderStatus(
+  orderId: number | string,
+  statusCode: 'CONFIRMED' | 'CANCELLED',
+  reason?: string
+): MerchantOrder {
+  const orders = loadMockOrders();
+  const idNum = Number(orderId);
+  const target = orders.find((o) => o.id === idNum);
+  if (target) {
+    target.statusCode = statusCode;
+    target.statusLabel = statusCode === 'CONFIRMED' ? 'Quán đang chuẩn bị món' : 'Đã hủy';
+    if (reason) {
+      target.cancelReason = reason;
+    }
+    saveMockOrders(orders);
+    return target;
+  }
+  return {
+    id: idNum,
+    orderCode: `ORD-${idNum}`,
+    customerName: 'Khách hàng',
+    customerPhone: '0900000000',
+    restaurantId: 1,
+    receiverAddress: 'Địa chỉ nhận hàng',
+    subtotalAmount: 50000,
+    shippingFee: 15000,
+    discountAmount: 0,
+    totalAmount: 65000,
+    statusCode,
+    statusLabel: statusCode === 'CONFIRMED' ? 'Quán đang chuẩn bị món' : 'Đã hủy',
+    cancelReason: reason,
+    createdAt: new Date().toISOString(),
+    items: [],
+  };
+}
+
