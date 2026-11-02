@@ -29,6 +29,7 @@ public class OrderResponse {
     private BigDecimal shippingFee;
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
+    private String paymentMethod;
     private String statusCode;
     private String statusLabel;
     private Integer version;

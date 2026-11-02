@@ -68,6 +68,10 @@ public class Order {
     @Column(name = "total_amount", precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
+    @Column(name = "payment_method", length = 30)
+    @Builder.Default
+    private String paymentMethod = "COD";
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "status_id", nullable = false)
     private OrderStatus status;

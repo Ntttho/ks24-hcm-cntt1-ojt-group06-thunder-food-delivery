@@ -3,10 +3,12 @@ package com.foodthunder.order.service;
 import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.*;
 import com.foodthunder.order.dto.client.RemoteProductDto;
+import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
 import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
@@ -46,6 +48,7 @@ class OrderServiceTest {
     @InjectMocks
     private OrderServiceImpl orderService;
 
+    private OrderStatus awaitingPaymentStatus;
     private OrderStatus pendingStatus;
     private OrderStatus confirmedStatus;
     private OrderStatus driverAcceptedStatus;
@@ -53,9 +56,11 @@ class OrderServiceTest {
     private OrderStatus deliveringStatus;
     private OrderStatus completedStatus;
     private OrderStatus cancelledStatus;
+    private RemoteRestaurantDto validRestaurantDto;
 
     @BeforeEach
     void setUp() {
+        awaitingPaymentStatus = OrderStatus.builder().id(0).code(OrderStatus.AWAITING_PAYMENT).label("Chờ thanh toán VNPay").build();
         pendingStatus = OrderStatus.builder().id(1).code(OrderStatus.PENDING).label("Chờ xác nhận").build();
         confirmedStatus = OrderStatus.builder().id(4).code(OrderStatus.CONFIRMED).label("Đã xác nhận").build();
         driverAcceptedStatus = OrderStatus.builder().id(2).code(OrderStatus.DRIVER_ACCEPTED).label("Tài xế đã nhận").build();
@@ -63,10 +68,17 @@ class OrderServiceTest {
         deliveringStatus = OrderStatus.builder().id(6).code(OrderStatus.DELIVERING).label("Đang giao hàng").build();
         completedStatus = OrderStatus.builder().id(7).code(OrderStatus.COMPLETED).label("Hoàn thành").build();
         cancelledStatus = OrderStatus.builder().id(8).code(OrderStatus.CANCELLED).label("Đã hủy").build();
+
+        validRestaurantDto = RemoteRestaurantDto.builder()
+                .id(10)
+                .name("Quán Ăn Ngon")
+                .isOpen(true)
+                .approvalStatus("APPROVED")
+                .build();
     }
 
     @Test
-    @DisplayName("Tạo đơn hàng thành công khi tất cả món cùng thuộc 1 quán và tính giá chính xác")
+    @DisplayName("Tạo đơn hàng COD thành công khi quán hợp lệ và tất cả món cùng thuộc 1 quán")
     void testCreateOrder_Success() {
         // Given
         CreateOrderRequest request = CreateOrderRequest.builder()
@@ -74,6 +86,7 @@ class OrderServiceTest {
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .distanceKm(3.2)
                 .idempotencyKey("KEY-123456")
+                .paymentMethod("COD")
                 .items(List.of(
                         CreateOrderItemRequest.builder()
                                 .foodId(101)
@@ -102,10 +115,9 @@ class OrderServiceTest {
                 .build();
 
         when(orderRepository.findByIdempotencyKey("KEY-123456")).thenReturn(Optional.empty());
-        when(restaurantClient.getProductDetail(101))
-                .thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
-        when(orderStatusRepository.findByCode(OrderStatus.PENDING))
-                .thenReturn(Optional.of(pendingStatus));
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+        when(orderStatusRepository.findByCode(OrderStatus.PENDING)).thenReturn(Optional.of(pendingStatus));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
             o.setId(5001L);
@@ -119,6 +131,7 @@ class OrderServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getId()).isEqualTo(5001L);
         assertThat(response.getStatusCode()).isEqualTo(OrderStatus.PENDING);
+        assertThat(response.getPaymentMethod()).isEqualTo("COD");
         assertThat(response.getRestaurantId()).isEqualTo(10);
         // Subtotal: (45000 * 2) + (10000 * 1 * 2) = 110,000
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(110000));
@@ -129,6 +142,78 @@ class OrderServiceTest {
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getFoodName()).isEqualTo("Trà Sữa Ô Long");
         assertThat(response.getItems().get(0).getToppings()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Tạo đơn hàng VNPay thành công và lưu trạng thái ban đầu là AWAITING_PAYMENT")
+    void testCreateOrder_VNPay_Success() {
+        // Given
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Phố Huế, Hà Nội")
+                .distanceKm(2.0)
+                .idempotencyKey("KEY-VNPAY-01")
+                .paymentMethod("VNPAY")
+                .items(List.of(
+                        CreateOrderItemRequest.builder().foodId(101).quantity(1).build()
+                ))
+                .build();
+
+        RemoteProductDto productDto = RemoteProductDto.builder()
+                .id(101)
+                .name("Trà Sữa Ô Long")
+                .price(BigDecimal.valueOf(45000))
+                .restaurantId(10)
+                .isAvailable(true)
+                .build();
+
+        when(orderRepository.findByIdempotencyKey("KEY-VNPAY-01")).thenReturn(Optional.empty());
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+        when(orderStatusRepository.findByCode(OrderStatus.AWAITING_PAYMENT)).thenReturn(Optional.of(awaitingPaymentStatus));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId(6001L);
+            return o;
+        });
+
+        // When
+        OrderResponse response = orderService.createOrder(request, 1);
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(6001L);
+        assertThat(response.getStatusCode()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
+        assertThat(response.getPaymentMethod()).isEqualTo("VNPAY");
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(60000)); // 45k + 15k ship
+    }
+
+    @Test
+    @DisplayName("Ném lỗi BadRequest khi quán ăn đang đóng cửa (isOpen = false)")
+    void testCreateOrder_RestaurantClosed_ThrowsBadRequest() {
+        // Given
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Phố Huế")
+                .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(1).build()))
+                .build();
+
+        RemoteRestaurantDto closedRestaurant = RemoteRestaurantDto.builder()
+                .id(10)
+                .name("Quán Trà Đóng Cửa")
+                .isOpen(false)
+                .approvalStatus("APPROVED")
+                .build();
+
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(closedRestaurant)));
+
+        // When & Then
+        assertThatThrownBy(() -> orderService.createOrder(request, 1))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("đang đóng cửa");
+
+        verify(restaurantClient, never()).getProductDetail(any());
+        verify(orderRepository, never()).save(any());
     }
 
     @Test
@@ -151,8 +236,8 @@ class OrderServiceTest {
                 .isAvailable(true)
                 .build();
 
-        when(restaurantClient.getProductDetail(101))
-                .thenReturn(ResponseEntity.ok(ApiResponse.success(productDifferentShop)));
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDifferentShop)));
 
         // When & Then
         assertThatThrownBy(() -> orderService.createOrder(request, 1))
@@ -174,6 +259,7 @@ class OrderServiceTest {
                 .restaurantId(10)
                 .status(pendingStatus)
                 .totalAmount(BigDecimal.valueOf(100000))
+                .paymentMethod("COD")
                 .build();
 
         when(orderRepository.findByIdempotencyKey("KEY-REPEAT")).thenReturn(Optional.of(existing));
@@ -191,12 +277,13 @@ class OrderServiceTest {
         // Then
         assertThat(response.getId()).isEqualTo(888L);
         assertThat(response.getOrderCode()).isEqualTo("ORD-20261101-888");
+        verify(restaurantClient, never()).getRestaurantDetail(any());
         verify(restaurantClient, never()).getProductDetail(any());
         verify(orderRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("Chuyển trạng thái Order State Machine hợp lệ qua các bước tuần tự")
+    @DisplayName("Chuyển trạng thái Order State Machine hợp lệ qua các bước tuần tự với Pessimistic Lock")
     void testUpdateOrderStatus_ValidStateMachineWorkflow() {
         // Given
         Order order = Order.builder()
@@ -207,7 +294,7 @@ class OrderServiceTest {
                 .status(pendingStatus)
                 .build();
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
         when(orderStatusRepository.findByCode(OrderStatus.CONFIRMED)).thenReturn(Optional.of(confirmedStatus));
         when(orderStatusRepository.findByCode(OrderStatus.DRIVER_ACCEPTED)).thenReturn(Optional.of(driverAcceptedStatus));
         when(orderStatusRepository.findByCode(OrderStatus.PICKING_UP)).thenReturn(Optional.of(pickingUpStatus));
@@ -215,31 +302,75 @@ class OrderServiceTest {
         when(orderStatusRepository.findByCode(OrderStatus.COMPLETED)).thenReturn(Optional.of(completedStatus));
         when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
 
-        // 1. PENDING -> CONFIRMED
+        // 1. PENDING -> CONFIRMED (Merchant xác nhận)
         OrderResponse res1 = orderService.updateOrderStatus(1L,
                 UpdateOrderStatusRequest.builder().statusCode(OrderStatus.CONFIRMED).reason("Quán nhận đơn").build(), 2, "ROLE_MERCHANT");
         assertThat(res1.getStatusCode()).isEqualTo(OrderStatus.CONFIRMED);
 
-        // 2. CONFIRMED -> DRIVER_ACCEPTED
+        // 2. CONFIRMED -> DRIVER_ACCEPTED (Driver nhận đơn)
         OrderResponse res2 = orderService.updateOrderStatus(1L,
                 UpdateOrderStatusRequest.builder().statusCode(OrderStatus.DRIVER_ACCEPTED).reason("Tài xế nhận cuốc").build(), 3, "ROLE_DRIVER");
         assertThat(res2.getStatusCode()).isEqualTo(OrderStatus.DRIVER_ACCEPTED);
         assertThat(res2.getDriverId()).isEqualTo(3);
 
-        // 3. DRIVER_ACCEPTED -> PICKING_UP
+        // 3. DRIVER_ACCEPTED -> PICKING_UP (Driver tới quán)
         OrderResponse res3 = orderService.updateOrderStatus(1L,
                 UpdateOrderStatusRequest.builder().statusCode(OrderStatus.PICKING_UP).reason("Đã đến quán lấy đồ").build(), 3, "ROLE_DRIVER");
         assertThat(res3.getStatusCode()).isEqualTo(OrderStatus.PICKING_UP);
 
-        // 4. PICKING_UP -> DELIVERING
+        // 4. PICKING_UP -> DELIVERING (Driver đang giao)
         OrderResponse res4 = orderService.updateOrderStatus(1L,
                 UpdateOrderStatusRequest.builder().statusCode(OrderStatus.DELIVERING).reason("Đang đi giao").build(), 3, "ROLE_DRIVER");
         assertThat(res4.getStatusCode()).isEqualTo(OrderStatus.DELIVERING);
 
-        // 5. DELIVERING -> COMPLETED
+        // 5. DELIVERING -> COMPLETED (Driver giao thành công)
         OrderResponse res5 = orderService.updateOrderStatus(1L,
                 UpdateOrderStatusRequest.builder().statusCode(OrderStatus.COMPLETED).reason("Giao thành công").build(), 3, "ROLE_DRIVER");
         assertThat(res5.getStatusCode()).isEqualTo(OrderStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("Khách hàng hủy đơn ở trạng thái PENDING thành công")
+    void testUpdateOrderStatus_CustomerCancelsPending_Success() {
+        // Given
+        Order order = Order.builder()
+                .id(1L)
+                .orderCode("ORD-001")
+                .customerId(10)
+                .restaurantId(10)
+                .status(pendingStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
+        when(orderStatusRepository.findByCode(OrderStatus.CANCELLED)).thenReturn(Optional.of(cancelledStatus));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse res = orderService.updateOrderStatus(1L,
+                UpdateOrderStatusRequest.builder().statusCode(OrderStatus.CANCELLED).reason("Khách đổi ý").build(), 10, "ROLE_CUSTOMER");
+
+        assertThat(res.getStatusCode()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getCancelledByUserId()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("Ném lỗi Forbidden khi khách hàng cố tình chuyển trạng thái sang CONFIRMED")
+    void testUpdateOrderStatus_CustomerCannotConfirm_ThrowsForbidden() {
+        // Given
+        Order order = Order.builder()
+                .id(1L)
+                .customerId(10)
+                .status(pendingStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
+
+        UpdateOrderStatusRequest req = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.CONFIRMED)
+                .build();
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(1L, req, 10, "ROLE_CUSTOMER"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("không có quyền");
     }
 
     @Test
@@ -248,18 +379,19 @@ class OrderServiceTest {
         // Given: Đơn hàng đang ở PENDING
         Order order = Order.builder()
                 .id(1L)
+                .customerId(1)
                 .status(pendingStatus)
                 .build();
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
-        // Cố tình chuyển thẳng từ PENDING sang COMPLETED
+        // Cố tình chuyển thẳng từ PENDING sang COMPLETED (Admin)
         UpdateOrderStatusRequest invalidRequest = UpdateOrderStatusRequest.builder()
                 .statusCode(OrderStatus.COMPLETED)
                 .build();
 
         // When & Then
-        assertThatThrownBy(() -> orderService.updateOrderStatus(1L, invalidRequest, 1, "ROLE_CUSTOMER"))
+        assertThatThrownBy(() -> orderService.updateOrderStatus(1L, invalidRequest, 999, "ROLE_ADMIN"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không thể chuyển trạng thái");
     }
@@ -270,10 +402,11 @@ class OrderServiceTest {
         // Given: Đơn hàng đã COMPLETED
         Order order = Order.builder()
                 .id(1L)
+                .customerId(1)
                 .status(completedStatus)
                 .build();
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(order));
 
         UpdateOrderStatusRequest cancelRequest = UpdateOrderStatusRequest.builder()
                 .statusCode(OrderStatus.CANCELLED)
@@ -281,7 +414,7 @@ class OrderServiceTest {
                 .build();
 
         // When & Then
-        assertThatThrownBy(() -> orderService.updateOrderStatus(1L, cancelRequest, 1, "ROLE_CUSTOMER"))
+        assertThatThrownBy(() -> orderService.updateOrderStatus(1L, cancelRequest, 999, "ROLE_ADMIN"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không thể chuyển trạng thái");
     }

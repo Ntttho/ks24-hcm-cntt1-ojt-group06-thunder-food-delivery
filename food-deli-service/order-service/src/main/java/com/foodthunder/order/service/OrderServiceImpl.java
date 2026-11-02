@@ -3,10 +3,13 @@ package com.foodthunder.order.service;
 import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.*;
 import com.foodthunder.order.dto.client.RemoteProductDto;
+import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
 import com.foodthunder.order.entity.*;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.exception.ResourceNotFoundException;
+import com.foodthunder.order.exception.UnauthorizedException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
@@ -42,6 +45,7 @@ public class OrderServiceImpl implements OrderService {
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
     private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
+            OrderStatus.AWAITING_PAYMENT, Set.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
             OrderStatus.PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
             OrderStatus.CONFIRMED, Set.of(OrderStatus.DRIVER_ACCEPTED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
             OrderStatus.DRIVER_ACCEPTED, Set.of(OrderStatus.PICKING_UP, OrderStatus.DRIVER_REJECTED, OrderStatus.CANCELLED),
@@ -57,7 +61,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request, Integer customerId) {
         if (customerId == null) {
-            customerId = 1; // Default fallback if not yet passed from auth token
+            throw new UnauthorizedException("Yêu cầu thông tin định danh khách hàng hợp lệ (X-User-Id)");
         }
         log.info("Starting order creation for customerId: {}, restaurantId: {}", customerId, request.getRestaurantId());
 
@@ -73,8 +77,30 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 2. Fetch products and validate single-shop constraint via OpenFeign
+        // 2. Validate restaurant existence and operational status via OpenFeign
         Integer targetRestaurantId = request.getRestaurantId();
+        ResponseEntity<ApiResponse<RemoteRestaurantDto>> restaurantResponse;
+        try {
+            restaurantResponse = restaurantClient.getRestaurantDetail(targetRestaurantId);
+        } catch (Exception e) {
+            log.error("Failed to fetch restaurant id: {} from restaurant-service", targetRestaurantId, e);
+            throw new ResourceNotFoundException("Không tìm thấy thông tin quán ăn với ID=" + targetRestaurantId);
+        }
+
+        if (restaurantResponse == null || restaurantResponse.getBody() == null || restaurantResponse.getBody().getData() == null) {
+            throw new ResourceNotFoundException("Không tìm thấy thông tin quán ăn với ID=" + targetRestaurantId);
+        }
+
+        RemoteRestaurantDto restaurantDto = restaurantResponse.getBody().getData();
+        if (restaurantDto.getApprovalStatus() != null && !"APPROVED".equalsIgnoreCase(restaurantDto.getApprovalStatus())) {
+            throw new BadRequestException("Quán ăn '" + restaurantDto.getName() + "' hiện chưa được phê duyệt hoạt động");
+        }
+
+        if (Boolean.FALSE.equals(restaurantDto.getIsOpen())) {
+            throw new BadRequestException("Quán ăn '" + restaurantDto.getName() + "' hiện đang đóng cửa hoặc tạm ngưng nhận đơn");
+        }
+
+        // 3. Fetch products and validate single-shop constraint via OpenFeign
         BigDecimal subtotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
 
@@ -159,8 +185,21 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal totalAmount = subtotal.add(shippingFee).add(taxAmount).subtract(discountAmount);
 
-        // 4. Retrieve initial status PENDING
-        OrderStatus pendingStatus = getOrCreateStatus(OrderStatus.PENDING, "Chờ xác nhận", "Đơn hàng vừa được tạo, đang chờ xử lý", 1);
+        // 4. Retrieve initial status based on payment method (COD vs VNPAY)
+        String paymentMethod = (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank())
+                ? request.getPaymentMethod().trim().toUpperCase() : "COD";
+
+        OrderStatus initialStatus;
+        String initialReason;
+        if ("VNPAY".equalsIgnoreCase(paymentMethod)) {
+            paymentMethod = "VNPAY";
+            initialStatus = getOrCreateStatus(OrderStatus.AWAITING_PAYMENT, "Chờ thanh toán VNPay", "Đơn hàng đang chờ thanh toán qua cổng VNPay Sandbox", 1);
+            initialReason = "Khách hàng tạo đơn hàng qua VNPay (Chờ thanh toán)";
+        } else {
+            paymentMethod = "COD";
+            initialStatus = getOrCreateStatus(OrderStatus.PENDING, "Chờ xác nhận", "Đơn hàng vừa được tạo, đang chờ xử lý", 2);
+            initialReason = "Khách hàng tạo đơn hàng COD (Chờ xác nhận)";
+        }
 
         // 5. Generate unique order code
         String orderCode = generateOrderCode();
@@ -181,7 +220,8 @@ public class OrderServiceImpl implements OrderService {
                 .shippingFee(shippingFee)
                 .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
-                .status(pendingStatus)
+                .paymentMethod(paymentMethod)
+                .status(initialStatus)
                 .version(0)
                 .createdAt(LocalDateTime.now())
                 .build();
@@ -192,15 +232,16 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatusLog initialLog = OrderStatusLog.builder()
                 .previousStatus(null)
-                .newStatus(OrderStatus.PENDING)
+                .newStatus(initialStatus.getCode())
                 .changedBy(customerId)
-                .reason("Khách hàng tạo đơn hàng")
+                .reason(initialReason)
                 .createdAt(LocalDateTime.now())
                 .build();
         order.addStatusLog(initialLog);
 
         Order savedOrder = orderRepository.save(order);
-        log.info("Order created successfully with id: {}, code: {}", savedOrder.getId(), savedOrder.getOrderCode());
+        log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, status: {}",
+                savedOrder.getId(), savedOrder.getOrderCode(), paymentMethod, initialStatus.getCode());
 
         return mapToOrderResponse(savedOrder);
     }
@@ -278,26 +319,53 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request, Integer requestingUserId, String requestingUserRole) {
-        Order order = orderRepository.findById(orderId)
+        // Pessimistic Locking with SELECT ... FOR UPDATE to prevent race conditions during status changes
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng với ID=" + orderId));
 
         String currentStatus = order.getStatus().getCode();
         String targetStatus = request.getStatusCode().trim().toUpperCase();
 
-        log.info("Request status transition for order {}: {} -> {}", orderId, currentStatus, targetStatus);
+        log.info("Request status transition for order {}: {} -> {} (user: {}, role: {})",
+                orderId, currentStatus, targetStatus, requestingUserId, requestingUserRole);
 
         // 1. If same status, no-op return
         if (currentStatus.equals(targetStatus)) {
             return mapToOrderResponse(order);
         }
 
-        // 2. Validate state machine transition
+        // 2. Validate state machine transition graph
         Set<String> allowedNext = ALLOWED_TRANSITIONS.getOrDefault(currentStatus, Collections.emptySet());
         if (!allowedNext.contains(targetStatus)) {
             throw new BadRequestException("Không thể chuyển trạng thái đơn hàng từ '" + currentStatus + "' sang '" + targetStatus + "'");
         }
 
-        // 3. Handle status-specific side effects
+        // 3. RBAC validation based on user role
+        if (requestingUserRole != null && !requestingUserRole.isBlank()) {
+            String roleUpper = requestingUserRole.toUpperCase();
+            if (roleUpper.contains("CUSTOMER")) {
+                if (requestingUserId != null && !requestingUserId.equals(order.getCustomerId())) {
+                    throw new ForbiddenException("Bạn không có quyền thao tác trên đơn hàng của người khác");
+                }
+                if (OrderStatus.CANCELLED.equals(targetStatus)) {
+                    if (!OrderStatus.PENDING.equals(currentStatus) && !OrderStatus.AWAITING_PAYMENT.equals(currentStatus)) {
+                        throw new BadRequestException("Khách hàng chỉ có thể hủy đơn khi đơn hàng đang ở trạng thái Chờ thanh toán hoặc Chờ xác nhận");
+                    }
+                } else {
+                    throw new ForbiddenException("Khách hàng không có quyền chuyển trạng thái đơn hàng sang '" + targetStatus + "'");
+                }
+            } else if (roleUpper.contains("DRIVER")) {
+                if (OrderStatus.CANCELLED.equals(targetStatus)) {
+                    throw new BadRequestException("Tài xế không thể hủy đơn trực tiếp, vui lòng thực hiện qua quy trình trả đơn");
+                }
+            } else if (roleUpper.contains("MERCHANT")) {
+                if (!OrderStatus.CONFIRMED.equals(targetStatus) && !OrderStatus.CANCELLED.equals(targetStatus)) {
+                    throw new BadRequestException("Quán ăn chỉ có quyền xác nhận đơn (CONFIRMED) hoặc từ chối hủy đơn (CANCELLED)");
+                }
+            }
+        }
+
+        // 4. Handle status-specific side effects
         if (OrderStatus.CANCELLED.equals(targetStatus)) {
             order.setCancelReason(request.getReason() != null ? request.getReason() : "Đơn hàng đã bị hủy");
             order.setCancelledByRole(requestingUserRole != null ? requestingUserRole : "SYSTEM");
@@ -406,6 +474,7 @@ public class OrderServiceImpl implements OrderService {
                 .shippingFee(order.getShippingFee())
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
+                .paymentMethod(order.getPaymentMethod())
                 .statusCode(order.getStatus() != null ? order.getStatus().getCode() : null)
                 .statusLabel(order.getStatus() != null ? order.getStatus().getLabel() : null)
                 .version(order.getVersion())
