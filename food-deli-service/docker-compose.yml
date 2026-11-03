@@ -89,6 +89,10 @@ services:
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      - VNP_TMNCODE=${VNP_TMNCODE:-QF8R0HDB}
+      - VNP_HASHSECRET=${VNP_HASHSECRET:-OQQTQXPPWRLNWHQFDNWCGMDYZTSYHHMP}
+      - VNP_URL=${VNP_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      - VNP_RETURN_URL=${VNP_RETURN_URL:-http://localhost:5173/payment/vnpay-return}
     networks:
       - foodthunder-network
     healthcheck:
