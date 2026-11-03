@@ -15,6 +15,12 @@
     <description>Order Fulfillment, Cart, and State Machine Microservice for Food Thunder Deli</description>
 
     <dependencies>
+        <!-- Shared Common Library -->
+        <dependency>
+            <groupId>com.foodthunder</groupId>
+            <artifactId>common-library-service</artifactId>
+        </dependency>
+
         <!-- Spring Boot Web Starter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

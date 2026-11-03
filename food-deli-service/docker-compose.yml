@@ -3,19 +3,24 @@ services:
   mysql:
     image: mysql:8.0
     container_name: ft-mysql
+    restart: unless-stopped
     ports:
       - "${MYSQL_PORT:-3307}:3306"
     environment:
-      MYSQL_ROOT_PASSWORD: "root"
-      MYSQL_DATABASE: "grabfood_db"
-    command: --default-authentication-plugin=mysql_native_password
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:-root}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE:-grabfood_db}"
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
     volumes:
-      - ../database/seed_all.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+      - ../database/seed_all.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - foodthunder-network
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 10
       start_period: 20s
@@ -26,6 +31,7 @@ services:
       context: ./discovery-service
       dockerfile: Dockerfile
     container_name: ft-discovery-service
+    restart: unless-stopped
     ports:
       - "8761:8761"
     environment:
@@ -36,7 +42,7 @@ services:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8761/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 6
       start_period: 30s
 
   # 2. Centralized Configuration Server
@@ -45,6 +51,7 @@ services:
       context: ./config-server
       dockerfile: Dockerfile
     container_name: ft-config-server
+    restart: unless-stopped
     ports:
       - "8888:8888"
     depends_on:
@@ -60,7 +67,7 @@ services:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8888/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 6
       start_period: 30s
 
   # 3. API Gateway with Dynamic Load Balancing
@@ -69,6 +76,7 @@ services:
       context: ./api-gateway
       dockerfile: Dockerfile
     container_name: ft-api-gateway
+    restart: unless-stopped
     ports:
       - "8080:8080"
     depends_on:
@@ -80,8 +88,15 @@ services:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     networks:
       - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   # 4. Auth & User Microservice
   auth-service:
@@ -89,6 +104,7 @@ services:
       context: ./auth-service
       dockerfile: Dockerfile
     container_name: ft-auth-service
+    restart: unless-stopped
     ports:
       - "8081:8081"
     depends_on:
@@ -106,8 +122,15 @@ services:
       - MYSQL_PORT=3306
       - MYSQL_USER=root
       - MYSQL_PASSWORD=root
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
     networks:
       - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   # 5. Restaurant & Catalog Microservice
   restaurant-service:
@@ -115,6 +138,7 @@ services:
       context: ./restaurant-service
       dockerfile: Dockerfile
     container_name: ft-restaurant-service
+    restart: unless-stopped
     ports:
       - "8082:8082"
     depends_on:
@@ -133,6 +157,12 @@ services:
       - DB_PASSWORD=root
     networks:
       - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   # 6. Order Fulfillment & State Machine Microservice
   order-service:
@@ -140,6 +170,7 @@ services:
       context: ./order-service
       dockerfile: Dockerfile
     container_name: ft-order-service
+    restart: unless-stopped
     ports:
       - "8083:8083"
     depends_on:
@@ -158,9 +189,53 @@ services:
       - DB_PASSWORD=root
     networks:
       - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  # 7. Payment Microservice (VNPay Sandbox & COD - Port 8085)
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: ft-payment-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=grabfood_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8085/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  mysql_data:
+    name: ft_mysql_data
+    driver: local
 
 networks:
   foodthunder-network:
     name: foodthunder-microservices-net
     driver: bridge
-

@@ -32,7 +32,13 @@ spring:
           predicates:
             - Path=/api/v1/orders/**, /api/v1/cart/**
 
-        # 4. Delivery & Shipper Hub Microservice (Load balanced)
+        # 4. Payment Microservice (Load balanced - VNPay & COD)
+        - id: payment-service-route
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/v1/payments/**
+
+        # 5. Delivery & Shipper Hub Microservice (Load balanced)
         - id: delivery-service-route
           uri: lb://delivery-service
           predicates:
