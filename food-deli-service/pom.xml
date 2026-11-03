@@ -19,6 +19,7 @@
     <description>Food Thunder Deli Microservices Platform Parent POM</description>
 
     <modules>
+        <module>common-library-service</module>
         <module>discovery-service</module>
         <module>config-server</module>
         <module>api-gateway</module>
@@ -38,6 +39,13 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Shared Common Library Module -->
+            <dependency>
+                <groupId>com.foodthunder</groupId>
+                <artifactId>common-library-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
             <!-- Spring Cloud Dependencies Release Train -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>

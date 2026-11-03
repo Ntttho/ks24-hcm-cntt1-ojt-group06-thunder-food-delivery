@@ -17,6 +17,12 @@
     <description>Restaurant &amp; Catalog Microservice for Food Thunder Deli</description>
 
     <dependencies>
+        <!-- Shared Common Library -->
+        <dependency>
+            <groupId>com.foodthunder</groupId>
+            <artifactId>common-library-service</artifactId>
+        </dependency>
+
         <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
