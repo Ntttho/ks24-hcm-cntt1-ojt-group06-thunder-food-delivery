@@ -6,4 +6,4 @@ export * from './profile/ProfilePage';
 export * from './not-found/NotFoundPage';
 export * from './user';
 export * from './merchant';
-
+export * from './order';
