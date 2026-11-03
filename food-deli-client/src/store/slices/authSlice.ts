@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { authApi } from '@/services/modules/authApi';
 import { storage } from '@/utils/storage';
+import { isTokenExpired, getRoleFromToken } from '@/utils/jwt';
 import type {
   AuthResponse,
   AuthState,
@@ -10,9 +11,18 @@ import type {
   User,
 } from '@/types';
 
-// Load initial state from localStorage if available
-const storedToken = storage.getToken();
-const storedUser = storage.getUser();
+// Load initial state from localStorage if available and not expired
+const rawToken = storage.getToken();
+const rawUser = storage.getUser();
+const tokenIsExpired = isTokenExpired(rawToken);
+
+if (rawToken && tokenIsExpired) {
+  storage.removeToken();
+  storage.removeUser();
+}
+
+const storedToken = tokenIsExpired ? null : rawToken;
+const storedUser = tokenIsExpired ? null : rawUser;
 
 const initialState: AuthState = {
   user: storedUser,
@@ -93,12 +103,17 @@ export const authSlice = createSlice({
       action: PayloadAction<{ user: User; token: string }>
     ) => {
       const { user, token } = action.payload;
-      state.user = user;
+      const roleFromJwt = getRoleFromToken(token);
+      const enrichedUser = {
+        ...user,
+        role: (user.role || roleFromJwt) as any,
+      };
+      state.user = enrichedUser;
       state.token = token;
       state.isAuthenticated = true;
       state.error = null;
       storage.setToken(token);
-      storage.setUser(user);
+      storage.setUser(enrichedUser);
     },
     setUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
@@ -125,12 +140,19 @@ export const authSlice = createSlice({
       state.error = null;
     });
     builder.addCase(loginThunk.fulfilled, (state, action) => {
+      const token = action.payload.token;
+      const roleFromJwt = getRoleFromToken(token);
+      const user = {
+        ...action.payload.user,
+        role: (action.payload.user?.role || roleFromJwt) as any,
+      };
+
       state.isLoading = false;
       state.isAuthenticated = true;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
-      storage.setToken(action.payload.token);
-      storage.setUser(action.payload.user);
+      state.token = token;
+      state.user = user;
+      storage.setToken(token);
+      storage.setUser(user);
     });
     builder.addCase(loginThunk.rejected, (state, action) => {
       state.isLoading = false;
@@ -143,12 +165,19 @@ export const authSlice = createSlice({
       state.error = null;
     });
     builder.addCase(registerThunk.fulfilled, (state, action) => {
+      const token = action.payload.token;
+      const roleFromJwt = getRoleFromToken(token);
+      const user = {
+        ...action.payload.user,
+        role: (action.payload.user?.role || roleFromJwt) as any,
+      };
+
       state.isLoading = false;
       state.isAuthenticated = true;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
-      storage.setToken(action.payload.token);
-      storage.setUser(action.payload.user);
+      state.token = token;
+      state.user = user;
+      storage.setToken(token);
+      storage.setUser(user);
     });
     builder.addCase(registerThunk.rejected, (state, action) => {
       state.isLoading = false;

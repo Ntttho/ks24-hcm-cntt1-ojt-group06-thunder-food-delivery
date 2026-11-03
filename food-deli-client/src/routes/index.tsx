@@ -13,9 +13,10 @@ import {
   StoreReviewPage,
   MerchantDashboardPage,
   MerchantMenuPage,
+  OrdersPage,
+  OrderDetailPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-
 import { APP_ROUTES } from '@/constants';
 
 export const router = createBrowserRouter([
@@ -26,6 +27,10 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <HomePage />,
+      },
+      {
+        path: 'restaurants',
         element: <HomePage />,
       },
       {
@@ -60,22 +65,45 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Customer Orders Route: Protected
+      {
+        path: 'orders',
+        element: (
+          <ProtectedRoute>
+            <OrdersPage />
+          </ProtectedRoute>
+        ),
+      },
+      // Customer Order Detail & Live Tracking Route: Protected
+      {
+        path: 'orders/:id',
+        element: (
+          <ProtectedRoute>
+            <OrderDetailPage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: '*',
         element: <NotFoundPage />,
       },
     ],
   },
-  // Dedicated Cart & Checkout Screens (with full mobile-first sticky bars)
+  // Dedicated Cart Screen
   {
     path: APP_ROUTES.CART,
     element: <CartPage />,
   },
+  // Dedicated Checkout Screen (Protected: user must be authenticated)
   {
     path: APP_ROUTES.CHECKOUT,
-    element: <CheckoutPage />,
+    element: (
+      <ProtectedRoute>
+        <CheckoutPage />
+      </ProtectedRoute>
+    ),
   },
-  // Auth Layout: Login & Register
+  // Auth Layout: Strictly 1 Login & 1 Register page
   {
     path: '/',
     element: <AuthLayout />,
@@ -107,3 +135,4 @@ export const router = createBrowserRouter([
   },
 ]);
 
+export default router;

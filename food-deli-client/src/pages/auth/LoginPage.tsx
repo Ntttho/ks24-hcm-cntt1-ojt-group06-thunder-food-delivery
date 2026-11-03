@@ -21,8 +21,17 @@ export const LoginPage: React.FC = () => {
   const [form] = Form.useForm();
   const [selectedRole, setSelectedRole] = useState<string>('CUSTOMER');
 
-  // Check if redirected from another page
-  const fromLocation = (location.state as any)?.from?.pathname || APP_ROUTES.HOME;
+  // Check if redirected from another page (e.g. from /checkout)
+  const queryParams = new URLSearchParams(location.search);
+  const fromQuery = queryParams.get('from');
+  const fromState = (location.state as any)?.from;
+
+  const fromLocation =
+    (typeof fromState === 'string'
+      ? fromState
+      : fromState?.pathname
+      ? `${fromState.pathname}${fromState.search || ''}`
+      : fromQuery) || APP_ROUTES.HOME;
 
   // Custom validation rule for Phone or Email
   const validatePhoneOrEmail = (_: any, value: string) => {
@@ -257,3 +266,5 @@ export const LoginPage: React.FC = () => {
     </div>
   );
 };
+
+export default LoginPage;

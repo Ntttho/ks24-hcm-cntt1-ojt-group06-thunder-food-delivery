@@ -14,15 +14,16 @@ import {
   DashboardOutlined,
   MenuOutlined,
   HomeOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
-import { APP_ROUTES, ROLES } from '@/constants';
+import { APP_ROUTES } from '@/constants';
 
 export const Header: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, isMerchant, isShipper, logout } = useAuth();
   const { totalQuantity } = useAppSelector((state) => state.cart);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -48,14 +49,14 @@ export const Header: React.FC = () => {
 
   const handleUserMenuClick: MenuProps['onClick'] = ({ key }) => {
     switch (key) {
-      case 'addresses':
-        navigate(APP_ROUTES.ADDRESSES);
-        break;
       case 'profile':
         navigate(APP_ROUTES.PROFILE);
         break;
       case 'orders':
         navigate(APP_ROUTES.ORDERS);
+        break;
+      case 'addresses':
+        navigate(APP_ROUTES.ADDRESSES);
         break;
       case 'merchant-portal':
         navigate(APP_ROUTES.MERCHANT_DASHBOARD);
@@ -76,58 +77,64 @@ export const Header: React.FC = () => {
 
   // Helper for role tag display
   const getRoleBadge = () => {
-    if (!user) return null;
-    const r = user.role;
-    if (r === ROLES.ADMIN || r === 'ADMIN') {
-      return <Tag color="red">Quản trị viên</Tag>;
+    if (isAdmin) {
+      return <Tag color="red" className="font-semibold">Quản trị viên</Tag>;
     }
-    if (r === ROLES.MERCHANT || r === 'MERCHANT') {
-      return <Tag color="purple">Chủ quán</Tag>;
+    if (isMerchant) {
+      return <Tag color="purple" className="font-semibold">Chủ quán</Tag>;
     }
-    if (r === ROLES.SHIPPER || r === 'SHIPPER' || r === 'DRIVER' || r === ROLES.DRIVER) {
-      return <Tag color="blue">Tài xế</Tag>;
+    if (isShipper) {
+      return <Tag color="blue" className="font-semibold">Tài xế</Tag>;
     }
-    return <Tag color="green">Khách hàng</Tag>;
+    return <Tag color="green" className="font-semibold">Khách hàng</Tag>;
   };
 
-  // Context-specific portal items based on user role
+  // Role-specific portals in Dropdown Menu
   const roleSpecificMenuItems: MenuProps['items'] = [];
-  if (user?.role === ROLES.MERCHANT || user?.role === 'MERCHANT') {
+  if (isMerchant) {
     roleSpecificMenuItems.push({
       key: 'merchant-portal',
-      icon: <ShopOutlined className="text-purple-500" />,
-      label: <span className="font-semibold text-purple-600">Quản lý Quán ăn (Merchant)</span>,
+      icon: <ShopOutlined className="text-purple-600 text-base" />,
+      label: (
+        <span className="font-bold text-purple-700">
+          Quán ăn của tôi (Merchant Portal)
+        </span>
+      ),
     });
-  } else if (
-    user?.role === ROLES.SHIPPER ||
-    user?.role === 'SHIPPER' ||
-    user?.role === 'DRIVER' ||
-    user?.role === ROLES.DRIVER
-  ) {
+  } else if (isShipper) {
     roleSpecificMenuItems.push({
       key: 'shipper-hub',
-      icon: <CarOutlined className="text-blue-500" />,
-      label: <span className="font-semibold text-blue-600">Trung tâm Tài xế (Shipper Hub)</span>,
+      icon: <CarOutlined className="text-blue-600 text-base" />,
+      label: (
+        <span className="font-bold text-blue-700">
+          Cổng làm việc Tài xế (Shipper Hub)
+        </span>
+      ),
     });
-  } else if (user?.role === ROLES.ADMIN || user?.role === 'ADMIN') {
+  } else if (isAdmin) {
     roleSpecificMenuItems.push({
       key: 'admin-portal',
-      icon: <DashboardOutlined className="text-red-500" />,
-      label: <span className="font-semibold text-red-600">Cổng Quản trị (Admin)</span>,
+      icon: <DashboardOutlined className="text-red-600 text-base" />,
+      label: (
+        <span className="font-bold text-red-700">
+          Trang Quản trị Hệ thống (Admin Portal)
+        </span>
+      ),
     });
   }
 
+  // Full user dropdown items conforming to role specifications
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'user-info',
       disabled: true,
       label: (
-        <div className="py-2 px-1 max-w-[220px]">
+        <div className="py-2 px-1 max-w-[240px]">
           <div className="font-bold text-gray-900 text-sm truncate">
             {user?.fullName || 'Người dùng Thunder'}
           </div>
           <div className="text-xs text-gray-500 truncate">{user?.phone || user?.email}</div>
-          <div className="mt-1.5 flex items-center gap-1.5">
+          <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
             {getRoleBadge()}
             {user?.ratingAvg && (
               <span className="text-xs text-amber-600 font-semibold">
@@ -145,19 +152,19 @@ export const Header: React.FC = () => {
       ? [...roleSpecificMenuItems, { type: 'divider' as const }]
       : []),
     {
-      key: 'addresses',
-      icon: <EnvironmentOutlined className="text-orange-500" />,
-      label: <span className="font-medium text-gray-700">Sổ địa chỉ nhận hàng</span>,
-    },
-    {
       key: 'profile',
       icon: <ProfileOutlined className="text-blue-500" />,
-      label: <span className="font-medium text-gray-700">Thông tin cá nhân</span>,
+      label: <span className="font-medium text-gray-700">Xem thông tin cá nhân</span>,
     },
     {
       key: 'orders',
-      icon: <ShoppingCartOutlined className="text-emerald-500" />,
-      label: <span className="font-medium text-gray-700">Đơn hàng của tôi</span>,
+      icon: <HistoryOutlined className="text-orange-500" />,
+      label: <span className="font-medium text-gray-700">Lịch sử đơn hàng</span>,
+    },
+    {
+      key: 'addresses',
+      icon: <EnvironmentOutlined className="text-emerald-500" />,
+      label: <span className="font-medium text-gray-700">Sổ địa chỉ nhận hàng</span>,
     },
     {
       type: 'divider',
@@ -174,7 +181,7 @@ export const Header: React.FC = () => {
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-2xs">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo */}
-        <Link to={APP_ROUTES.HOME} className="flex items-center gap-2.5 group">
+        <Link to={APP_ROUTES.HOME} className="flex items-center gap-2.5 group shrink-0">
           <div className="w-10 h-10 rounded-xl bg-linear-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-md shadow-orange-500/20 group-hover:scale-105 transition-transform">
             <ThunderboltFilled className="text-xl" />
           </div>
@@ -188,8 +195,8 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Center Navigation Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-1.5">
+        {/* Center Navigation Links (Desktop): Trang chủ, Quán ăn, Đơn hàng của tôi, Giỏ hàng */}
+        <nav className="hidden md:flex items-center gap-1 lg:gap-2">
           <Link
             to={APP_ROUTES.HOME}
             className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
@@ -203,7 +210,7 @@ export const Header: React.FC = () => {
           </Link>
 
           <Link
-            to="/restaurants/1"
+            to={APP_ROUTES.RESTAURANTS}
             className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
               location.pathname.startsWith('/restaurants')
                 ? 'text-orange-600 bg-orange-50 font-bold'
@@ -211,30 +218,43 @@ export const Header: React.FC = () => {
             }`}
           >
             <ShopOutlined />
-            <span>Quán ăn nổi bật</span>
+            <span>Quán ăn</span>
           </Link>
 
-          {isAuthenticated && (
-            <Link
-              to={APP_ROUTES.ADDRESSES}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                location.pathname === APP_ROUTES.ADDRESSES
-                  ? 'text-orange-600 bg-orange-50 font-bold'
-                  : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-              }`}
-            >
-              <EnvironmentOutlined />
-              <span>Sổ địa chỉ</span>
-            </Link>
-          )}
-        </nav>
+          <Link
+            to={APP_ROUTES.ORDERS}
+            className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+              location.pathname.startsWith('/orders')
+                ? 'text-orange-600 bg-orange-50 font-bold'
+                : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
+            }`}
+          >
+            <HistoryOutlined />
+            <span>Đơn hàng của tôi</span>
+          </Link>
 
-        {/* Right actions: Cart & User Profile / Login */}
-        <div className="flex items-center gap-3">
-          {/* Cart Preview Badge */}
           <Link
             to={APP_ROUTES.CART}
-            className="p-2.5 rounded-xl text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors relative"
+            className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+              location.pathname === APP_ROUTES.CART
+                ? 'text-orange-600 bg-orange-50 font-bold'
+                : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
+            }`}
+          >
+            <ShoppingCartOutlined />
+            <span>Giỏ hàng</span>
+            {totalQuantity > 0 && (
+              <Badge count={totalQuantity} size="small" color="#f97316" />
+            )}
+          </Link>
+        </nav>
+
+        {/* Right actions: Cart Badge & User Profile / Login */}
+        <div className="flex items-center gap-3">
+          {/* Quick Cart Preview Badge Icon */}
+          <Link
+            to={APP_ROUTES.CART}
+            className="p-2.5 rounded-xl text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors relative cursor-pointer"
             title="Giỏ hàng"
           >
             <Badge count={totalQuantity} offset={[2, -2]} color="#f97316">
@@ -253,11 +273,17 @@ export const Header: React.FC = () => {
                   size="small"
                 />
                 <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-xs font-bold text-gray-800 max-w-[110px] truncate leading-tight group-hover:text-orange-600">
+                  <span className="text-xs font-bold text-gray-800 max-w-[120px] truncate leading-tight group-hover:text-orange-600">
                     {user.fullName || user.phone || 'Tài khoản'}
                   </span>
                   <span className="text-[10px] text-gray-400 capitalize leading-tight">
-                    {user.role === 'CUSTOMER' || user.role === ROLES.CUSTOMER ? 'Khách hàng' : user.role}
+                    {isAdmin
+                      ? 'Quản trị viên'
+                      : isMerchant
+                      ? 'Chủ quán'
+                      : isShipper
+                      ? 'Tài xế'
+                      : 'Khách hàng'}
                   </span>
                 </div>
               </div>
@@ -298,9 +324,9 @@ export const Header: React.FC = () => {
         placement="right"
         onClose={() => setMobileMenuOpen(false)}
         open={mobileMenuOpen}
-        width={280}
+        width={300}
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <Link
             to={APP_ROUTES.HOME}
             onClick={() => setMobileMenuOpen(false)}
@@ -309,11 +335,18 @@ export const Header: React.FC = () => {
             <HomeOutlined /> Trang chủ
           </Link>
           <Link
-            to="/restaurants/1"
+            to={APP_ROUTES.RESTAURANTS}
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
           >
-            <ShopOutlined /> Quán ăn nổi bật
+            <ShopOutlined /> Quán ăn
+          </Link>
+          <Link
+            to={APP_ROUTES.ORDERS}
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
+          >
+            <HistoryOutlined /> Đơn hàng của tôi
           </Link>
           <Link
             to={APP_ROUTES.CART}
@@ -325,22 +358,56 @@ export const Header: React.FC = () => {
             </span>
             {totalQuantity > 0 && <Tag color="orange">{totalQuantity} món</Tag>}
           </Link>
-          {isAuthenticated && (
+
+          {isAuthenticated ? (
             <>
-              <Link
-                to={APP_ROUTES.ADDRESSES}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
-              >
-                <EnvironmentOutlined /> Sổ địa chỉ
-              </Link>
-              <Link
-                to={APP_ROUTES.PROFILE}
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
-              >
-                <ProfileOutlined /> Thông tin cá nhân
-              </Link>
+              <div className="my-2 border-t border-gray-100 pt-2">
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
+                  Tài khoản ({getRoleBadge()})
+                </div>
+                {isMerchant && (
+                  <Link
+                    to={APP_ROUTES.MERCHANT_DASHBOARD}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-purple-700 font-bold py-2 hover:text-purple-800"
+                  >
+                    <ShopOutlined /> Quán ăn của tôi (Merchant Portal)
+                  </Link>
+                )}
+                {isShipper && (
+                  <Link
+                    to={APP_ROUTES.SHIPPER_DASHBOARD}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-blue-700 font-bold py-2 hover:text-blue-800"
+                  >
+                    <CarOutlined /> Cổng làm việc Tài xế (Shipper Hub)
+                  </Link>
+                )}
+                {isAdmin && (
+                  <Link
+                    to={APP_ROUTES.ADMIN_DASHBOARD}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
+                  >
+                    <DashboardOutlined /> Trang Quản trị (Admin Portal)
+                  </Link>
+                )}
+                <Link
+                  to={APP_ROUTES.PROFILE}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
+                >
+                  <ProfileOutlined /> Xem thông tin cá nhân
+                </Link>
+                <Link
+                  to={APP_ROUTES.ADDRESSES}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
+                >
+                  <EnvironmentOutlined /> Sổ địa chỉ nhận hàng
+                </Link>
+              </div>
+
               <Button
                 danger
                 icon={<LogoutOutlined />}
@@ -348,13 +415,12 @@ export const Header: React.FC = () => {
                   setMobileMenuOpen(false);
                   handleLogoutConfirm();
                 }}
-                className="mt-4 w-full"
+                className="mt-2 w-full"
               >
-                Đăng xuất
+                Đăng xuất an toàn
               </Button>
             </>
-          )}
-          {!isAuthenticated && (
+          ) : (
             <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-gray-100">
               <Link to={APP_ROUTES.LOGIN} onClick={() => setMobileMenuOpen(false)}>
                 <Button block>Đăng nhập</Button>
@@ -373,4 +439,3 @@ export const Header: React.FC = () => {
 };
 
 export default Header;
-

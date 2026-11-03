@@ -8,6 +8,7 @@ import axios, {
 import { message } from 'antd';
 import { appConfig } from '@/config/appConfig';
 import { storage } from '@/utils/storage';
+import { isTokenExpired } from '@/utils/jwt';
 import type { ApiResponse } from '@/types/api.types';
 
 // Create custom Axios instance
@@ -20,12 +21,24 @@ const axiosInstance: AxiosInstance = axios.create({
   },
 });
 
-// Request Interceptor: Attach JWT Token & Correlation Headers
+// Request Interceptor: Attach JWT Token & Correlation Headers & Proactive Expiration Check
 axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = storage.getToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      if (isTokenExpired(token)) {
+        storage.removeToken();
+        storage.removeUser();
+        const currentPath = window.location.pathname;
+        if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+          message.warning('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+          window.location.href = `/login?from=${encodeURIComponent(currentPath)}`;
+        }
+        return Promise.reject(new Error('Phiên đăng nhập đã hết hạn.'));
+      }
+      if (config.headers) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -49,8 +62,9 @@ axiosInstance.interceptors.response.use(
       case 401:
         storage.removeToken();
         storage.removeUser();
-        if (!window.location.pathname.includes('/login')) {
-          message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+          message.error('Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+          window.location.href = `/login?from=${encodeURIComponent(window.location.pathname)}`;
         }
         break;
       case 403:

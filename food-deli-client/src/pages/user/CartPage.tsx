@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAppSelector } from '@/hooks/useAppSelector';
+import { useAuth } from '@/hooks/useAuth';
+import { APP_ROUTES } from '@/constants';
 import { addToCart, updateQuantity, removeFromCart } from '@/store/slices/cartSlice';
 import { RestaurantConflictModal } from './components/RestaurantConflictModal';
 import { PaymentMethodModal } from './components/PaymentMethodModal';
@@ -86,7 +90,9 @@ const UPSELL_ITEMS: UpsellItemType[] = [
 ];
 
 export const CartPage: React.FC = () => {
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { isAuthenticated } = useAuth();
   const reduxCart = useAppSelector((state) => state.cart);
 
   // Fallback to local sample items if Redux cart is initially empty for UI demo
@@ -209,6 +215,16 @@ export const CartPage: React.FC = () => {
     }
   };
 
+  // Requirement: If not authenticated when proceeding to checkout, alert and redirect to /login with state: { from: '/checkout' }
+  const handleProceedToCheckout = () => {
+    if (!isAuthenticated) {
+      message.warning('Vui lòng đăng nhập để tiến hành đặt hàng và thanh toán!');
+      navigate(APP_ROUTES.LOGIN, { state: { from: APP_ROUTES.CHECKOUT } });
+      return;
+    }
+    navigate(APP_ROUTES.CHECKOUT);
+  };
+
   const currentShopName = reduxCart.shopName || 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi';
 
   return (
@@ -266,6 +282,7 @@ export const CartPage: React.FC = () => {
         totalAmount={subtotal + shippingFee}
         itemCount={items.length}
         onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
+        onProceedToCheckout={handleProceedToCheckout}
         disabled={items.length === 0}
       />
 
