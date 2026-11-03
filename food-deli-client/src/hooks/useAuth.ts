@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useAppDispatch } from './useAppDispatch';
 import { useAppSelector } from './useAppSelector';
 import {
@@ -10,12 +11,20 @@ import {
 } from '@/store/slices/authSlice';
 import type { LoginRequest, RegisterRequest, UpdateProfileRequest } from '@/types';
 import { ROLES } from '@/constants';
+import { isTokenExpired, normalizeRole, getRoleFromToken } from '@/utils/jwt';
 
 export const useAuth = () => {
   const dispatch = useAppDispatch();
   const { user, token, isAuthenticated, isLoading, error } = useAppSelector(
     (state) => state.auth
   );
+
+  // Proactive token expiration check on hook invocation / mount
+  useEffect(() => {
+    if (token && isTokenExpired(token)) {
+      dispatch(logoutAction());
+    }
+  }, [token, dispatch]);
 
   const login = async (credentials: LoginRequest) => {
     return dispatch(loginThunk(credentials)).unwrap();
@@ -41,22 +50,30 @@ export const useAuth = () => {
     dispatch(clearAuthError());
   };
 
-  const role = user?.role;
-  const isAdmin = role === ROLES.ADMIN || role === 'ADMIN';
-  const isMerchant = role === ROLES.MERCHANT || role === 'MERCHANT';
-  const isShipper = role === ROLES.SHIPPER || role === 'SHIPPER' || role === 'DRIVER' || role === ROLES.DRIVER;
+  // Determine user role with fallback to JWT decoded claims
+  const rawRole = user?.role || (token ? getRoleFromToken(token) : null);
+  const normalizedRole = normalizeRole(rawRole);
+
+  const isAdmin = normalizedRole === ROLES.ADMIN || normalizedRole === 'ROLE_ADMIN';
+  const isMerchant = normalizedRole === ROLES.MERCHANT || normalizedRole === 'ROLE_MERCHANT';
+  const isShipper =
+    normalizedRole === ROLES.SHIPPER ||
+    normalizedRole === 'ROLE_SHIPPER' ||
+    normalizedRole === ROLES.DRIVER ||
+    normalizedRole === 'ROLE_DRIVER';
   const isCustomer =
-    role === ROLES.CUSTOMER ||
-    role === 'CUSTOMER' ||
+    normalizedRole === ROLES.CUSTOMER ||
+    normalizedRole === 'ROLE_CUSTOMER' ||
     (!isAdmin && !isMerchant && !isShipper);
 
   return {
     user,
     token,
-    isAuthenticated,
+    isAuthenticated: isAuthenticated && !isTokenExpired(token),
     isLoading,
     error,
-    role,
+    role: normalizedRole,
+    rawRole,
     isAdmin,
     isMerchant,
     isShipper,
