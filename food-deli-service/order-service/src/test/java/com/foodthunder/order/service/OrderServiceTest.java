@@ -5,6 +5,8 @@ import com.foodthunder.order.dto.*;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
+import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
+import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.exception.BadRequestException;
@@ -417,5 +419,103 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.updateOrderStatus(1L, cancelRequest, 999, "ROLE_ADMIN"))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không thể chuyển trạng thái");
+    }
+
+    @Test
+    @DisplayName("Tạo đơn hàng với mã voucher hợp lệ thì tính tiền chiết khấu chính xác")
+    void testCreateOrder_WithValidVoucher_AppliesDiscount() {
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Phố Huế, Hà Nội")
+                .distanceKm(2.0)
+                .paymentMethod("COD")
+                .voucherCode("GIAM20K")
+                .items(List.of(
+                        CreateOrderItemRequest.builder()
+                                .foodId(101)
+                                .quantity(2)
+                                .build()
+                ))
+                .build();
+
+        RemoteProductDto productDto = RemoteProductDto.builder()
+                .id(101)
+                .name("Trà Sữa Ô Long")
+                .price(BigDecimal.valueOf(50000))
+                .restaurantId(10)
+                .isAvailable(true)
+                .toppings(List.of())
+                .build();
+
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+        when(orderStatusRepository.findByCode(OrderStatus.PENDING)).thenReturn(Optional.of(pendingStatus));
+
+        RemoteVoucherValidationResponse vResponse = RemoteVoucherValidationResponse.builder()
+                .voucherId(99)
+                .code("GIAM20K")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(20000))
+                .isValid(true)
+                .message("Áp dụng thành công")
+                .build();
+        when(restaurantClient.validateVoucher(any(RemoteValidateVoucherRequest.class)))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(vResponse)));
+
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId(1001L);
+            return o;
+        });
+
+        OrderResponse response = orderService.createOrder(request, 1);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
+        assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(95000));
+        assertThat(response.getVoucherId()).isEqualTo(99);
+    }
+
+    @Test
+    @DisplayName("Ném BadRequestException khi mã voucher không hợp lệ lúc tạo đơn")
+    void testCreateOrder_WithInvalidVoucher_ThrowsBadRequest() {
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Phố Huế, Hà Nội")
+                .distanceKm(2.0)
+                .paymentMethod("COD")
+                .voucherCode("EXPIRED_VOUCHER")
+                .items(List.of(
+                        CreateOrderItemRequest.builder()
+                                .foodId(101)
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        RemoteProductDto productDto = RemoteProductDto.builder()
+                .id(101)
+                .name("Trà Sữa Ô Long")
+                .price(BigDecimal.valueOf(50000))
+                .restaurantId(10)
+                .isAvailable(true)
+                .toppings(List.of())
+                .build();
+
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+
+        RemoteVoucherValidationResponse vResponse = RemoteVoucherValidationResponse.builder()
+                .code("EXPIRED_VOUCHER")
+                .isValid(false)
+                .message("Mã giảm giá đã hết hạn")
+                .build();
+        when(restaurantClient.validateVoucher(any(RemoteValidateVoucherRequest.class)))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(vResponse)));
+
+        assertThatThrownBy(() -> orderService.createOrder(request, 1))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Không thể áp dụng voucher");
     }
 }

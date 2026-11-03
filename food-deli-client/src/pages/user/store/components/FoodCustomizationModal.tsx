@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button, Checkbox, Modal, Radio } from 'antd';
 import { MinusOutlined, PlusOutlined } from '@ant-design/icons';
-import type { CustomizationOption, FoodItem } from '../types';
+import type { CustomizationGroup, CustomizationOption, FoodItem } from '../types';
 
 interface FoodCustomizationModalProps {
   food: FoodItem | null;
@@ -19,20 +19,22 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
   const [quantity, setQuantity] = useState(1);
   const [selected, setSelected] = useState<Record<string, number[]>>({});
 
-  useEffect(() => {
-    if (open) {
-      setQuantity(1);
-      setSelected({});
-    }
-  }, [open, food?.id]);
+  const handleClose = () => {
+    setQuantity(1);
+    setSelected({});
+    onClose();
+  };
 
   const totalPrice = useMemo(() => {
     if (!food) return 0;
-    const optionPrice = (food.customizationGroups || []).reduce((sum, group) => {
+    const optionPrice = (food.customizationGroups || []).reduce((sum: number, group: CustomizationGroup) => {
       const selectedIds = selected[String(group.id)] || [];
-      return sum + group.options
-        .filter((option) => selectedIds.includes(option.id))
-        .reduce((groupSum, option) => groupSum + option.price, 0);
+      return (
+        sum +
+        group.options
+          .filter((option: CustomizationOption) => selectedIds.includes(option.id))
+          .reduce((groupSum: number, option: CustomizationOption) => groupSum + option.price, 0)
+      );
     }, 0);
     return (food.price + optionPrice) * quantity;
   }, [food, quantity, selected]);
@@ -47,13 +49,13 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
     setSelected((current) => ({ ...current, [String(groupId)]: optionIds }));
   };
 
-  const selectedToppings = (food.customizationGroups || []).flatMap((group) =>
-    (group.options as CustomizationOption[]).filter((option) =>
-      (selected[String(group.id)] || []).includes(option.id)
-    ).map((option) => ({ id: option.id, name: option.name, price: option.price }))
+  const selectedToppings = (food.customizationGroups || []).flatMap((group: CustomizationGroup) =>
+    (group.options as CustomizationOption[])
+      .filter((option: CustomizationOption) => (selected[String(group.id)] || []).includes(option.id))
+      .map((option: CustomizationOption) => ({ id: option.id, name: option.name, price: option.price }))
   );
 
-  const missingRequiredGroup = (food.customizationGroups || []).some((group) => {
+  const missingRequiredGroup = (food.customizationGroups || []).some((group: CustomizationGroup) => {
     if (!group.required) return false;
     return !(selected[String(group.id)] || []).length;
   });
@@ -61,7 +63,8 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={handleClose}
+      destroyOnClose
       footer={null}
       width={560}
       title={null}
@@ -78,7 +81,7 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
       </div>
 
       <div className="space-y-5 py-5">
-        {(food.customizationGroups || []).map((group) => (
+        {(food.customizationGroups || []).map((group: CustomizationGroup) => (
           <section key={group.id} className="border-b border-gray-100 pb-5">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-bold text-gray-900">{group.name}</h3>
@@ -88,9 +91,9 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
               <Checkbox.Group
                 className="grid w-full gap-3"
                 value={selected[String(group.id)] || []}
-                onChange={(values) => selectMultiple(group.id, values)}
+                onChange={(values) => selectMultiple(group.id, values.map(Number))}
               >
-                {group.options.map((option) => (
+                {group.options.map((option: CustomizationOption) => (
                   <Checkbox key={option.id} value={option.id} className="m-0 flex w-full justify-between">
                     <span>{option.name}</span>
                     <span className="ml-4 text-orange-600">+{option.price.toLocaleString('vi-VN')}đ</span>
@@ -101,9 +104,9 @@ export const FoodCustomizationModal: React.FC<FoodCustomizationModalProps> = ({
               <Radio.Group
                 className="grid w-full gap-3"
                 value={selected[String(group.id)]?.[0]}
-                onChange={(event) => selectSingle(group.id, event.target.value)}
+                onChange={(event) => selectSingle(group.id, Number(event.target.value))}
               >
-                {group.options.map((option) => (
+                {group.options.map((option: CustomizationOption) => (
                   <Radio key={option.id} value={option.id} className="m-0 w-full">
                     <span>{option.name}</span>
                     <span className="ml-4 text-orange-600">+{option.price.toLocaleString('vi-VN')}đ</span>

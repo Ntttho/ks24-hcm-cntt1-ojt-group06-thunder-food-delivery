@@ -1,3 +1,17 @@
+export interface CustomizationOption {
+  id: number;
+  name: string;
+  price: number;
+}
+
+export interface CustomizationGroup {
+  id: number;
+  name: string;
+  required?: boolean;
+  multiple?: boolean;
+  options: CustomizationOption[];
+}
+
 export interface FoodItem {
   id: number | string;
   name: string;
@@ -9,7 +23,7 @@ export interface FoodItem {
   isPopular?: boolean;
   isNew?: boolean;
   soldCount?: number;
-
+  customizationGroups?: CustomizationGroup[];
 }
 
 export interface StoreDetail {
@@ -29,4 +43,3 @@ export interface StoreDetail {
   tags: string[];
   isVerified?: boolean;
 }
-

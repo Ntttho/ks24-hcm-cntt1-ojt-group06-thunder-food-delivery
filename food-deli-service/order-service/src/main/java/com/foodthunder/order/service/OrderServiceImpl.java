@@ -5,6 +5,8 @@ import com.foodthunder.order.dto.*;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
+import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
+import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.*;
 import com.foodthunder.order.exception.BadRequestException;
 import com.foodthunder.order.exception.ForbiddenException;
@@ -14,8 +16,8 @@ import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
 import jakarta.persistence.criteria.Predicate;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,15 +35,27 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+
+    private static final Logger log = LoggerFactory.getLogger(OrderServiceImpl.class);
 
     private final OrderRepository orderRepository;
     private final OrderStatusRepository orderStatusRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final RestaurantClient restaurantClient;
+
+    public OrderServiceImpl(
+            OrderRepository orderRepository,
+            OrderStatusRepository orderStatusRepository,
+            OrderStatusLogRepository orderStatusLogRepository,
+            RestaurantClient restaurantClient
+    ) {
+        this.orderRepository = orderRepository;
+        this.orderStatusRepository = orderStatusRepository;
+        this.orderStatusLogRepository = orderStatusLogRepository;
+        this.restaurantClient = restaurantClient;
+    }
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
     private static final Map<String, Set<String>> ALLOWED_TRANSITIONS = Map.of(
@@ -175,7 +189,7 @@ public class OrderServiceImpl implements OrderService {
             orderItems.add(orderItem);
         }
 
-        // 3. Calculate shipping fee based on distance
+        // 4. Calculate shipping fee based on distance
         Double distanceKm = request.getDistanceKm();
         if (distanceKm == null || distanceKm <= 0) {
             distanceKm = 2.0;
@@ -183,9 +197,55 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal shippingFee = calculateShippingFee(distanceKm);
         BigDecimal taxAmount = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
-        BigDecimal totalAmount = subtotal.add(shippingFee).add(taxAmount).subtract(discountAmount);
+        Integer appliedVoucherId = request.getVoucherId();
 
-        // 4. Retrieve initial status based on payment method (COD vs VNPAY)
+        // 4.1 Validate & apply voucher if provided
+        String voucherCode = request.getVoucherCode();
+        if ((voucherCode != null && !voucherCode.isBlank()) || appliedVoucherId != null) {
+            if ((voucherCode == null || voucherCode.isBlank()) && appliedVoucherId != null) {
+                try {
+                    ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.getVoucherById(appliedVoucherId);
+                    if (vRes != null && vRes.getBody() != null && vRes.getBody().getData() != null) {
+                        voucherCode = vRes.getBody().getData().getCode();
+                    }
+                } catch (Exception ex) {
+                    log.warn("Could not fetch voucher by id {}: {}", appliedVoucherId, ex.getMessage());
+                }
+            }
+
+            if (voucherCode != null && !voucherCode.isBlank()) {
+                RemoteValidateVoucherRequest vReq = RemoteValidateVoucherRequest.builder()
+                        .code(voucherCode)
+                        .restaurantId(targetRestaurantId)
+                        .orderAmount(subtotal)
+                        .build();
+
+                try {
+                    ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.validateVoucher(vReq);
+                    RemoteVoucherValidationResponse vData = (vRes != null && vRes.getBody() != null) ? vRes.getBody().getData() : null;
+                    if (vData == null || !Boolean.TRUE.equals(vData.getIsValid())) {
+                        String errMsg = (vData != null && vData.getMessage() != null)
+                                ? vData.getMessage()
+                                : "Mã voucher không hợp lệ";
+                        throw new BadRequestException("Không thể áp dụng voucher: " + errMsg);
+                    }
+                    discountAmount = vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO;
+                    appliedVoucherId = vData.getVoucherId();
+                } catch (BadRequestException bre) {
+                    throw bre;
+                } catch (Exception ex) {
+                    log.error("Error validating voucher with restaurant-service: {}", ex.getMessage());
+                    throw new BadRequestException("Lỗi xác thực mã voucher: " + ex.getMessage());
+                }
+            }
+        }
+
+        BigDecimal totalAmount = subtotal.add(shippingFee).add(taxAmount).subtract(discountAmount);
+        if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            totalAmount = BigDecimal.ZERO;
+        }
+
+        // 5. Retrieve initial status based on payment method (COD vs VNPAY)
         String paymentMethod = (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank())
                 ? request.getPaymentMethod().trim().toUpperCase() : "COD";
 
@@ -201,16 +261,16 @@ public class OrderServiceImpl implements OrderService {
             initialReason = "Khách hàng tạo đơn hàng COD (Chờ xác nhận)";
         }
 
-        // 5. Generate unique order code
+        // 6. Generate unique order code
         String orderCode = generateOrderCode();
 
-        // 6. Build Order entity
+        // 7. Build Order entity
         Order order = Order.builder()
                 .orderCode(orderCode)
                 .idempotencyKey(idempotencyKey)
                 .customerId(customerId)
                 .restaurantId(targetRestaurantId)
-                .voucherId(request.getVoucherId())
+                .voucherId(appliedVoucherId)
                 .receiverAddress(request.getReceiverAddress())
                 .receiverLat(request.getReceiverLat())
                 .receiverLng(request.getReceiverLng())
@@ -240,8 +300,8 @@ public class OrderServiceImpl implements OrderService {
         order.addStatusLog(initialLog);
 
         Order savedOrder = orderRepository.save(order);
-        log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, status: {}",
-                savedOrder.getId(), savedOrder.getOrderCode(), paymentMethod, initialStatus.getCode());
+        log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, discount: {}, status: {}",
+                savedOrder.getId(), savedOrder.getOrderCode(), paymentMethod, discountAmount, initialStatus.getCode());
 
         return mapToOrderResponse(savedOrder);
     }

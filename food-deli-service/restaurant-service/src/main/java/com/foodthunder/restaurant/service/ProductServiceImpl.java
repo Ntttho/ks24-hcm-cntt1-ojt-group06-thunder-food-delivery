@@ -4,6 +4,8 @@ import com.foodthunder.restaurant.dto.*;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Product;
 import com.foodthunder.restaurant.entity.Topping;
+import com.foodthunder.restaurant.exception.BadRequestException;
+import com.foodthunder.restaurant.exception.ForbiddenException;
 import com.foodthunder.restaurant.exception.ResourceNotFoundException;
 import com.foodthunder.restaurant.repository.MenuCategoryRepository;
 import com.foodthunder.restaurant.repository.ProductRepository;
@@ -167,6 +169,72 @@ public class ProductServiceImpl implements ProductService {
         product.setIsAvailable(isAvailable);
         Product updated = productRepository.save(product);
         return mapProductToDto(updated);
+    }
+
+    @Override
+    @Transactional
+    public List<ToppingDto> assignToppingsToProduct(Integer productId, List<Integer> toppingIds, Integer requesterUserId, String role) {
+        Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + productId));
+
+        MenuCategory category = product.getCategory();
+        Integer restaurantId = (category != null && category.getRestaurant() != null)
+                ? category.getRestaurant().getId()
+                : null;
+        Integer ownerId = (category != null && category.getRestaurant() != null)
+                ? category.getRestaurant().getOwnerId()
+                : null;
+
+        // RBAC check: if role is merchant, requesterUserId must be the owner of the restaurant
+        if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
+            if (ownerId != null && !ownerId.equals(requesterUserId)) {
+                throw new ForbiddenException("Bạn không có quyền quản lý món ăn của quán khác (Chủ sở hữu: " + ownerId + ")");
+            }
+        }
+
+        if (toppingIds == null || toppingIds.isEmpty()) {
+            product.getToppings().clear();
+        } else {
+            List<Topping> foundToppings = toppingRepository.findAllById(toppingIds);
+            if (foundToppings.size() != toppingIds.size()) {
+                throw new BadRequestException("Một hoặc nhiều mã topping không tồn tại trong hệ thống");
+            }
+
+            // All toppings must belong to the same restaurant
+            if (restaurantId != null) {
+                for (Topping t : foundToppings) {
+                    if (!restaurantId.equals(t.getRestaurantId())) {
+                        throw new BadRequestException("Topping '" + t.getName() + "' (ID: " + t.getId() + ") không thuộc về quán ăn ID: " + restaurantId);
+                    }
+                }
+            }
+
+            product.setToppings(new HashSet<>(foundToppings));
+        }
+
+        Product saved = productRepository.save(product);
+        return saved.getToppings().stream()
+                .map(this::mapToppingToDto)
+                .sorted(Comparator.comparing(ToppingDto::getId))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ToppingDto> getProductToppings(Integer productId) {
+        Product product = productRepository.findByIdAndDeletedAtIsNull(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + productId));
+
+        Set<Topping> toppings = product.getToppings();
+        if (toppings == null || toppings.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return toppings.stream()
+                .filter(t -> Boolean.TRUE.equals(t.getIsAvailable()))
+                .map(this::mapToppingToDto)
+                .sorted(Comparator.comparing(ToppingDto::getId))
+                .collect(Collectors.toList());
     }
 
     private ProductDto mapProductToDto(Product product) {
