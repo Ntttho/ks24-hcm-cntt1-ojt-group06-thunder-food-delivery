@@ -3,6 +3,7 @@ package com.foodthunder.restaurant.service;
 import com.foodthunder.restaurant.dto.ProductDetailDto;
 import com.foodthunder.restaurant.dto.ProductDto;
 import com.foodthunder.restaurant.dto.ProductRequestDto;
+import com.foodthunder.restaurant.dto.ToppingDto;
 
 import java.util.List;
 
@@ -19,4 +20,8 @@ public interface ProductService {
     void deleteProduct(Integer id);
 
     ProductDto updateProductStatus(Integer id, Boolean isAvailable);
+
+    List<ToppingDto> assignToppingsToProduct(Integer productId, List<Integer> toppingIds, Integer requesterUserId, String role);
+
+    List<ToppingDto> getProductToppings(Integer productId);
 }

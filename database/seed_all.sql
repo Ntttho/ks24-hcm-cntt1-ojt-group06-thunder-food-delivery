@@ -215,13 +215,21 @@ CREATE TABLE `food_toppings` (
 
 CREATE TABLE `vouchers` (
   `id` INT NOT NULL AUTO_INCREMENT,
+  `restaurant_id` INT DEFAULT NULL,          -- [Logical FK] NULL = Voucher toàn sàn, NOT NULL = Voucher riêng của quán (restaurants.id)
   `code` VARCHAR(20) NOT NULL,
-  `discount_amount` DECIMAL(10,2) NOT NULL,
+  `discount_type` VARCHAR(20) NOT NULL DEFAULT 'FIXED', -- FIXED (giảm tiền mặt), PERCENTAGE (giảm %)
+  `discount_value` DECIMAL(10,2) NOT NULL DEFAULT '0.00', -- Giá trị giảm (tiền hoặc %)
+  `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT '0.00', -- Giá trị tiền giảm danh nghĩa
+  `max_discount_amount` DECIMAL(10,2) DEFAULT NULL, -- Giảm tối đa nếu là PERCENTAGE
   `min_order_value` DECIMAL(10,2) DEFAULT '0.00',
+  `usage_limit` INT DEFAULT NULL,
+  `used_count` INT NOT NULL DEFAULT '0',
+  `start_date` DATETIME DEFAULT NULL,
   `expiry_date` DATETIME DEFAULT NULL,
   `is_active` TINYINT(1) DEFAULT '1',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_vouchers_code` (`code`)
+  UNIQUE KEY `uniq_vouchers_code` (`code`),
+  KEY `idx_vouchers_restaurant_id` (`restaurant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
@@ -518,10 +526,12 @@ INSERT INTO `system_settings` (`id`, `config_key`, `config_value`, `description`
 (2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT');
 
 -- 8. Vouchers
-INSERT INTO `vouchers` (`id`, `code`, `discount_amount`, `min_order_value`, `expiry_date`, `is_active`) VALUES
-(1, 'FREESHIP', 15000.00, 50000.00, '2026-12-31 23:59:59', 1),
-(2, 'FLASHFOOD20', 20000.00, 80000.00, '2026-12-31 23:59:59', 1),
-(3, 'WELCOME50', 50000.00, 150000.00, '2026-12-31 23:59:59', 1);
+INSERT INTO `vouchers` (`id`, `restaurant_id`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES
+(1, NULL, 'FREESHIP', 'FIXED', 15000.00, 15000.00, NULL, 50000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(2, NULL, 'FLASHFOOD20', 'FIXED', 20000.00, 20000.00, NULL, 80000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(3, NULL, 'WELCOME50', 'FIXED', 50000.00, 50000.00, NULL, 150000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(4, 1, 'HANHDUNG10', 'PERCENTAGE', 10.00, 10.00, 30000.00, 50000.00, 100, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
+(5, 1, 'HANHDUNG25K', 'FIXED', 25000.00, 25000.00, NULL, 100000.00, 50, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1);
 
 -- 9. Restaurants
 INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `longitude`, `opening_time`, `closing_time`, `is_open`, `is_open_today`, `temporary_closed_reason`, `temporary_closed_until`, `image_url`, `rating_avg`, `approval_status`, `approved_by`, `approved_at`, `reject_reason`, `deleted_at`) VALUES

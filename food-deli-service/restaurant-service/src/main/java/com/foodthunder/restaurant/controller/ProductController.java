@@ -1,24 +1,24 @@
 package com.foodthunder.restaurant.controller;
 
-import com.foodthunder.restaurant.dto.ApiResponse;
-import com.foodthunder.restaurant.dto.ProductDetailDto;
-import com.foodthunder.restaurant.dto.ProductDto;
-import com.foodthunder.restaurant.dto.ProductRequestDto;
+import com.foodthunder.restaurant.dto.*;
 import com.foodthunder.restaurant.service.ProductService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping({"/api/v1/products", "/api/v1/foods"})
-@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
+
+    public ProductController(ProductService productService) {
+        this.productService = productService;
+    }
 
     /**
      * API 1.4: Lấy chi tiết món ăn kèm các nhóm Topping (bắt buộc / tùy chọn)
@@ -78,5 +78,30 @@ public class ProductController {
                 : true;
         ProductDto updated = productService.updateProductStatus(id, isAvailable);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái món ăn thành công", updated));
+    }
+
+    /**
+     * Gán danh sách topping áp dụng cho món ăn vào bảng food_toppings (CRUD Merchant)
+     * POST /api/v1/products/{id}/toppings
+     */
+    @PostMapping("/{id}/toppings")
+    public ResponseEntity<ApiResponse<List<ToppingDto>>> assignToppings(
+            @PathVariable Integer id,
+            @Valid @RequestBody AssignToppingsRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Integer userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    ) {
+        List<ToppingDto> result = productService.assignToppingsToProduct(id, request.getToppingIds(), userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success("Gán danh sách topping cho món ăn thành công", result));
+    }
+
+    /**
+     * Lấy chi tiết các topping kèm theo món ăn để render modal chọn món
+     * GET /api/v1/products/{id}/toppings
+     */
+    @GetMapping("/{id}/toppings")
+    public ResponseEntity<ApiResponse<List<ToppingDto>>> getProductToppings(@PathVariable Integer id) {
+        List<ToppingDto> toppings = productService.getProductToppings(id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping của món ăn thành công", toppings));
     }
 }
