@@ -15,6 +15,7 @@ import { orderApi, type MerchantOrder } from '@/services/modules/orderApi';
 import { merchantWebSocket } from '@/services/modules/merchantWebSocket';
 import { soundManager } from '@/utils/soundNotification';
 import { formatCurrency } from '@/utils/formatters';
+import { useAuth } from '@/hooks/useAuth';
 import {
   MerchantHeader,
   MerchantStats,
@@ -25,6 +26,9 @@ import {
 } from './components';
 
 export const MerchantDashboardPage: React.FC = () => {
+  const { user } = useAuth();
+  const currentRestaurantId = (user as any)?.restaurantId || 1;
+
   const [orders, setOrders] = useState<MerchantOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('PENDING');
@@ -50,7 +54,7 @@ export const MerchantDashboardPage: React.FC = () => {
   const fetchOrders = async (silent: boolean = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await orderApi.getMerchantOrders(1);
+      const res = await orderApi.getMerchantOrders(currentRestaurantId);
       if (res && res.data) {
         // Detect if any new PENDING orders arrived during polling
         if (knownOrderIdsRef.current.size > 0) {
@@ -84,7 +88,7 @@ export const MerchantDashboardPage: React.FC = () => {
     fetchOrders();
 
     // 1. Connect WebSocket STOMP
-    merchantWebSocket.connect(1);
+    merchantWebSocket.connect(currentRestaurantId);
 
     // 2. Subscribe to WebSocket connection status
     const unsubStatus = merchantWebSocket.subscribeConnectionStatus((status) => {
