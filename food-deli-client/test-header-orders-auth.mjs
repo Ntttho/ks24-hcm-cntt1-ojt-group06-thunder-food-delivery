@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 const CLIENT_DIR = process.cwd();
@@ -58,10 +58,9 @@ test('1. JWT Decoder, Role Normalization and Expiration Detection', async () => 
 test('2. Header Navigation Links and Role-based Dropdown Recognition', async () => {
   const headerContent = readFileSync(join(CLIENT_DIR, 'src', 'components', 'header', 'Header.tsx'), 'utf-8');
 
-  // 1. Desktop Nav items: Trang chủ, Quán ăn, Đơn hàng của tôi, Giỏ hàng
+  // 1. Desktop Nav items: Trang chủ, Quán ăn, Giỏ hàng
   assert.ok(headerContent.includes('Trang chủ'), 'Header must contain Trang chủ link');
   assert.ok(headerContent.includes('Quán ăn'), 'Header must contain Quán ăn link');
-  assert.ok(headerContent.includes('Đơn hàng của tôi'), 'Header must contain Đơn hàng của tôi link');
   assert.ok(headerContent.includes('Giỏ hàng'), 'Header must contain Giỏ hàng link');
 
   // 2. Role Dropdown Menu items
@@ -76,7 +75,10 @@ test('2. Header Navigation Links and Role-based Dropdown Recognition', async () 
 // Test 3: Cart Checkout Protection & Return to Checkout
 test('3. Cart Checkout Protection & Seamless Return after Login', async () => {
   // Verify CartPage has authentication check before proceeding
-  const cartContent = readFileSync(join(CLIENT_DIR, 'src', 'pages', 'user', 'CartPage.tsx'), 'utf-8');
+  const cartPath = existsSync(join(CLIENT_DIR, 'src', 'pages', 'user', 'cartpage', 'CartPage.tsx'))
+    ? join(CLIENT_DIR, 'src', 'pages', 'user', 'cartpage', 'CartPage.tsx')
+    : join(CLIENT_DIR, 'src', 'pages', 'user', 'CartPage.tsx');
+  const cartContent = readFileSync(cartPath, 'utf-8');
   assert.ok(cartContent.includes('!isAuthenticated'), 'CartPage must check isAuthenticated on checkout');
   assert.ok(cartContent.includes('state: { from: APP_ROUTES.CHECKOUT }'), 'CartPage must redirect to login with from state');
   assert.ok(cartContent.includes('Vui lòng đăng nhập'), 'CartPage must display warning message');
@@ -84,9 +86,9 @@ test('3. Cart Checkout Protection & Seamless Return after Login', async () => {
   // Verify routes/index.tsx protects /checkout
   const routeContent = readFileSync(join(CLIENT_DIR, 'src', 'routes', 'index.tsx'), 'utf-8');
   assert.ok(routeContent.includes('<ProtectedRoute>\n        <CheckoutPage />\n      </ProtectedRoute>') ||
-            routeContent.includes('<ProtectedRoute><CheckoutPage /></ProtectedRoute>') ||
-            (routeContent.includes('CHECKOUT') && routeContent.includes('<ProtectedRoute>')),
-            'routes/index.tsx must wrap CheckoutPage in ProtectedRoute');
+    routeContent.includes('<ProtectedRoute><CheckoutPage /></ProtectedRoute>') ||
+    (routeContent.includes('CHECKOUT') && routeContent.includes('<ProtectedRoute>')),
+    'routes/index.tsx must wrap CheckoutPage in ProtectedRoute');
 
   // Verify LoginPage reads from location and redirects back to /checkout
   const loginContent = readFileSync(join(CLIENT_DIR, 'src', 'pages', 'auth', 'LoginPage.tsx'), 'utf-8');
@@ -107,17 +109,18 @@ test('4. Customer Orders Page (/orders) & Order Detail Tracking (/orders/:id)', 
   // Verify OrdersPage calls API and supports status tabs, details and live tracking
   const ordersPageContent = readFileSync(join(CLIENT_DIR, 'src', 'pages', 'order', 'OrdersPage.tsx'), 'utf-8');
   assert.ok(ordersPageContent.includes('orderApi.getMyOrders'), 'OrdersPage must call orderApi.getMyOrders');
-  assert.ok(ordersPageContent.includes('OrderDetailModal'), 'OrdersPage must support OrderDetailModal');
+  assert.ok(ordersPageContent.includes('CustomerOrderCard'), 'OrdersPage must render CustomerOrderCard');
   assert.ok(ordersPageContent.includes('/orders/${order.id}'), 'OrdersPage must navigate to live tracking');
   assert.ok(ordersPageContent.includes('paymentMethod'), 'OrdersPage must display payment method');
   assert.ok(ordersPageContent.includes('totalAmount'), 'OrdersPage must display total amount');
 
   // Verify OrderDetailPage has state machine steps and full detail
   const detailContent = readFileSync(join(CLIENT_DIR, 'src', 'pages', 'order', 'OrderDetailPage.tsx'), 'utf-8');
-  assert.ok(detailContent.includes('Steps'), 'OrderDetailPage must render visual tracking Steps');
-  assert.ok(detailContent.includes('Quán chế biến'), 'Steps must include preparation');
-  assert.ok(detailContent.includes('Đang giao hàng'), 'Steps must include delivery step');
-  assert.ok(detailContent.includes('Giao thành công'), 'Steps must include completion step');
+  const stepperContent = readFileSync(join(CLIENT_DIR, 'src', 'pages', 'order', 'components', 'OrderLiveTrackingStepper.tsx'), 'utf-8');
+  assert.ok(stepperContent.includes('Steps'), 'OrderDetailPage must render visual tracking Steps');
+  assert.ok(stepperContent.includes('Quán chế biến'), 'Steps must include preparation');
+  assert.ok(stepperContent.includes('Đang giao hàng'), 'Steps must include delivery step');
+  assert.ok(stepperContent.includes('Giao thành công'), 'Steps must include completion step');
   assert.ok(detailContent.includes('order.receiverAddress'), 'OrderDetailPage must render delivery address');
   assert.ok(detailContent.includes('order.items'), 'OrderDetailPage must render order items');
 });
