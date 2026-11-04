@@ -65,3 +65,4 @@ export interface CustomerOrder {
   items: OrderItem[];
   statusLogs?: OrderStatusLog[];
 }
+

@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { MainLayout, AuthLayout, MerchantLayout } from '@/layouts';
 import {
   HomePage,
+  RestaurantListPage,
   LoginPage,
   RegisterPage,
   AddressManagementPage,
@@ -31,7 +32,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'restaurants',
-        element: <HomePage />,
+        element: <RestaurantListPage />,
       },
       {
         path: 'restaurants/:id',

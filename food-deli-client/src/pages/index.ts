@@ -1,4 +1,5 @@
 export * from './public/home/HomePage';
+export * from './public/restaurants';
 export * from './auth/LoginPage';
 export * from './auth/RegisterPage';
 export * from './profile/AddressManagementPage';

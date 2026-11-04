@@ -79,3 +79,4 @@ export const getRoleFromToken = (token: string | null | undefined): string => {
 
   return ROLES.CUSTOMER;
 };
+
