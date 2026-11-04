@@ -15,7 +15,6 @@ import {
   StoreMenuCategories,
   StoreFoodCard,
   StoreCartDrawer,
-
 } from './components';
 import { StoreReviewSection } from '../store-review';
 import type { FoodItem, StoreDetail } from './types';
@@ -52,7 +51,6 @@ const MOCK_FOODS: FoodItem[] = [
     category: 'Cơm Tấm',
     isPopular: true,
     soldCount: 1240,
-
   },
   {
     id: 102,
@@ -141,7 +139,6 @@ export const StoreDetailPage: React.FC = () => {
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
 
-
   // Store data with dynamic ID support
   const store: StoreDetail = useMemo(
     () => ({
@@ -157,11 +154,43 @@ export const StoreDetailPage: React.FC = () => {
   }, [activeCategory]);
 
   const handleAddToCart = (food: FoodItem) => {
+    if (cartState.shopId && cartState.shopId !== Number(store.id)) {
+      setPendingFood(food);
+      setIsConflictOpen(true);
+      return;
+    }
+
+    dispatch(
+      addToCart({
+        id: `food-${food.id}`,
+        productId: Number(food.id),
+        productName: food.name,
+        price: food.price,
+        quantity: 1,
+        imageUrl: food.imageUrl,
+        shopId: Number(store.id),
+        shopName: store.name,
+      })
+    );
+    message.success(`Đã thêm "${food.name}" vào giỏ hàng!`);
   };
 
   const handleConfirmReplaceCart = () => {
     if (!pendingFood) return;
-
+    dispatch(
+      addToCart({
+        id: `food-${pendingFood.id}`,
+        productId: Number(pendingFood.id),
+        productName: pendingFood.name,
+        price: pendingFood.price,
+        quantity: 1,
+        imageUrl: pendingFood.imageUrl,
+        shopId: Number(store.id),
+        shopName: store.name,
+      })
+    );
+    setIsConflictOpen(false);
+    setPendingFood(null);
     message.success(`Đã tạo giỏ hàng mới tại "${store.name}"!`);
   };
 
@@ -237,7 +266,12 @@ export const StoreDetailPage: React.FC = () => {
       )}
 
       {activeTab === 'reviews' && (
-        <StoreReviewSection shopId={store.id} shopName={store.name} rating={store.rating} reviewCount={store.reviewCount} />
+        <StoreReviewSection
+          shopId={store.id}
+          shopName={store.name}
+          rating={store.rating}
+          reviewCount={store.reviewCount}
+        />
       )}
 
       {activeTab === 'info' && (
@@ -280,7 +314,6 @@ export const StoreDetailPage: React.FC = () => {
         newDishPrice={pendingFood?.price}
         newImageUrl={pendingFood?.imageUrl}
       />
-
     </div>
   );
 };

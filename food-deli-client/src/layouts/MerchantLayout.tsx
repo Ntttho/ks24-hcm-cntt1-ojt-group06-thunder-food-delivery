@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Link, Navigate } from 'react-router-dom';
 import {
   Layout,
   Menu,
@@ -36,7 +36,16 @@ export const MerchantLayout: React.FC = () => {
   const [shopName] = useState('Hạnh Dũng - Ẩm Thực Chay Mặn (Quán #1)');
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isMerchant, isAdmin } = useAuth();
+
+  // Defense-in-depth: Ngăn chặn tuyệt đối người dùng không phải Quán ăn hoặc Admin
+  if (!isAuthenticated) {
+    return <Navigate to={APP_ROUTES.LOGIN} replace />;
+  }
+
+  if (!isMerchant && !isAdmin) {
+    return <Navigate to={APP_ROUTES.HOME} replace />;
+  }
 
   const handleToggleShopStatus = async (checked: boolean) => {
     setIsOpen(checked);

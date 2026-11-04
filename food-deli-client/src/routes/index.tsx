@@ -118,18 +118,30 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Merchant Layout: Merchant Dashboard & Menu Management
+  // Merchant Layout: Merchant Dashboard & Menu Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {
     path: '/merchant',
-    element: <MerchantLayout />,
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+        <MerchantLayout />
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
-        element: <MerchantDashboardPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantDashboardPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: 'menu',
-        element: <MerchantMenuPage />,
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantMenuPage />
+          </ProtectedRoute>
+        ),
       },
     ],
   },

@@ -6,8 +6,8 @@ import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import { addToCart, updateQuantity, removeFromCart } from '@/store/slices/cartSlice';
-import { RestaurantConflictModal } from './components/RestaurantConflictModal';
-import { PaymentMethodModal } from './components/PaymentMethodModal';
+import { RestaurantConflictModal } from '../components/RestaurantConflictModal';
+import { PaymentMethodModal } from '../components/PaymentMethodModal';
 import {
   CartHeader,
   CartRestaurantCard,
@@ -18,8 +18,8 @@ import {
   CartUpsellRail,
   CartPriceSummary,
   CartBottomBar,
-} from './components/cart';
-import type { CartItemType, UpsellItemType } from './types';
+} from '../components/cart';
+import type { CartItemType, UpsellItemType } from '../types';
 
 const INITIAL_FALLBACK_ITEMS: CartItemType[] = [
   {
