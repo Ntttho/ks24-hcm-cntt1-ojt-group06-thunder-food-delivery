@@ -124,3 +124,25 @@ test('4. Customer Orders Page (/orders) & Order Detail Tracking (/orders/:id)', 
   assert.ok(detailContent.includes('order.receiverAddress'), 'OrderDetailPage must render delivery address');
   assert.ok(detailContent.includes('order.items'), 'OrderDetailPage must render order items');
 });
+
+// Test 5: Strict RBAC Protection on Merchant Routes (/merchant)
+test('5. Strict RBAC Protection on Merchant Routes (/merchant & /merchant/menu)', async () => {
+  // 1. Verify routes/index.tsx wraps /merchant with ProtectedRoute and allowedRoles
+  const routeContent = readFileSync(join(CLIENT_DIR, 'src', 'routes', 'index.tsx'), 'utf-8');
+  assert.ok(routeContent.includes("path: '/merchant'"), 'Route /merchant must be registered');
+  assert.ok(
+    routeContent.includes("allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}") ||
+    routeContent.includes('allowedRoles={["ROLE_MERCHANT", "ROLE_ADMIN"]}'),
+    'Route /merchant must strictly enforce ROLE_MERCHANT & ROLE_ADMIN in allowedRoles'
+  );
+
+  // 2. Verify ProtectedRoute.tsx normalizes roles and denies access if role is not allowed
+  const protectedRouteContent = readFileSync(join(CLIENT_DIR, 'src', 'routes', 'ProtectedRoute.tsx'), 'utf-8');
+  assert.ok(protectedRouteContent.includes('normalizeRole'), 'ProtectedRoute must normalize user roles');
+  assert.ok(protectedRouteContent.includes('hasPermission'), 'ProtectedRoute must evaluate permission');
+  assert.ok(protectedRouteContent.includes('403 - Quyền truy cập bị từ chối') || protectedRouteContent.includes('Result'), 'ProtectedRoute must display 403 Forbidden on denied access');
+
+  // 3. Verify MerchantLayout has defense-in-depth check
+  const merchantLayoutContent = readFileSync(join(CLIENT_DIR, 'src', 'layouts', 'MerchantLayout.tsx'), 'utf-8');
+  assert.ok(merchantLayoutContent.includes('!isMerchant && !isAdmin'), 'MerchantLayout must guard against unauthorized roles');
+});
