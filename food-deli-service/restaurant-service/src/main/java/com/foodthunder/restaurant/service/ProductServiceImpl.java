@@ -52,13 +52,6 @@ public class ProductServiceImpl implements ProductService {
                             .thenComparing(ToppingDto::getPrice)
                             .thenComparing(ToppingDto::getName))
                     .collect(Collectors.toList());
-        } else if (restaurantId != null) {
-            allToppings = toppingRepository.findByRestaurantIdAndIsAvailableTrue(restaurantId).stream()
-                    .map(this::mapToppingToDto)
-                    .sorted(Comparator.comparing(ToppingDto::getGroupName, Comparator.nullsLast(String::compareTo))
-                            .thenComparing(ToppingDto::getPrice)
-                            .thenComparing(ToppingDto::getName))
-                    .collect(Collectors.toList());
         }
 
         // Build structured topping groups (Size ly, Độ ngọt, Mức đá, Topping thêm...)
