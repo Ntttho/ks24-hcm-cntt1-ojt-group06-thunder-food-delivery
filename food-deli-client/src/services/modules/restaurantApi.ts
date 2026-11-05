@@ -3,12 +3,30 @@ import type { ApiResponse } from '@/types';
 
 export interface Shop {
   id: number;
+  ownerId?: number;
   name: string;
   address: string;
   phoneNumber?: string;
   rating?: number;
   imageUrl?: string;
   status?: string;
+  isOpen?: boolean;
+  isOpenToday?: boolean;
+  openingTime?: string;
+  closingTime?: string;
+  ratingAvg?: number;
+  approvalStatus?: string;
+}
+
+export interface CreateRestaurantPayload {
+  name: string;
+  address: string;
+  latitude?: number;
+  longitude?: number;
+  openingTime?: string;
+  closingTime?: string;
+  imageUrl?: string;
+  initialCategoryName?: string;
 }
 
 export interface ProductItem {
@@ -165,7 +183,31 @@ export const restaurantApi = {
   },
 
   getMyRestaurants: async (ownerId?: number): Promise<ApiResponse<Shop[]>> => {
-    return apiClient.get<Shop[]>('/restaurants/mine', { params: { ownerId } });
+    return apiClient.get<Shop[]>('/restaurants/mine', {
+      params: ownerId ? { ownerId } : undefined,
+      headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
+    });
+  },
+
+  createRestaurant: async (
+    data: CreateRestaurantPayload,
+    ownerId?: number
+  ): Promise<ApiResponse<Shop>> => {
+    return apiClient.post<Shop>('/restaurants', data, {
+      params: ownerId ? { ownerId } : undefined,
+      headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
+    });
+  },
+
+  updateRestaurantDetails: async (
+    restaurantId: number | string,
+    data: CreateRestaurantPayload,
+    ownerId?: number
+  ): Promise<ApiResponse<Shop>> => {
+    return apiClient.post<Shop>(`/restaurants/${restaurantId}/details`, data, {
+      params: ownerId ? { ownerId } : undefined,
+      headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
+    });
   },
 
   updateRestaurantStatus: async (id: number | string, isOpen: boolean, reason?: string): Promise<ApiResponse<Shop>> => {

@@ -26,3 +26,4 @@ public class UpdateToppingRequest {
 
     private Boolean isAvailable;
 }
+

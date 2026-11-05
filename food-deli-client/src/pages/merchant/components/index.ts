@@ -7,3 +7,6 @@ export * from './MerchantOrderDetailDrawer';
 export * from './ProductFormModal';
 export * from './AssignToppingModal';
 export * from './ToppingFormModal';
+export * from './MerchantOnboardingModal';
+export * from './MerchantOnboardingView';
+export * from './LocationPickerMap';

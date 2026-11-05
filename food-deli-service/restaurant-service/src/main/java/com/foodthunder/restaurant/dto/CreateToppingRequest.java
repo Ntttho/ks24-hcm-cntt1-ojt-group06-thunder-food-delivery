@@ -35,3 +35,4 @@ public class CreateToppingRequest {
     @Builder.Default
     private Boolean isAvailable = true;
 }
+
