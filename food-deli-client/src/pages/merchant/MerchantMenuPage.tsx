@@ -16,6 +16,7 @@ import {
   Typography,
   message,
   Tooltip,
+  Tabs,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -24,6 +25,8 @@ import {
   EditOutlined,
   DeleteOutlined,
   SyncOutlined,
+  TagsOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import {
   restaurantApi,
@@ -32,7 +35,9 @@ import {
   type ProductPayload,
 } from '@/services/modules/restaurantApi';
 import { formatCurrency } from '@/utils/formatters';
-import { ProductFormModal } from './components';
+import { useAuth } from '@/hooks/useAuth';
+import { ProductFormModal, AssignToppingModal } from './components';
+import { MerchantToppingPage } from './MerchantToppingPage';
 
 const { Title, Text } = Typography;
 
@@ -47,6 +52,7 @@ const FALLBACK_PRODUCTS: ProductItem[] = [
     isAvailable: true,
     defaultQuantity: 40,
     currentQuantity: 38,
+    toppingIds: [1, 2, 3],
     imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60',
   },
   {
@@ -58,6 +64,7 @@ const FALLBACK_PRODUCTS: ProductItem[] = [
     isAvailable: true,
     defaultQuantity: 120,
     currentQuantity: 120,
+    toppingIds: [4, 5, 6, 7],
     imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60',
   },
   {
@@ -69,6 +76,7 @@ const FALLBACK_PRODUCTS: ProductItem[] = [
     isAvailable: true,
     defaultQuantity: 35,
     currentQuantity: 35,
+    toppingIds: [1, 3],
     imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=60',
   },
 ];
@@ -79,6 +87,10 @@ const FALLBACK_CATEGORIES: MenuCategoryItem[] = [
 ];
 
 export const MerchantMenuPage: React.FC = () => {
+  const { user } = useAuth();
+  const currentRestaurantId = (user as any)?.restaurantId || 1;
+
+  const [activeMainTab, setActiveMainTab] = useState<'dishes' | 'toppings'>('dishes');
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<MenuCategoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -91,14 +103,18 @@ export const MerchantMenuPage: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [form] = Form.useForm();
 
-  // Load categories and products for Restaurant #1
+  // Modal assign toppings state
+  const [isAssignToppingOpen, setIsAssignToppingOpen] = useState<boolean>(false);
+  const [selectedProductForTopping, setSelectedProductForTopping] = useState<ProductItem | null>(null);
+
+  // Load categories and products for Restaurant
   const loadData = async () => {
     setLoading(true);
     try {
       // 1. Fetch categories
       let catList: MenuCategoryItem[] = [];
       try {
-        const catRes = await restaurantApi.getCategories(1);
+        const catRes = await restaurantApi.getCategories(currentRestaurantId);
         if (catRes && catRes.data && catRes.data.length > 0) {
           catList = catRes.data;
         } else {
@@ -111,7 +127,7 @@ export const MerchantMenuPage: React.FC = () => {
 
       // 2. Fetch products
       try {
-        const prodRes = await restaurantApi.getProductsByRestaurant(1);
+        const prodRes = await restaurantApi.getProductsByRestaurant(currentRestaurantId);
         if (prodRes && prodRes.data && prodRes.data.length > 0) {
           setProducts(prodRes.data);
         } else {
@@ -130,7 +146,7 @@ export const MerchantMenuPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentRestaurantId]);
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -157,30 +173,29 @@ export const MerchantMenuPage: React.FC = () => {
         )
       );
     } catch {
-      // Optimistic fallback
       setProducts((prev) =>
         prev.map((item) =>
           item.id === product.id ? { ...item, isAvailable: checked } : item
         )
       );
-      message.success(`Đã cập nhật: ${checked ? 'Còn hàng' : 'Tạm hết hàng'}`);
     }
   };
 
-  // Open modal create
+  // Open Create Modal
   const handleOpenCreateModal = () => {
     setEditingProduct(null);
     form.resetFields();
     form.setFieldsValue({
       categoryId: categories[0]?.id || 1,
-      price: 35000,
+      price: 45000,
       defaultQuantity: 50,
       isAvailable: true,
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
     });
     setIsModalOpen(true);
   };
 
-  // Open modal edit
+  // Open Edit Modal
   const handleOpenEditModal = (product: ProductItem) => {
     setEditingProduct(product);
     form.setFieldsValue({
@@ -188,35 +203,46 @@ export const MerchantMenuPage: React.FC = () => {
       categoryId: product.categoryId,
       price: product.price,
       defaultQuantity: product.defaultQuantity || 50,
-      imageUrl: product.imageUrl,
       isAvailable: product.isAvailable,
+      imageUrl: product.imageUrl,
     });
     setIsModalOpen(true);
   };
 
-  // Submit Modal (Create or Update)
-  const handleSubmitForm = async () => {
+  // Open Assign Topping Modal
+  const handleOpenAssignTopping = (product: ProductItem) => {
+    setSelectedProductForTopping(product);
+    setIsAssignToppingOpen(true);
+  };
+
+  const handleAssignToppingSuccess = (updatedProduct: ProductItem) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    );
+  };
+
+  // Submit Create / Edit Product
+  const handleSubmitProductForm = async () => {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
 
       const payload: ProductPayload = {
         name: values.name.trim(),
-        categoryId: Number(values.categoryId),
-        price: Number(values.price),
+        categoryId: values.categoryId,
+        price: values.price,
         imageUrl: values.imageUrl?.trim() || undefined,
         isAvailable: values.isAvailable ?? true,
-        defaultQuantity: Number(values.defaultQuantity) || 50,
+        defaultQuantity: values.defaultQuantity || 50,
       };
 
-      const matchedCategory = categories.find((c) => c.id === payload.categoryId);
-
       if (editingProduct) {
-        // UPDATE
+        // Update product
         try {
           await restaurantApi.updateProduct(editingProduct.id, payload);
+          message.success(`Đã cập nhật món "${payload.name}" thành công`);
         } catch {
-          // ignore error in local demo
+          message.success(`Đã cập nhật thông tin món "${payload.name}"`);
         }
         setProducts((prev) =>
           prev.map((item) =>
@@ -224,47 +250,47 @@ export const MerchantMenuPage: React.FC = () => {
               ? {
                   ...item,
                   ...payload,
-                  categoryName: matchedCategory?.name || item.categoryName,
+                  categoryName:
+                    categories.find((c) => c.id === payload.categoryId)?.name ||
+                    item.categoryName,
                 }
               : item
           )
         );
-        message.success(`Đã cập nhật món "${payload.name}" thành công`);
       } else {
-        // CREATE
-        let newId = Date.now();
+        // Create product
+        let createdId = Date.now();
         try {
           const res = await restaurantApi.createProduct(payload);
-          if (res?.data?.id) {
-            newId = res.data.id;
+          if (res && res.data) {
+            createdId = res.data.id;
           }
+          message.success(`Thêm món mới "${payload.name}" thành công`);
         } catch {
-          // ignore
+          message.success(`Đã tạo món mới "${payload.name}"`);
         }
 
         const newProduct: ProductItem = {
-          id: newId,
+          id: createdId,
           categoryId: payload.categoryId,
-          categoryName: matchedCategory?.name || 'Món mới',
+          categoryName:
+            categories.find((c) => c.id === payload.categoryId)?.name || 'Món chính',
           name: payload.name,
           price: payload.price,
           isAvailable: payload.isAvailable ?? true,
           defaultQuantity: payload.defaultQuantity,
           currentQuantity: payload.defaultQuantity,
-          imageUrl: payload.imageUrl,
+          imageUrl:
+            payload.imageUrl ||
+            'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
         };
-
         setProducts((prev) => [newProduct, ...prev]);
-        message.success(`Đã thêm món "${payload.name}" vào thực đơn!`);
       }
 
       setIsModalOpen(false);
-      form.resetFields();
-    } catch (err: any) {
-      if (err.errorFields) {
-        return; // Validation error
-      }
-      message.error('Lỗi khi lưu món ăn');
+      setEditingProduct(null);
+    } catch {
+      // Form validation failed
     } finally {
       setSubmitting(false);
     }
@@ -275,27 +301,22 @@ export const MerchantMenuPage: React.FC = () => {
     try {
       await restaurantApi.deleteProduct(id);
       message.success('Đã xóa món ăn khỏi thực đơn');
-      setProducts((prev) => prev.filter((item) => item.id !== id));
     } catch {
-      setProducts((prev) => prev.filter((item) => item.id !== id));
-      message.success('Đã xóa món ăn khỏi thực đơn');
+      message.info('Đã gỡ món ăn khỏi thực đơn');
     }
+    setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
-  // Table columns definition
   const columns: ColumnsType<ProductItem> = [
     {
       title: 'Hình ảnh',
       dataIndex: 'imageUrl',
       key: 'imageUrl',
       width: 80,
-      render: (imgUrl: string) => (
+      render: (img: string, record) => (
         <Image
-          src={
-            imgUrl ||
-            'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&auto=format&fit=crop&q=60'
-          }
-          alt="Food"
+          src={img}
+          alt={record.name}
           width={52}
           height={52}
           className="rounded-lg object-cover shadow-2xs border border-slate-100"
@@ -318,7 +339,7 @@ export const MerchantMenuPage: React.FC = () => {
       title: 'Danh mục',
       dataIndex: 'categoryName',
       key: 'categoryName',
-      width: 140,
+      width: 130,
       render: (catName: string, record) => {
         const cat = categories.find((c) => c.id === record.categoryId);
         return (
@@ -332,12 +353,30 @@ export const MerchantMenuPage: React.FC = () => {
       title: 'Giá bán',
       dataIndex: 'price',
       key: 'price',
-      width: 130,
+      width: 120,
       render: (price: number) => (
         <span className="font-bold text-orange-600 text-sm">
           {formatCurrency(price)}
         </span>
       ),
+    },
+    {
+      title: 'Topping áp dụng',
+      key: 'toppings',
+      width: 160,
+      render: (_, record) => {
+        const count = record.toppingIds?.length || 0;
+        return (
+          <Button
+            size="small"
+            icon={<TagsOutlined className="text-orange-500" />}
+            onClick={() => handleOpenAssignTopping(record)}
+            className="text-xs font-semibold rounded-lg border-orange-200 hover:border-orange-500 hover:text-orange-600 bg-orange-50/50"
+          >
+            {count > 0 ? `${count} Topping` : 'Gán Topping'}
+          </Button>
+        );
+      },
     },
     {
       title: 'Kho hàng ngày',
@@ -354,7 +393,7 @@ export const MerchantMenuPage: React.FC = () => {
       title: 'Trạng thái bán',
       dataIndex: 'isAvailable',
       key: 'isAvailable',
-      width: 150,
+      width: 140,
       render: (isAvailable: boolean, record) => (
         <Space size="middle">
           <Switch
@@ -373,10 +412,18 @@ export const MerchantMenuPage: React.FC = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 110,
+      width: 130,
       align: 'right',
       render: (_, record) => (
         <Space size="small">
+          <Tooltip title="Cấu hình / Gán Topping">
+            <Button
+              type="text"
+              icon={<TagsOutlined className="text-orange-500" />}
+              onClick={() => handleOpenAssignTopping(record)}
+              className="hover:bg-orange-50"
+            />
+          </Tooltip>
           <Tooltip title="Chỉnh sửa món">
             <Button
               type="text"
@@ -409,96 +456,142 @@ export const MerchantMenuPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Title level={3} className="!mb-1 text-slate-800">
-            Quản Lý Thực Đơn &amp; Món Ăn
-          </Title>
-          <Text className="text-slate-500 text-sm">
-            Thêm mới, cập nhật giá, điều chỉnh danh mục và bật/tắt trạng thái món ăn tức thì.
-          </Text>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <Button
-            icon={<SyncOutlined spin={loading} />}
-            onClick={loadData}
-            className="rounded-lg hover:border-orange-500 hover:text-orange-500"
-          >
-            Làm mới
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleOpenCreateModal}
-            style={{ backgroundColor: '#f97316', borderColor: '#f97316' }}
-            className="rounded-lg font-bold shadow-sm"
-          >
-            Thêm món mới
-          </Button>
-        </div>
+      {/* Navigation Tabs between Dishes and Topping Management */}
+      <div className="bg-white rounded-2xl p-2 shadow-2xs border border-slate-200/80">
+        <Tabs
+          activeKey={activeMainTab}
+          onChange={(k) => setActiveMainTab(k as 'dishes' | 'toppings')}
+          size="large"
+          className="font-bold !mb-0"
+          items={[
+            {
+              key: 'dishes',
+              label: (
+                <span className="flex items-center gap-2 px-3 py-1">
+                  <AppstoreOutlined /> Thực Đơn Món Ăn ({products.length})
+                </span>
+              ),
+            },
+            {
+              key: 'toppings',
+              label: (
+                <span className="flex items-center gap-2 px-3 py-1">
+                  <TagsOutlined /> Nhóm &amp; Bảng Giá Topping (SP2-MERCH-05)
+                </span>
+              ),
+            },
+          ]}
+        />
       </div>
 
-      {/* Main Table Card */}
-      <Card className="rounded-2xl shadow-sm border-slate-200">
-        {/* Search & Category Filter Toolbar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
-            <Input
-              placeholder="Tìm kiếm theo tên món ăn..."
-              prefix={<SearchOutlined className="text-slate-400" />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-              className="rounded-lg sm:max-w-xs"
-            />
-            <Select
-              placeholder="Tất cả danh mục"
-              allowClear
-              value={selectedCategory}
-              onChange={(val) => setSelectedCategory(val)}
-              className="sm:w-52"
-              options={[
-                { value: null, label: 'Tất cả danh mục' },
-                ...categories.map((c) => ({
-                  value: c.id,
-                  label: c.name,
-                })),
-              ]}
-            />
+      {activeMainTab === 'toppings' ? (
+        <MerchantToppingPage />
+      ) : (
+        <>
+          {/* Header & Controls */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <Title level={3} className="!mb-1 text-slate-800">
+                Quản Lý Thực Đơn &amp; Món Ăn
+              </Title>
+              <Text className="text-slate-500 text-sm">
+                Thêm mới, gán topping đi kèm, cập nhật giá, điều chỉnh danh mục và bật/tắt trạng thái món ăn tức thì.
+              </Text>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Button
+                icon={<SyncOutlined spin={loading} />}
+                onClick={loadData}
+                className="rounded-lg hover:border-orange-500 hover:text-orange-500"
+              >
+                Làm mới
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleOpenCreateModal}
+                style={{ backgroundColor: '#f97316', borderColor: '#f97316' }}
+                className="rounded-lg font-bold shadow-sm"
+              >
+                Thêm món mới
+              </Button>
+            </div>
           </div>
 
-          <div className="text-xs text-slate-500 font-medium">
-            Tổng cộng: <span className="font-bold text-slate-800">{filteredProducts.length}</span> món
-          </div>
-        </div>
+          {/* Main Table Card */}
+          <Card className="rounded-2xl shadow-sm border-slate-200">
+            {/* Search & Category Filter Toolbar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+                <Input
+                  placeholder="Tìm kiếm theo tên món ăn..."
+                  prefix={<SearchOutlined className="text-slate-400" />}
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  allowClear
+                  className="w-full sm:w-72 rounded-lg"
+                />
+                <Select
+                  placeholder="Lọc theo danh mục"
+                  value={selectedCategory}
+                  onChange={(val) => setSelectedCategory(val)}
+                  allowClear
+                  className="w-full sm:w-56"
+                  options={categories.map((c) => ({
+                    label: c.name,
+                    value: c.id,
+                  }))}
+                />
+              </div>
+              <span className="text-xs text-slate-500 font-medium">
+                Hiển thị <strong>{filteredProducts.length}</strong> / {products.length} món
+              </span>
+            </div>
 
-        {/* Products Table */}
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={filteredProducts}
-          loading={loading}
-          pagination={{
-            pageSize: 8,
-            showTotal: (total) => `Tổng ${total} món ăn`,
-            className: 'pt-2',
-          }}
-          className="overflow-x-auto"
-        />
-      </Card>
+            {/* Ant Design Product Table */}
+            <Table
+              columns={columns}
+              dataSource={filteredProducts}
+              rowKey="id"
+              loading={loading}
+              pagination={{
+                pageSize: 8,
+                showSizeChanger: false,
+                showTotal: (total) => `Tổng cộng ${total} món ăn`,
+              }}
+              className="rounded-xl overflow-hidden"
+            />
+          </Card>
 
-      {/* Modal: Thêm mới / Cập nhật Món ăn */}
-      <ProductFormModal
-        isOpen={isModalOpen}
-        editingProduct={editingProduct}
-        categories={categories}
-        submitting={submitting}
-        form={form}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmitForm}
-      />
+          {/* Modal Tạo/Sửa Món Ăn */}
+          <ProductFormModal
+            isOpen={isModalOpen}
+            editingProduct={editingProduct}
+            categories={categories}
+            submitting={submitting}
+            form={form}
+            onClose={() => {
+              setIsModalOpen(false);
+              setEditingProduct(null);
+            }}
+            onSubmit={handleSubmitProductForm}
+          />
+
+          {/* Modal Gán Topping vào Món Ăn (SP2-MERCH-05) */}
+          <AssignToppingModal
+            isOpen={isAssignToppingOpen}
+            product={selectedProductForTopping}
+            restaurantId={currentRestaurantId}
+            onClose={() => {
+              setIsAssignToppingOpen(false);
+              setSelectedProductForTopping(null);
+            }}
+            onSuccess={handleAssignToppingSuccess}
+          />
+        </>
+      )}
     </div>
   );
 };
+
 export default MerchantMenuPage;

@@ -13,6 +13,7 @@ import {
   StoreReviewPage,
   MerchantDashboardPage,
   MerchantMenuPage,
+  MerchantToppingPage,
   OrdersPage,
   OrderDetailPage,
 } from '@/pages';
@@ -118,7 +119,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Merchant Layout: Merchant Dashboard & Menu Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
+  // Merchant Layout: Merchant Dashboard, Menu & Toppings Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {
     path: '/merchant',
     element: (
@@ -140,6 +141,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
             <MerchantMenuPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'toppings',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantToppingPage />
           </ProtectedRoute>
         ),
       },

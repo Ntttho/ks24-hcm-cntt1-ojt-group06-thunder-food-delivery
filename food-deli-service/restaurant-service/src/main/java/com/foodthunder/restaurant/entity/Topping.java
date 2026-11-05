@@ -21,6 +21,10 @@ public class Topping {
     @Column(name = "restaurant_id", nullable = false)
     private Integer restaurantId;
 
+    @Column(name = "group_name", length = 100)
+    @Builder.Default
+    private String groupName = "Topping thêm";
+
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 

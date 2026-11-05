@@ -40,7 +40,7 @@ public class ProductServiceImpl implements ProductService {
                 ? category.getRestaurant().getName()
                 : null;
 
-        // Collect product toppings, or fallback to restaurant's available toppings
+        // Collect product toppings (strictly from configured food_toppings), or fallback to restaurant's available toppings
         Set<Topping> toppingsSet = product.getToppings();
         List<ToppingDto> allToppings = new ArrayList<>();
 
@@ -48,24 +48,39 @@ public class ProductServiceImpl implements ProductService {
             allToppings = toppingsSet.stream()
                     .filter(t -> Boolean.TRUE.equals(t.getIsAvailable()))
                     .map(this::mapToppingToDto)
-                    .collect(Collectors.toList());
-        } else if (restaurantId != null) {
-            allToppings = toppingRepository.findByRestaurantIdAndIsAvailableTrue(restaurantId).stream()
-                    .map(this::mapToppingToDto)
+                    .sorted(Comparator.comparing(ToppingDto::getGroupName, Comparator.nullsLast(String::compareTo))
+                            .thenComparing(ToppingDto::getPrice)
+                            .thenComparing(ToppingDto::getName))
                     .collect(Collectors.toList());
         }
 
-        // Build topping groups (Mandatory vs Optional)
+        // Build structured topping groups (Size ly, Độ ngọt, Mức đá, Topping thêm...)
         List<ToppingGroupDto> groups = new ArrayList<>();
         if (!allToppings.isEmpty()) {
-            // Group 1: Topping thêm (Tùy chọn)
-            groups.add(ToppingGroupDto.builder()
-                    .groupName("Topping thêm (Tùy chọn)")
-                    .required(false)
-                    .minSelection(0)
-                    .maxSelection(allToppings.size())
-                    .toppings(allToppings)
-                    .build());
+            Map<String, List<ToppingDto>> grouped = allToppings.stream()
+                    .collect(Collectors.groupingBy(
+                            t -> (t.getGroupName() != null && !t.getGroupName().isBlank()) ? t.getGroupName() : "Topping thêm",
+                            LinkedHashMap::new,
+                            Collectors.toList()
+                    ));
+
+            grouped.forEach((groupName, items) -> {
+                boolean isSize = groupName.toLowerCase().contains("size");
+                boolean isSweetness = groupName.toLowerCase().contains("ngọt") || groupName.toLowerCase().contains("đường");
+                boolean isIce = groupName.toLowerCase().contains("đá");
+
+                boolean required = isSize;
+                int minSelection = isSize ? 1 : 0;
+                int maxSelection = (isSize || isSweetness || isIce) ? 1 : items.size();
+
+                groups.add(ToppingGroupDto.builder()
+                        .groupName(groupName)
+                        .required(required)
+                        .minSelection(minSelection)
+                        .maxSelection(maxSelection)
+                        .toppings(items)
+                        .build());
+            });
         }
 
         return ProductDetailDto.builder()
@@ -255,6 +270,7 @@ public class ProductServiceImpl implements ProductService {
         return ToppingDto.builder()
                 .id(topping.getId())
                 .restaurantId(topping.getRestaurantId())
+                .groupName(topping.getGroupName() != null ? topping.getGroupName() : "Topping thêm")
                 .name(topping.getName())
                 .price(topping.getPrice())
                 .isAvailable(topping.getIsAvailable())

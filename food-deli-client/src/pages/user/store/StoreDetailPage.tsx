@@ -15,8 +15,10 @@ import {
   StoreMenuCategories,
   StoreFoodCard,
   StoreCartDrawer,
+  FoodCustomizationModal,
 } from './components';
 import { StoreReviewSection } from '../store-review';
+import { restaurantApi } from '@/services/modules/restaurantApi';
 import type { FoodItem, StoreDetail } from './types';
 
 const MOCK_STORE: StoreDetail = {
@@ -45,7 +47,7 @@ const MOCK_FOODS: FoodItem[] = [
     name: 'Cơm Tấm Sườn Bì Chả Đặc Biệt',
     price: 87000,
     originalPrice: 95000,
-    description: 'Sườn cốt lết nướng than hoa thơm lừng, bì giòn dai, chả trứng hấp mềm mịn, mỡ hành tép mỡ thơm ngậy.',
+    description: 'Sườn cốt lết nướng than hoa thơm lừng, bì giòn dai, chả trứng hấp mềm mịn, mỡ hành tóp mỡ thơm ngậy.',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuAIqfTI5s8Q8ASaoe0eenWqww4cUBT5Qndph9kSGOPYbs1F1lc3YSgyIp98tLIRpxAgVziH2jroEu4J3Lm7sSxvt_ZYhlJ-5cAO7yFUGC0B-zfUsVSOEQJgLrBcPS-2JM4UJWXfKrWnqYhSgqDZ0SKVb1PkH5MqQFKI-umi-MtJpVS2KNDAzQWnfvmP968_J5KRwMh_yLu3icf_iU7IHTDx3wnoXLLF2CLwt08eOsO6uO1-Vu4Km2lyEg',
     category: 'Cơm Tấm',
@@ -56,7 +58,7 @@ const MOCK_FOODS: FoodItem[] = [
     id: 102,
     name: 'Cơm Tấm Sườn Cốt Lết Nướng',
     price: 65000,
-    description: 'Miếng sườn ướp sốt bí truyền nướng đều tay, da giòn thịt ngọt nước xì xụp.',
+    description: 'Miếng sườn ướp sốt bí truyền nướng đều tay, da giòn thịt ngọt nước xá xốp.',
     imageUrl:
       'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
     category: 'Cơm Tấm',
@@ -66,7 +68,7 @@ const MOCK_FOODS: FoodItem[] = [
     id: 103,
     name: 'Canh Khổ Qua Nhồi Thịt',
     price: 35000,
-    description: 'Canh thanh mát, khổ qua giòn nhẹ nhồi thịt bằm mộc nhĩ ngọt nước dùng.',
+    description: 'Canh thanh mát, khổ qua giòn nhẹ nhồi thịt băm mộc nhĩ ngọt nước dùng.',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuD5xddBWdavFNppRvgJfZ-98sSI-55_jOOTZ78Qypan6fiv63Malq-00eOk0ly36_G0fH7UuQbgBjaEijPgHIbCMNa57oRbWN8ELerPyOl-5ZtOn02rkIIaFPKLIuX-bbdIh51ICzw7yby5ewLv35H3_pFwpatAvydIXHcgyTtU3cn7vYgJsz2OOnAf7JbL8x-Irk3JkkVZOCF1TOL8TsCgRLcZG_WLb0ULMgL1dsj1Pqq9UiL5EfI59w',
     category: 'Món Canh',
@@ -75,9 +77,9 @@ const MOCK_FOODS: FoodItem[] = [
   },
   {
     id: 104,
-    name: 'Canh Rong Biển Thịt Bằm',
+    name: 'Canh Rong Biển Thịt Băm',
     price: 25000,
-    description: 'Rong biển Hàn Quốc nấu cùng thịt bằm tươi và đậu hũ non.',
+    description: 'Rong biển Hàn Quốc nấu cùng thịt băm tươi và đậu hũ non.',
     imageUrl:
       'https://lh3.googleusercontent.com/aida-public/AB6AXuAiCUfFW0oIdlsdc6LxoZcF3edvStw0IbxcMFrWXOIGuBEFMWW1fjfOtgAIeO8amdHOF_Iqav19ci6H9bMDTgaRi-y6thcbrrdi8j576QmRBn6yEds_3fdwpxCNSGKIY9oLcgofaUVbTJ2h-JIZqb6ZVwHF6OvMxZdx7_8LqCesGMwoxR5Ls7OP4RqVwCciFVDsXVBw0nJCMmBq3VsuR6uCH13dSydqqrspPMgcz3YnuA9xSYtM8n4nJw',
     category: 'Món Canh',
@@ -98,22 +100,21 @@ const MOCK_FOODS: FoodItem[] = [
     id: 106,
     name: 'Trà Đào Cam Sả',
     price: 28000,
-    description: 'Trà đen thơm thanh đào giòn giòn cùng hương sả cam ấm nồng giải nhiệt.',
+    description: 'Trà đen thơm lừng quyện cùng vị ngọt thanh của đào và hương sả cay nhẹ.',
     imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCYTOCsQhWpehtSfIaVBg--khW253SrSOhmMUZ9XtiQrCxyE3ikSDxd6S0ssIdrg14C8QZ5hO-SfGCYyrNXoKjo5nlOf6w4gqefYMSdF8EJ3G_xclpZ0tCqyxizipN0QaEtIM2N6YrUXrRXqinCvoRLGI62-BUWnEunIMFDXQWo8MH6es4xtnr1tOkrQxSTMw9iv4ijB75wOCheTw4cBaX_yL0GEgQmdDkn1g2YY5RnYYU0L0hfOtEQug',
+      'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80',
     category: 'Đồ Uống',
-    isNew: true,
-    soldCount: 420,
+    soldCount: 780,
   },
   {
     id: 107,
     name: 'Chả Trứng Hấp Thêm',
-    price: 15000,
-    description: 'Phần chả trứng hấp vàng ươm thêm vào phần ăn.',
+    price: 12000,
+    description: 'Miếng chả trứng vàng ươm, thơm mùi nấm mèo và thịt băm béo ngọt.',
     imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDiE6DtiK6elJx982NJFnl4-Qr1AvO2VT9kdfo9DDSTF99sswTRpIzud6brNhpbijnbmzvj9ndtgL50KytKZ8pdWOZ9vgtFh0NJNA-6daJ2hc8KKizP6wBTvlotae7G6mxkfbu3pIYKTvR-MA5lhHe8Wk8bkFJri1iNzXV2zNRY2ETiqWF-KYkYHWwDx052D2-f-LbbcBRHRoq45qEh_S10Mk7_4AcYSBa4Gc6tiH_IlW70ieTsdwWB7Q',
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuD96s73W13D39b8tqXlO-G_e549T-RIdVnSjVzO4e7I2bVlA5w9f6d6mC4Q1gH8kL9oP3rT5vX8zB0cM2eK4iA6wY8uE1qS3uO5vW7yC9aE1gI3kM5oQ7sU9w',
     category: 'Món Thêm',
-    soldCount: 780,
+    soldCount: 620,
   },
   {
     id: 108,
@@ -139,6 +140,15 @@ export const StoreDetailPage: React.FC = () => {
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
 
+  // Customization Modal State
+  const [selectedFoodForCustomization, setSelectedFoodForCustomization] = useState<FoodItem | null>(null);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+  const [pendingCustomization, setPendingCustomization] = useState<{
+    food: FoodItem;
+    quantity: number;
+    toppings: Array<{ id: number; name: string; price: number }>;
+  } | null>(null);
+
   // Store data with dynamic ID support
   const store: StoreDetail = useMemo(
     () => ({
@@ -153,44 +163,93 @@ export const StoreDetailPage: React.FC = () => {
     return MOCK_FOODS.filter((f) => f.category === activeCategory);
   }, [activeCategory]);
 
-  const handleAddToCart = (food: FoodItem) => {
-    if (cartState.shopId && cartState.shopId !== Number(store.id)) {
+  const handleAddToCart = async (food: FoodItem) => {
+    try {
+      const res = await restaurantApi.getProductDetail(food.id);
+      if (res && res.data) {
+        const detail = res.data;
+        const groups = (detail.toppingGroups || []).map((g, idx) => ({
+          id: idx + 1,
+          name: g.groupName,
+          required: g.required,
+          multiple: g.maxSelection > 1,
+          options: g.toppings.map((t) => ({
+            id: t.id,
+            name: t.name,
+            price: t.price,
+          })),
+        }));
+        setSelectedFoodForCustomization({
+          ...food,
+          customizationGroups: groups,
+        });
+      } else {
+        setSelectedFoodForCustomization(food);
+      }
+    } catch {
+      setSelectedFoodForCustomization(food);
+    }
+    setIsCustomizationOpen(true);
+  };
+
+  const handleConfirmCustomization = (
+    food: FoodItem,
+    quantity: number,
+    toppings: Array<{ id: number; name: string; price: number }>
+  ) => {
+    const isDifferentShop = cartState.shopId && cartState.shopId !== Number(store.id);
+    if (isDifferentShop) {
       setPendingFood(food);
+      setPendingCustomization({ food, quantity, toppings });
       setIsConflictOpen(true);
       return;
     }
 
+    applyAddToCart(food, quantity, toppings);
+  };
+
+  const applyAddToCart = (
+    food: FoodItem,
+    quantity: number,
+    toppings: Array<{ id: number; name: string; price: number }>
+  ) => {
+    const toppingKey = toppings.map((t) => t.id).sort().join('-');
+    const cartItemId = `${food.id}-${toppingKey || 'base'}`;
+
     dispatch(
       addToCart({
-        id: `food-${food.id}`,
+        id: cartItemId,
         productId: Number(food.id),
         productName: food.name,
         price: food.price,
-        quantity: 1,
+        quantity,
         imageUrl: food.imageUrl,
         shopId: Number(store.id),
         shopName: store.name,
+        toppings,
       })
     );
-    message.success(`Đã thêm "${food.name}" vào giỏ hàng!`);
+
+    setIsCustomizationOpen(false);
+    message.success(
+      `Đã thêm "${food.name}" ${toppings.length > 0 ? `(kèm ${toppings.length} topping)` : ''} vào giỏ hàng!`
+    );
   };
 
   const handleConfirmReplaceCart = () => {
-    if (!pendingFood) return;
-    dispatch(
-      addToCart({
-        id: `food-${pendingFood.id}`,
-        productId: Number(pendingFood.id),
-        productName: pendingFood.name,
-        price: pendingFood.price,
-        quantity: 1,
-        imageUrl: pendingFood.imageUrl,
-        shopId: Number(store.id),
-        shopName: store.name,
-      })
-    );
+    if (pendingCustomization) {
+      applyAddToCart(
+        pendingCustomization.food,
+        pendingCustomization.quantity,
+        pendingCustomization.toppings
+      );
+      setPendingCustomization(null);
+      setPendingFood(null);
+    } else if (pendingFood) {
+      applyAddToCart(pendingFood, 1, []);
+      setPendingFood(null);
+    }
     setIsConflictOpen(false);
-    setPendingFood(null);
     message.success(`Đã tạo giỏ hàng mới tại "${store.name}"!`);
   };
 
@@ -220,7 +279,7 @@ export const StoreDetailPage: React.FC = () => {
               key: 'reviews',
               label: (
                 <span className="flex items-center gap-2 font-bold px-3 py-1">
-                  <CommentOutlined /> Đánh giá ({store.reviewCount})
+                  <CommentOutlined /> Đánh giá (384)
                 </span>
               ),
             },
@@ -239,14 +298,12 @@ export const StoreDetailPage: React.FC = () => {
       {/* 3. Tab Contents */}
       {activeTab === 'menu' && (
         <div className="space-y-6">
-          {/* Categories Bar */}
           <StoreMenuCategories
             categories={CATEGORIES}
             activeCategory={activeCategory}
             onSelectCategory={setActiveCategory}
           />
 
-          {/* Food Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredFoods.map((food) => (
               <StoreFoodCard
@@ -258,7 +315,7 @@ export const StoreDetailPage: React.FC = () => {
           </div>
 
           {filteredFoods.length === 0 && (
-            <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center">
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
               <Empty description="Không tìm thấy món ăn trong danh mục này" />
             </div>
           )}
@@ -313,6 +370,17 @@ export const StoreDetailPage: React.FC = () => {
         newDishName={pendingFood?.name}
         newDishPrice={pendingFood?.price}
         newImageUrl={pendingFood?.imageUrl}
+      />
+
+      {/* 6. Food Customization Modal (SP2-MERCH-05: hiển thị đúng các topping được quán cấu hình) */}
+      <FoodCustomizationModal
+        food={selectedFoodForCustomization}
+        open={isCustomizationOpen}
+        onClose={() => {
+          setIsCustomizationOpen(false);
+          setSelectedFoodForCustomization(null);
+        }}
+        onConfirm={handleConfirmCustomization}
       />
     </div>
   );
