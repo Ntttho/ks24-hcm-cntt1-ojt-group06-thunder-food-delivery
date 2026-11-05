@@ -6,9 +6,16 @@ export interface Shop {
   name: string;
   address: string;
   phoneNumber?: string;
+  openingTime?: string;
+  closingTime?: string;
   rating?: number;
+  ratingAvg?: number;
   imageUrl?: string;
   status?: string;
+  isOpen?: boolean;
+  isOpenToday?: boolean;
+  temporaryClosedReason?: string;
+  approvalStatus?: string;
 }
 
 export interface ProductItem {
@@ -21,6 +28,48 @@ export interface ProductItem {
   defaultQuantity?: number;
   currentQuantity?: number;
   imageUrl?: string;
+  description?: string;
+}
+
+export interface ToppingItem {
+  id: number;
+  restaurantId?: number;
+  name: string;
+  price: number;
+  isAvailable?: boolean;
+}
+
+export interface ProductToppingGroup {
+  groupName: string;
+  required?: boolean;
+  minSelection?: number;
+  maxSelection?: number;
+  toppings: ToppingItem[];
+}
+
+export interface ProductDetail extends Omit<ProductItem, 'isAvailable'> {
+  isAvailable: boolean;
+  restaurantId?: number;
+  restaurantName?: string;
+  toppingGroups?: ProductToppingGroup[];
+  toppings?: ToppingItem[];
+}
+
+export interface RestaurantDetail extends Shop {
+  categories?: Array<{
+    id: number;
+    name: string;
+    products: ProductItem[];
+  }>;
+}
+
+export interface RestaurantPage {
+  content: Shop[];
+  pageNumber: number;
+  pageSize: number;
+  totalElements: number;
+  totalPages: number;
+  last: boolean;
 }
 
 export interface MenuCategoryItem {
@@ -40,17 +89,21 @@ export interface ProductPayload {
 }
 
 export const restaurantApi = {
-  getAll: async (params?: Record<string, any>): Promise<ApiResponse<Shop[]>> => {
-    return apiClient.get<Shop[]>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
+  getAll: async (params?: Record<string, string | number | boolean>): Promise<ApiResponse<RestaurantPage>> => {
+    return apiClient.get<RestaurantPage>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
   },
 
-  getById: async (id: number | string): Promise<ApiResponse<Shop>> => {
-    return apiClient.get<Shop>(API_ENDPOINTS.RESTAURANTS.DETAIL(id));
+  getById: async (id: number | string): Promise<ApiResponse<RestaurantDetail>> => {
+    return apiClient.get<RestaurantDetail>(API_ENDPOINTS.RESTAURANTS.DETAIL(id));
   },
 
   // Merchant Portal: Menu & Catalog Management APIs
   getProductsByRestaurant: async (restaurantId: number | string): Promise<ApiResponse<ProductItem[]>> => {
     return apiClient.get<ProductItem[]>(`/restaurants/${restaurantId}/products`);
+  },
+
+  getProductDetail: async (productId: number | string): Promise<ApiResponse<ProductDetail>> => {
+    return apiClient.get<ProductDetail>(API_ENDPOINTS.RESTAURANTS.PRODUCT_DETAIL(productId));
   },
 
   getCategories: async (restaurantId?: number | string): Promise<ApiResponse<MenuCategoryItem[]>> => {
@@ -81,4 +134,3 @@ export const restaurantApi = {
     return apiClient.patch<Shop>(`/restaurants/${id}/status`, { isOpen, temporaryClosedReason: reason });
   },
 };
-

@@ -6,24 +6,19 @@ import { StarFilled, ClockCircleOutlined, ShopOutlined } from '@ant-design/icons
 export interface RestaurantItem {
   id: number;
   name: string;
-  cuisine: string;
   address: string;
   imageUrl: string;
-  rating: number;
-  deliveryTime: string;
+  rating?: number;
+  openingTime?: string;
+  closingTime?: string;
+  isOpen?: boolean;
 }
 
 interface HomeRestaurantDirectoryProps {
-  cuisines: string[];
-  selectedCuisine: string;
-  onSelectCuisine: (cuisine: string) => void;
   restaurants: RestaurantItem[];
 }
 
 export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = ({
-  cuisines,
-  selectedCuisine,
-  onSelectCuisine,
   restaurants,
 }) => {
   const navigate = useNavigate();
@@ -33,20 +28,6 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
       <div>
         <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Nhà hàng gần bạn</h2>
         <p className="mt-1 text-sm text-gray-500">Tìm quán phù hợp theo loại ẩm thực hoặc tên nhà hàng</p>
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {cuisines.map((cuisine) => (
-          <Button
-            key={cuisine}
-            type={selectedCuisine === cuisine ? 'primary' : 'default'}
-            shape="round"
-            className={selectedCuisine === cuisine ? 'border-orange-500 bg-orange-500 font-semibold' : 'font-medium'}
-            onClick={() => onSelectCuisine(cuisine)}
-          >
-            {cuisine}
-          </Button>
-        ))}
       </div>
 
       <Row gutter={[20, 20]}>
@@ -62,12 +43,11 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
                     src={restaurant.imageUrl}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
-                    <StarFilled className="text-amber-500" /> {restaurant.rating}
-                  </div>
-                  <div className="absolute bottom-3 left-3 bg-black/65 px-2.5 py-0.5 rounded-full text-xs text-white">
-                    {restaurant.cuisine}
-                  </div>
+                  {typeof restaurant.rating === 'number' && (
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/65 px-2.5 py-1 text-xs text-white">
+                      <StarFilled className="text-amber-400" /> {restaurant.rating.toFixed(1)}
+                    </div>
+                  )}
                 </div>
               }
               className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow"
@@ -78,8 +58,15 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
                 <ShopOutlined /> {restaurant.address}
               </div>
               <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                <span className="flex items-center gap-1 text-orange-600 font-semibold">
-                  <ClockCircleOutlined /> {restaurant.deliveryTime}
+                <span className="flex items-center gap-1 font-semibold text-orange-600">
+                  <ClockCircleOutlined />
+                  {restaurant.openingTime && restaurant.closingTime
+                    ? `${restaurant.openingTime.slice(0, 5)} - ${restaurant.closingTime.slice(0, 5)}`
+                    : restaurant.isOpen === true
+                      ? 'Đang mở cửa'
+                      : restaurant.isOpen === false
+                        ? 'Đang đóng cửa'
+                        : ''}
                 </span>
                 <span className="font-medium text-gray-600">Xem quán &rarr;</span>
               </div>
@@ -92,4 +79,3 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
 };
 
 export default HomeRestaurantDirectory;
-

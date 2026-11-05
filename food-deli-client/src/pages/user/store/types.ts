@@ -30,16 +30,16 @@ export interface StoreDetail {
   id: number | string;
   name: string;
   address: string;
-  phone: string;
-  rating: number;
-  reviewCount: number;
-  openTime: string;
-  closeTime: string;
-  deliveryTime: string;
-  distance: string;
-  shippingFee: number;
+  phone?: string;
+  rating?: number;
+  reviewCount?: number;
+  openTime?: string;
+  closeTime?: string;
+  deliveryTime?: string;
+  distance?: string;
+  shippingFee?: number;
   coverImageUrl: string;
   avatarUrl: string;
-  tags: string[];
+  tags?: string[];
   isVerified?: boolean;
 }

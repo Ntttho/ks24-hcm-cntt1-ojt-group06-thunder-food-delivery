@@ -31,9 +31,11 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
               <CheckCircleFilled /> Đối tác ưu tiên
             </Tag>
           )}
-          <Tag color="orange" className="font-bold px-3 py-1 rounded-full border-none shadow-sm">
-            Giao siêu tốc {store.deliveryTime}
-          </Tag>
+          {store.deliveryTime && (
+            <Tag color="orange" className="font-bold px-3 py-1 rounded-full border-none shadow-sm">
+              Giao siêu tốc {store.deliveryTime}
+            </Tag>
+          )}
         </div>
       </div>
 
@@ -54,11 +56,11 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
             <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <EnvironmentOutlined className="text-orange-500" />
-                {store.address} ({store.distance})
+                {store.address}{store.distance ? ` (${store.distance})` : ''}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
-                <PhoneOutlined /> {store.phone}
+                {store.phone && <><PhoneOutlined /> {store.phone}</>}
               </span>
             </div>
             <div className="flex items-center gap-3 pt-1">
@@ -68,19 +70,23 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
                 className="flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-amber-700 font-bold text-xs sm:text-sm cursor-pointer transition-colors"
               >
                 <StarFilled className="text-amber-500" />
-                <span>{store.rating.toFixed(1)}</span>
-                <span className="text-amber-600 font-normal">({store.reviewCount}+ đánh giá)</span>
+                <span>{store.rating?.toFixed(1) ?? '—'}</span>
+                {typeof store.reviewCount === 'number' && (
+                  <span className="text-amber-600 font-normal">({store.reviewCount} đánh giá)</span>
+                )}
               </button>
-              <span className="text-xs text-gray-500 flex items-center gap-1">
-                <ClockCircleOutlined /> {store.openTime} - {store.closeTime}
-              </span>
+              {store.openTime && store.closeTime && (
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <ClockCircleOutlined /> {store.openTime.slice(0, 5)} - {store.closeTime.slice(0, 5)}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         {/* Tags */}
         <div className="flex flex-wrap gap-1.5 self-start md:self-auto">
-          {store.tags.map((tag) => (
+          {(store.tags || []).map((tag) => (
             <span
               key={tag}
               className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-600"
@@ -95,4 +101,3 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
 };
 
 export default StoreHeroBanner;
-
