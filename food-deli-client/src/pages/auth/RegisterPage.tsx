@@ -47,7 +47,11 @@ export const RegisterPage: React.FC = () => {
 
       await register(payload);
       message.success('Đăng ký tài khoản thành công! Bạn có thể bắt đầu sử dụng ngay.');
-      navigate(APP_ROUTES.HOME);
+      if (selectedRole === 'MERCHANT') {
+        navigate('/merchant');
+      } else {
+        navigate(APP_ROUTES.HOME);
+      }
     } catch {
       // Handled in Redux and displayed via Alert
     }

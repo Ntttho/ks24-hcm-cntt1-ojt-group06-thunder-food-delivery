@@ -1,13 +1,11 @@
 package com.foodthunder.restaurant.controller;
 
-import com.foodthunder.restaurant.dto.ApiResponse;
-import com.foodthunder.restaurant.dto.PageResponse;
-import com.foodthunder.restaurant.dto.ProductDto;
-import com.foodthunder.restaurant.dto.RestaurantDetailDto;
-import com.foodthunder.restaurant.dto.RestaurantDto;
+import com.foodthunder.restaurant.dto.*;
 import com.foodthunder.restaurant.service.ProductService;
 import com.foodthunder.restaurant.service.RestaurantService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -49,7 +47,7 @@ public class RestaurantController {
     }
 
     /**
-     * Danh sách quán ăn của chủ quán (Merchant Multi-shops)
+     * API 4.2: Danh sách quán ăn của chủ quán (Merchant Multi-shops)
      * GET /api/v1/restaurants/mine
      */
     @GetMapping("/mine")
@@ -60,6 +58,22 @@ public class RestaurantController {
         Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
         List<RestaurantDto> restaurants = restaurantService.getRestaurantsByOwner(effectiveOwnerId);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách quán của bạn thành công", restaurants));
+    }
+
+    /**
+     * API 4.3: Đăng ký quán ăn mới / Đăng ký đối tác quán ăn đầu tiên (Merchant Onboarding)
+     * POST /api/v1/restaurants
+     */
+    @PostMapping
+    public ResponseEntity<ApiResponse<RestaurantDto>> createRestaurant(
+            @RequestHeader(value = "X-User-Id", required = false) Integer headerOwnerId,
+            @RequestParam(required = false) Integer ownerId,
+            @Valid @RequestBody CreateRestaurantRequest request
+    ) {
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        RestaurantDto created = restaurantService.createRestaurant(request, effectiveOwnerId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created("Đăng ký quán ăn thành công", created));
     }
 
     /**

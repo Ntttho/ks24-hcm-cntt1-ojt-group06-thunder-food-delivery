@@ -60,7 +60,11 @@ export const LoginPage: React.FC = () => {
 
       await login(payload);
       message.success('Đăng nhập thành công! Chào mừng bạn quay trở lại.');
-      navigate(fromLocation, { replace: true });
+      if (fromLocation === APP_ROUTES.HOME && (selectedRole === 'MERCHANT')) {
+        navigate('/merchant', { replace: true });
+      } else {
+        navigate(fromLocation, { replace: true });
+      }
     } catch {
       // Error handled in Redux auth slice and displayed via Alert
     }

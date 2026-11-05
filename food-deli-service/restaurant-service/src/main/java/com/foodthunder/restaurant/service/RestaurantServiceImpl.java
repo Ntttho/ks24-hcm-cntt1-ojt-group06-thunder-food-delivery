@@ -16,6 +16,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -96,6 +99,49 @@ public class RestaurantServiceImpl implements RestaurantService {
         return shopRepository.findByOwnerIdAndDeletedAtIsNull(ownerId).stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public RestaurantDto createRestaurant(CreateRestaurantRequest request, Integer ownerId) {
+        LocalTime opening = request.getOpeningTime() != null ? request.getOpeningTime() : LocalTime.of(7, 0);
+        LocalTime closing = request.getClosingTime() != null ? request.getClosingTime() : LocalTime.of(22, 0);
+        Double lat = request.getLatitude() != null ? request.getLatitude() : 10.7769;
+        Double lng = request.getLongitude() != null ? request.getLongitude() : 106.7009;
+        String img = (request.getImageUrl() != null && !request.getImageUrl().trim().isEmpty())
+                ? request.getImageUrl().trim()
+                : "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60";
+
+        Shop shop = Shop.builder()
+                .ownerId(ownerId)
+                .name(request.getName().trim())
+                .address(request.getAddress().trim())
+                .latitude(lat)
+                .longitude(lng)
+                .openingTime(opening)
+                .closingTime(closing)
+                .isOpen(true)
+                .isOpenToday(true)
+                .imageUrl(img)
+                .ratingAvg(BigDecimal.valueOf(5.00))
+                .approvalStatus("APPROVED")
+                .approvedAt(LocalDateTime.now())
+                .build();
+
+        Shop savedShop = shopRepository.save(shop);
+
+        // Auto-create initial default category
+        String categoryName = (request.getInitialCategoryName() != null && !request.getInitialCategoryName().trim().isEmpty())
+                ? request.getInitialCategoryName().trim()
+                : "Món chính";
+
+        MenuCategory defaultCategory = MenuCategory.builder()
+                .restaurant(savedShop)
+                .name(categoryName)
+                .build();
+        menuCategoryRepository.save(defaultCategory);
+
+        return mapToDto(savedShop);
     }
 
     @Override

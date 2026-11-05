@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -88,7 +89,8 @@ const FALLBACK_CATEGORIES: MenuCategoryItem[] = [
 
 export const MerchantMenuPage: React.FC = () => {
   const { user } = useAuth();
-  const currentRestaurantId = (user as any)?.restaurantId || 1;
+  const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
+  const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
   const [activeMainTab, setActiveMainTab] = useState<'dishes' | 'toppings'>('dishes');
   const [products, setProducts] = useState<ProductItem[]>([]);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Card,
   Tabs,
@@ -27,7 +28,8 @@ import {
 
 export const MerchantDashboardPage: React.FC = () => {
   const { user } = useAuth();
-  const currentRestaurantId = (user as any)?.restaurantId || 1;
+  const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
+  const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
   const [orders, setOrders] = useState<MerchantOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -162,7 +164,7 @@ export const MerchantDashboardPage: React.FC = () => {
       clearInterval(pollInterval);
       merchantWebSocket.disconnect();
     };
-  }, []);
+  }, [currentRestaurantId]);
 
   // Filter orders based on active tab and search
   const filteredOrders = useMemo(() => {

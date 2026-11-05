@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -40,7 +41,8 @@ const { Title, Text } = Typography;
 
 export const MerchantToppingPage: React.FC = () => {
   const { user } = useAuth();
-  const currentRestaurantId = (user as any)?.restaurantId || 1;
+  const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
+  const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
   const [toppings, setToppings] = useState<ToppingItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -388,3 +390,4 @@ export const MerchantToppingPage: React.FC = () => {
 };
 
 export default MerchantToppingPage;
+
