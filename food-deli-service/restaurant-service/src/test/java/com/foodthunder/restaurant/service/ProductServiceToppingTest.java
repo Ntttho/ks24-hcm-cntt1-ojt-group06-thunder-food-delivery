@@ -149,4 +149,32 @@ class ProductServiceToppingTest {
         assertThat(toppings).hasSize(2);
         assertThat(toppings).extracting(ToppingDto::getId).containsExactly(1, 2);
     }
+
+    @Test
+    @DisplayName("Khách xem chi tiết món ăn chỉ hiển thị đúng các topping đã được quán cấu hình cho món")
+    void getProductDetail_withConfiguredToppings_returnsOnlyConfiguredToppings() {
+        product.setToppings(new HashSet<>(List.of(topping1, topping2)));
+        when(productRepository.findByIdAndDeletedAtIsNull(10)).thenReturn(Optional.of(product));
+
+        var detail = productService.getProductDetail(10);
+
+        assertThat(detail).isNotNull();
+        assertThat(detail.getToppings()).hasSize(2);
+        assertThat(detail.getToppings()).extracting(ToppingDto::getId).containsExactlyInAnyOrder(1, 2);
+        verify(toppingRepository, never()).findByRestaurantIdAndIsAvailableTrue(any());
+    }
+
+    @Test
+    @DisplayName("Khách xem chi tiết món ăn KHÔNG có topping cấu hình trả về danh sách rỗng, không tự động fallback lấy toàn bộ topping quán")
+    void getProductDetail_withoutToppings_returnsEmptyList_notFallbackToRestaurantToppings() {
+        product.setToppings(new HashSet<>());
+        when(productRepository.findByIdAndDeletedAtIsNull(10)).thenReturn(Optional.of(product));
+
+        var detail = productService.getProductDetail(10);
+
+        assertThat(detail).isNotNull();
+        assertThat(detail.getToppings()).isEmpty();
+        assertThat(detail.getToppingGroups()).isEmpty();
+        verify(toppingRepository, never()).findByRestaurantIdAndIsAvailableTrue(any());
+    }
 }

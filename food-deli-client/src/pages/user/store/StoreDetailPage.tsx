@@ -324,7 +324,8 @@ export const StoreDetailPage: React.FC = () => {
 
       {activeTab === 'reviews' && (
         <StoreReviewSection
-          restaurantId={Number(store.id)}
+          shopId={store.id}
+          shopName={store.name}
           rating={store.rating}
           reviewCount={store.reviewCount}
         />
