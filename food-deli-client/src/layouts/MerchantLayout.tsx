@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Outlet, useNavigate, useLocation, Link, useOutletContext } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Link, useOutletContext, Navigate } from 'react-router-dom';
 import {
   Layout,
   Menu,
@@ -55,7 +55,16 @@ export const MerchantLayout: React.FC = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAuthenticated, isMerchant, isAdmin } = useAuth();
+
+  // Defense-in-depth: Ngăn chặn tuyệt đối người dùng không phải Quán ăn hoặc Admin
+  if (!isAuthenticated) {
+    return <Navigate to={APP_ROUTES.LOGIN} replace />;
+  }
+
+  if (!isMerchant && !isAdmin) {
+    return <Navigate to={APP_ROUTES.HOME} replace />;
+  }
 
   // Load restaurants owned by current user
   const fetchMyRestaurants = useCallback(async () => {

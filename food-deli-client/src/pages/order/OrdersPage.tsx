@@ -1,26 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Tag,
-  Button,
-  Segmented,
-  Input,
-  Spin,
-  Empty,
-  Typography,
-} from 'antd';
-import {
-  ShopOutlined,
-  ClockCircleOutlined,
-  CreditCardOutlined,
-  CompassOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  FileTextOutlined,
-  ShoppingOutlined,
-} from '@ant-design/icons';
+import { Button, Spin, Empty, Typography } from 'antd';
+import { ReloadOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { orderApi } from '@/services/modules/orderApi';
-import { OrderDetailModal } from './components/OrderDetailModal';
+import { CustomerOrderCard, OrderFilterBar } from './components';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
 
@@ -109,8 +92,6 @@ export const OrdersPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [searchCode, setSearchCode] = useState<string>('');
-  const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
 
   // Fetch orders from API Gateway: GET /api/v1/orders/my-orders
   const fetchMyOrders = useCallback(async () => {
@@ -161,11 +142,9 @@ export const OrdersPage: React.FC = () => {
         }));
         setOrders(mappedOrders);
       } else {
-        // Fallback to sample demo orders so user can immediately view and test
         setOrders(DEMO_MY_ORDERS);
       }
     } catch {
-      // Graceful fallback to demo data on network error or offline
       setOrders(DEMO_MY_ORDERS);
     } finally {
       setLoading(false);
@@ -206,38 +185,9 @@ export const OrdersPage: React.FC = () => {
     return result;
   }, [orders, activeTab, searchCode]);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PENDING':
-        return <Tag color="gold" className="font-semibold">Chờ xác nhận</Tag>;
-      case 'AWAITING_PAYMENT':
-        return <Tag color="blue" className="font-semibold">Chờ thanh toán VNPay</Tag>;
-      case 'CONFIRMED':
-        return <Tag color="cyan" className="font-semibold">Quán đã nhận</Tag>;
-      case 'PREPARING':
-        return <Tag color="purple" className="font-semibold">Đang chế biến</Tag>;
-      case 'READY_FOR_PICKUP':
-        return <Tag color="lime" className="font-semibold">Chờ tài xế</Tag>;
-      case 'PICKED_UP':
-      case 'DELIVERING':
-        return <Tag color="green" className="font-semibold animate-pulse">Đang giao hàng</Tag>;
-      case 'DELIVERED':
-        return <Tag color="success" className="font-semibold">Giao thành công</Tag>;
-      case 'CANCELLED':
-        return <Tag color="error" className="font-semibold">Đã hủy</Tag>;
-      default:
-        return <Tag color="default">{status}</Tag>;
-    }
-  };
-
-  const handleOpenDetail = (order: CustomerOrder) => {
-    setSelectedOrder(order);
-    setIsModalOpen(true);
-  };
-
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Header section */}
+      {/* 1. Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-2xs">
         <div>
           <Title level={2} className="!mb-1 text-gray-900 font-extrabold flex items-center gap-2.5">
@@ -259,34 +209,15 @@ export const OrdersPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-2xs">
-        <Segmented
-          value={activeTab}
-          onChange={(val) => setActiveTab(val as string)}
-          options={[
-            { label: 'Tất cả', value: 'ALL' },
-            { label: 'Đang xử lý', value: 'PROCESSING' },
-            { label: 'Đang giao', value: 'DELIVERING' },
-            { label: 'Hoàn tất', value: 'COMPLETED' },
-            { label: 'Đã hủy', value: 'CANCELLED' },
-          ]}
-          className="p-1 font-semibold overflow-x-auto"
-        />
+      {/* 2. Filter & Search Bar */}
+      <OrderFilterBar
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        searchCode={searchCode}
+        onChangeSearch={setSearchCode}
+      />
 
-        <div className="w-full md:w-72">
-          <Input
-            placeholder="Tìm theo mã đơn hoặc quán..."
-            prefix={<SearchOutlined className="text-gray-400" />}
-            value={searchCode}
-            onChange={(e) => setSearchCode(e.target.value)}
-            allowClear
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
-          />
-        </div>
-      </div>
-
-      {/* Orders List */}
+      {/* 3. Orders List */}
       {loading ? (
         <div className="py-20 flex flex-col items-center justify-center gap-3">
           <Spin size="large" />
@@ -316,119 +247,14 @@ export const OrdersPage: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {filteredOrders.map((order) => (
-            <div
+            <CustomerOrderCard
               key={order.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-2xs hover:shadow-md hover:border-orange-200 transition-all p-5 flex flex-col gap-4 cursor-pointer"
-              onClick={() => handleOpenDetail(order)}
-            >
-              {/* Card Header: Restaurant, Date & Status */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-3 border-b border-gray-100">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center text-lg font-bold shrink-0">
-                    <ShopOutlined />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-gray-900 text-base mb-0.5">
-                      {order.restaurantName || `Quán ăn #${order.restaurantId}`}
-                    </h3>
-                    <div className="text-xs text-gray-400 flex items-center gap-2">
-                      <span className="font-semibold text-gray-700">{order.orderCode}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <ClockCircleOutlined />
-                        {new Date(order.createdAt).toLocaleString('vi-VN', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="self-start sm:self-auto">
-                  {getStatusBadge(order.statusCode)}
-                </div>
-              </div>
-
-              {/* Items summary */}
-              <div className="space-y-1.5 py-1">
-                {order.items.slice(0, 2).map((item, idx) => (
-                  <div key={item.id || idx} className="flex justify-between items-center text-sm">
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <span className="font-bold text-orange-600">{item.quantity}x</span>
-                      <span className="font-medium">{item.foodName}</span>
-                      {Boolean(item.toppings && item.toppings.length > 0) && (
-                        <span className="text-xs text-gray-400 italic">
-                          (+{item.toppings!.map((t) => t.name || 'Topping').join(', ')})
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-gray-500 font-semibold text-xs">
-                      {(item.priceAtOrder * item.quantity).toLocaleString('vi-VN')}đ
-                    </span>
-                  </div>
-                ))}
-
-                {order.items.length > 2 && (
-                  <div className="text-xs text-gray-400 font-medium italic">
-                    +{order.items.length - 2} món ăn khác...
-                  </div>
-                )}
-              </div>
-
-              {/* Delivery Address Preview */}
-              <div className="bg-gray-50/70 p-2.5 rounded-xl text-xs text-gray-600 truncate">
-                <span className="font-bold text-gray-700 mr-1.5">Giao tới:</span>
-                <span>{order.receiverAddress}</span>
-              </div>
-
-              {/* Card Footer: Total Amount, Payment Method & Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-gray-100">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-gray-500 font-medium">Tổng thanh toán:</span>
-                  <span className="text-lg font-extrabold text-orange-600">
-                    {order.totalAmount.toLocaleString('vi-VN')}đ
-                  </span>
-                  <Tag
-                    color={order.paymentMethod === 'VNPAY' ? 'blue' : 'orange'}
-                    className="text-xs font-semibold ml-1"
-                  >
-                    <CreditCardOutlined className="mr-1" />
-                    {order.paymentMethod === 'VNPAY' ? 'VNPay' : order.paymentMethod === 'COD' ? 'Tiền mặt' : order.paymentMethod}
-                  </Tag>
-                </div>
-
-                <div className="flex items-center gap-2 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    icon={<FileTextOutlined />}
-                    onClick={() => handleOpenDetail(order)}
-                    className="rounded-xl font-semibold border-gray-200 hover:border-orange-500 hover:text-orange-600 text-xs sm:text-sm"
-                  >
-                    Chi tiết đơn hàng
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<CompassOutlined />}
-                    onClick={() => navigate(`/orders/${order.id}`)}
-                    className="bg-orange-500 hover:bg-orange-600 rounded-xl font-bold text-xs sm:text-sm shadow-xs"
-                  >
-                    Xem tiến trình
-                  </Button>
-                </div>
-              </div>
-            </div>
+              order={order}
+              onViewDetail={(order) => navigate(`/orders/${order.id}`)}
+            />
           ))}
         </div>
       )}
-
-      {/* Order Detail Modal */}
-      <OrderDetailModal
-        order={selectedOrder}
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
     </div>
   );
 };

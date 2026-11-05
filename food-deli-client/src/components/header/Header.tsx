@@ -195,7 +195,7 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Center Navigation Links (Desktop): Trang chủ, Quán ăn, Đơn hàng của tôi, Giỏ hàng */}
+        {/* Center Navigation Links (Desktop): Trang chủ, Quán ăn, Giỏ hàng */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2">
           <Link
             to={APP_ROUTES.HOME}
@@ -219,18 +219,6 @@ export const Header: React.FC = () => {
           >
             <ShopOutlined />
             <span>Quán ăn</span>
-          </Link>
-
-          <Link
-            to={APP_ROUTES.ORDERS}
-            className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-              location.pathname.startsWith('/orders')
-                ? 'text-orange-600 bg-orange-50 font-bold'
-                : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-            }`}
-          >
-            <HistoryOutlined />
-            <span>Đơn hàng của tôi</span>
           </Link>
 
           <Link
@@ -342,13 +330,6 @@ export const Header: React.FC = () => {
             <ShopOutlined /> Quán ăn
           </Link>
           <Link
-            to={APP_ROUTES.ORDERS}
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
-          >
-            <HistoryOutlined /> Đơn hàng của tôi
-          </Link>
-          <Link
             to={APP_ROUTES.CART}
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center justify-between text-gray-800 font-semibold py-2 hover:text-orange-600"
@@ -398,6 +379,13 @@ export const Header: React.FC = () => {
                   className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
                 >
                   <ProfileOutlined /> Xem thông tin cá nhân
+                </Link>
+                <Link
+                  to={APP_ROUTES.ORDERS}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
+                >
+                  <HistoryOutlined /> Lịch sử đơn hàng
                 </Link>
                 <Link
                   to={APP_ROUTES.ADDRESSES}
