@@ -34,3 +34,4 @@ public class CreateRestaurantRequest {
 
     private String initialCategoryName;
 }
+

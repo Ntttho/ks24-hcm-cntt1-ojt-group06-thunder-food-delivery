@@ -199,6 +199,17 @@ export const restaurantApi = {
     });
   },
 
+  updateRestaurantDetails: async (
+    restaurantId: number | string,
+    data: CreateRestaurantPayload,
+    ownerId?: number
+  ): Promise<ApiResponse<Shop>> => {
+    return apiClient.post<Shop>(`/restaurants/${restaurantId}/details`, data, {
+      params: ownerId ? { ownerId } : undefined,
+      headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
+    });
+  },
+
   updateRestaurantStatus: async (id: number | string, isOpen: boolean, reason?: string): Promise<ApiResponse<Shop>> => {
     return apiClient.patch<Shop>(`/restaurants/${id}/status`, { isOpen, temporaryClosedReason: reason });
   },

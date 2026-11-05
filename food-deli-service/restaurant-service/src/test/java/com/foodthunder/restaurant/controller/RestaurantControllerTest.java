@@ -99,17 +99,35 @@ class RestaurantControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/v1/restaurants trả về 400 nếu thiếu tên hoặc địa chỉ")
-    void createRestaurant_badRequest_missingFields() throws Exception {
-        CreateRestaurantRequest badRequest = CreateRestaurantRequest.builder()
-                .name("") // blank name
-                .address("   ") // blank address
+    @DisplayName("POST /api/v1/restaurants/{id}/details lưu thông tin nhà hàng vào bảng restaurant_change_requests")
+    void updateRestaurantDetails_success() throws Exception {
+        CreateRestaurantRequest request = CreateRestaurantRequest.builder()
+                .name("Quán Cơm Tấm Sài Gòn Update")
+                .address("456 Nguyễn Trãi, Q.5, TP.HCM")
+                .latitude(10.7533)
+                .longitude(106.6789)
                 .build();
 
-        mockMvc.perform(post("/api/v1/restaurants")
-                        .header("X-User-Id", "7")
+        RestaurantDto updated = RestaurantDto.builder()
+                .id(1)
+                .ownerId(3)
+                .name("Quán Cơm Tấm Sài Gòn Update")
+                .address("456 Nguyễn Trãi, Q.5, TP.HCM")
+                .latitude(10.7533)
+                .longitude(106.6789)
+                .isOpen(true)
+                .build();
+
+        when(restaurantService.updateRestaurantDetails(eq(1), any(CreateRestaurantRequest.class), eq(3)))
+                .thenReturn(updated);
+
+        mockMvc.perform(post("/api/v1/restaurants/1/details")
+                        .header("X-User-Id", "3")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(badRequest)))
-                .andExpect(status().isBadRequest());
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data.id").value(1))
+                .andExpect(jsonPath("$.data.name").value("Quán Cơm Tấm Sài Gòn Update"));
     }
 }

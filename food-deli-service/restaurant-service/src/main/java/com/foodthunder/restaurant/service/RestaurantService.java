@@ -17,5 +17,7 @@ public interface RestaurantService {
 
     RestaurantDto createRestaurant(CreateRestaurantRequest request, Integer ownerId);
 
+    RestaurantDto updateRestaurantDetails(Integer id, CreateRestaurantRequest request, Integer ownerId);
+
     RestaurantDto updateShopStatus(Integer id, Boolean isOpen, String temporaryClosedReason);
 }

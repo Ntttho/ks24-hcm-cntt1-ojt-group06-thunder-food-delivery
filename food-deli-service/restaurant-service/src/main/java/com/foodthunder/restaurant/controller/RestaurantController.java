@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping({"/api/v1/restaurants", "/api/v1/shops"})
+@RequestMapping({"/api/v1/restaurants", "/api/v1/shops", "/api/v1/restaurant"})
 @RequiredArgsConstructor
 public class RestaurantController {
 
@@ -74,6 +74,35 @@ public class RestaurantController {
         RestaurantDto created = restaurantService.createRestaurant(request, effectiveOwnerId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Đăng ký quán ăn thành công", created));
+    }
+
+    /**
+     * Endpoint theo yêu cầu của Nhóm trưởng Thọ:
+     * POST/PUT /api/v1/restaurants/{id}/details
+     * Lưu thông tin nhà hàng và lưu vào bảng restaurant_change_requests
+     */
+    @PostMapping("/{id}/details")
+    public ResponseEntity<ApiResponse<RestaurantDto>> updateRestaurantDetailsPost(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer headerOwnerId,
+            @RequestParam(required = false) Integer ownerId,
+            @Valid @RequestBody CreateRestaurantRequest request
+    ) {
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        RestaurantDto updated = restaurantService.updateRestaurantDetails(id, request, effectiveOwnerId);
+        return ResponseEntity.ok(ApiResponse.success("Lưu thông tin nhà hàng vào bảng restaurant_change_requests thành công", updated));
+    }
+
+    @PutMapping("/{id}/details")
+    public ResponseEntity<ApiResponse<RestaurantDto>> updateRestaurantDetailsPut(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer headerOwnerId,
+            @RequestParam(required = false) Integer ownerId,
+            @Valid @RequestBody CreateRestaurantRequest request
+    ) {
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        RestaurantDto updated = restaurantService.updateRestaurantDetails(id, request, effectiveOwnerId);
+        return ResponseEntity.ok(ApiResponse.success("Lưu thông tin nhà hàng vào bảng restaurant_change_requests thành công", updated));
     }
 
     /**

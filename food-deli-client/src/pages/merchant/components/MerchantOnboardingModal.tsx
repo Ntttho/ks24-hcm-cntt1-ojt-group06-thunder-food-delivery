@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Button, TimePicker, Typography, Space, message, Tag } from 'antd';
+import { Modal, Form, Input, Button, TimePicker, Typography, message } from 'antd';
 import {
   ShopOutlined,
   EnvironmentOutlined,
@@ -12,8 +12,9 @@ import {
 import dayjs from 'dayjs';
 import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
 import { useAuth } from '@/hooks/useAuth';
+import { LocationPickerMap } from './LocationPickerMap';
 
-const { Text, Title, Paragraph } = Typography;
+const { Title, Paragraph } = Typography;
 
 export interface MerchantOnboardingModalProps {
   open: boolean;
@@ -52,11 +53,26 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [selectedImg, setSelectedImg] = useState<string>(PRESET_IMAGES[0].url);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: 10.7769,
+    lng: 106.7009,
+  });
   const { user } = useAuth();
 
   const handleSelectPreset = (url: string) => {
     setSelectedImg(url);
     form.setFieldsValue({ imageUrl: url });
+  };
+
+  const handleLocationChange = (lat: number, lng: number, address?: string) => {
+    setCoords({ lat, lng });
+    form.setFieldsValue({
+      latitude: lat,
+      longitude: lng,
+    });
+    if (address) {
+      form.setFieldsValue({ address });
+    }
   };
 
   const handleFinish = async (values: any) => {
@@ -76,12 +92,20 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
         closingTime: closingTimeStr,
         imageUrl: values.imageUrl?.trim() || selectedImg,
         initialCategoryName: values.initialCategoryName?.trim() || 'Món chính',
-        latitude: 10.7769,
-        longitude: 106.7009,
+        latitude: values.latitude || coords.lat,
+        longitude: values.longitude || coords.lng,
       };
 
-      const res = await restaurantApi.createRestaurant(payload, Number(user?.id));
+      const ownerId = Number(user?.id) || 3;
+
+      const res = await restaurantApi.createRestaurant(payload, ownerId);
       if (res && res.data) {
+        try {
+          await restaurantApi.updateRestaurantDetails(res.data.id, payload, ownerId);
+        } catch {
+          // Non-blocking
+        }
+
         message.success(
           isFirstShop
             ? '🎉 Đăng ký quán ăn đầu tiên thành công! Bắt đầu kinh doanh ngay thôi!'
@@ -102,14 +126,14 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
       open={open}
       onCancel={onClose}
       footer={null}
-      width={640}
+      width={720}
       centered
       destroyOnClose
       maskClosable={!isFirstShop}
       closable={!isFirstShop}
       className="rounded-2xl overflow-hidden"
     >
-      <div className="pt-2 pb-1">
+      <div className="pt-2 pb-1 max-h-[85vh] overflow-y-auto px-1">
         {/* Modal Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-400 text-white shadow-md shadow-orange-500/20 mb-2">
@@ -136,6 +160,8 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
             closingTime: dayjs('22:00:00', 'HH:mm:ss'),
             initialCategoryName: 'Món chính',
             imageUrl: PRESET_IMAGES[0].url,
+            latitude: 10.7769,
+            longitude: 106.7009,
           }}
         >
           {/* Tên Quán */}
@@ -155,9 +181,29 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
             />
           </Form.Item>
 
+          {/* Bản đồ định vị Google Map / GPS & Tọa độ */}
+          <div className="mb-4">
+            <LocationPickerMap
+              latitude={coords.lat}
+              longitude={coords.lng}
+              onLocationChange={handleLocationChange}
+            />
+          </div>
+
+          <Form.Item name="latitude" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="longitude" hidden>
+            <Input />
+          </Form.Item>
+
           {/* Địa chỉ */}
           <Form.Item
-            label={<span className="font-semibold text-slate-700 text-xs">Địa chỉ kinh doanh</span>}
+            label={
+              <span className="font-semibold text-slate-700 text-xs">
+                Địa chỉ kinh doanh (Tự động điền theo GPS hoặc nhập tay)
+              </span>
+            }
             name="address"
             rules={[
               { required: true, message: 'Vui lòng nhập địa chỉ quán ăn!' },

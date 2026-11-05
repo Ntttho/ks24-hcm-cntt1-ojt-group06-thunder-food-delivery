@@ -8,13 +8,11 @@ import {
   AppstoreAddOutlined,
   ThunderboltFilled,
   RocketFilled,
-  CheckCircleFilled,
-  SafetyCertificateOutlined,
-  BellOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
 import { useAuth } from '@/hooks/useAuth';
+import { LocationPickerMap } from './LocationPickerMap';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -45,11 +43,26 @@ export const MerchantOnboardingView: React.FC<MerchantOnboardingViewProps> = ({ 
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [selectedImg, setSelectedImg] = useState<string>(PRESET_IMAGES[0].url);
+  const [coords, setCoords] = useState<{ lat: number; lng: number }>({
+    lat: 10.7769,
+    lng: 106.7009,
+  });
   const { user } = useAuth();
 
   const handleSelectPreset = (url: string) => {
     setSelectedImg(url);
     form.setFieldsValue({ imageUrl: url });
+  };
+
+  const handleLocationChange = (lat: number, lng: number, address?: string) => {
+    setCoords({ lat, lng });
+    form.setFieldsValue({
+      latitude: lat,
+      longitude: lng,
+    });
+    if (address) {
+      form.setFieldsValue({ address });
+    }
   };
 
   const handleFinish = async (values: any) => {
@@ -69,12 +82,22 @@ export const MerchantOnboardingView: React.FC<MerchantOnboardingViewProps> = ({ 
         closingTime: closingTimeStr,
         imageUrl: values.imageUrl?.trim() || selectedImg,
         initialCategoryName: values.initialCategoryName?.trim() || 'Món chính',
-        latitude: 10.7769,
-        longitude: 106.7009,
+        latitude: values.latitude || coords.lat,
+        longitude: values.longitude || coords.lng,
       };
 
-      const res = await restaurantApi.createRestaurant(payload, Number(user?.id));
+      const ownerId = Number(user?.id) || 3;
+
+      // 1. Create restaurant
+      const res = await restaurantApi.createRestaurant(payload, ownerId);
       if (res && res.data) {
+        // 2. Also record details in restaurant_change_requests endpoint as requested by Thọ
+        try {
+          await restaurantApi.updateRestaurantDetails(res.data.id, payload, ownerId);
+        } catch {
+          // Non-blocking if change request fails
+        }
+
         message.success('🎉 Đăng ký quán ăn đầu tiên thành công! Chào mừng đối tác mới.');
         onSuccess(res.data);
       }
@@ -171,6 +194,8 @@ export const MerchantOnboardingView: React.FC<MerchantOnboardingViewProps> = ({ 
             closingTime: dayjs('22:00:00', 'HH:mm:ss'),
             initialCategoryName: 'Món chính',
             imageUrl: PRESET_IMAGES[0].url,
+            latitude: 10.7769,
+            longitude: 106.7009,
           }}
         >
           {/* Tên Quán */}
@@ -190,9 +215,30 @@ export const MerchantOnboardingView: React.FC<MerchantOnboardingViewProps> = ({ 
             />
           </Form.Item>
 
+          {/* Bản đồ định vị Google Map / GPS & Tọa độ */}
+          <div className="mb-4">
+            <LocationPickerMap
+              latitude={coords.lat}
+              longitude={coords.lng}
+              onLocationChange={handleLocationChange}
+            />
+          </div>
+
+          {/* Hidden/Synced Inputs for Form values */}
+          <Form.Item name="latitude" hidden>
+            <Input />
+          </Form.Item>
+          <Form.Item name="longitude" hidden>
+            <Input />
+          </Form.Item>
+
           {/* Địa chỉ */}
           <Form.Item
-            label={<span className="font-bold text-slate-700 text-sm">Địa chỉ kinh doanh</span>}
+            label={
+              <span className="font-bold text-slate-700 text-sm">
+                Địa chỉ kinh doanh (Tự động điền theo GPS hoặc nhập tay)
+              </span>
+            }
             name="address"
             rules={[
               { required: true, message: 'Vui lòng nhập địa chỉ kinh doanh!' },

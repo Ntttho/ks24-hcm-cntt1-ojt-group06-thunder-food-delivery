@@ -1,14 +1,18 @@
 package com.foodthunder.restaurant.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.restaurant.dto.*;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Product;
+import com.foodthunder.restaurant.entity.RestaurantChangeRequest;
 import com.foodthunder.restaurant.entity.Shop;
 import com.foodthunder.restaurant.exception.ResourceNotFoundException;
 import com.foodthunder.restaurant.repository.MenuCategoryRepository;
 import com.foodthunder.restaurant.repository.ProductRepository;
+import com.foodthunder.restaurant.repository.RestaurantChangeRequestRepository;
 import com.foodthunder.restaurant.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -20,9 +24,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class RestaurantServiceImpl implements RestaurantService {
@@ -30,6 +37,8 @@ public class RestaurantServiceImpl implements RestaurantService {
     private final ShopRepository shopRepository;
     private final MenuCategoryRepository menuCategoryRepository;
     private final ProductRepository productRepository;
+    private final RestaurantChangeRequestRepository restaurantChangeRequestRepository;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional(readOnly = true)
@@ -113,7 +122,7 @@ public class RestaurantServiceImpl implements RestaurantService {
                 : "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60";
 
         Shop shop = Shop.builder()
-                .ownerId(ownerId)
+                .ownerId(ownerId != null ? ownerId : 3)
                 .name(request.getName().trim())
                 .address(request.getAddress().trim())
                 .latitude(lat)
@@ -141,7 +150,94 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .build();
         menuCategoryRepository.save(defaultCategory);
 
+        // Also record change request for audit
+        try {
+            Map<String, Object> payloadMap = new LinkedHashMap<>();
+            payloadMap.put("name", savedShop.getName());
+            payloadMap.put("address", savedShop.getAddress());
+            payloadMap.put("ownerId", savedShop.getOwnerId());
+            payloadMap.put("imageUrl", savedShop.getImageUrl());
+            payloadMap.put("latitude", savedShop.getLatitude());
+            payloadMap.put("longitude", savedShop.getLongitude());
+            payloadMap.put("openingTime", savedShop.getOpeningTime() != null ? savedShop.getOpeningTime().toString() : "07:00:00");
+            payloadMap.put("closingTime", savedShop.getClosingTime() != null ? savedShop.getClosingTime().toString() : "22:00:00");
+            payloadMap.put("ratingAvg", savedShop.getRatingAvg());
+
+            String payloadJson = objectMapper.writeValueAsString(payloadMap);
+
+            RestaurantChangeRequest changeRequest = RestaurantChangeRequest.builder()
+                    .restaurantId(savedShop.getId())
+                    .requestedBy(savedShop.getOwnerId())
+                    .payload(payloadJson)
+                    .status("APPROVED")
+                    .build();
+
+            restaurantChangeRequestRepository.save(changeRequest);
+        } catch (Exception e) {
+            log.error("Lỗi khi ghi nhận restaurant_change_requests", e);
+        }
+
         return mapToDto(savedShop);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantDto updateRestaurantDetails(Integer id, CreateRestaurantRequest request, Integer ownerId) {
+        Shop shop = shopRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + id));
+
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            shop.setName(request.getName().trim());
+        }
+        if (request.getAddress() != null && !request.getAddress().trim().isEmpty()) {
+            shop.setAddress(request.getAddress().trim());
+        }
+        if (request.getLatitude() != null) {
+            shop.setLatitude(request.getLatitude());
+        }
+        if (request.getLongitude() != null) {
+            shop.setLongitude(request.getLongitude());
+        }
+        if (request.getOpeningTime() != null) {
+            shop.setOpeningTime(request.getOpeningTime());
+        }
+        if (request.getClosingTime() != null) {
+            shop.setClosingTime(request.getClosingTime());
+        }
+        if (request.getImageUrl() != null && !request.getImageUrl().trim().isEmpty()) {
+            shop.setImageUrl(request.getImageUrl().trim());
+        }
+
+        Shop updated = shopRepository.save(shop);
+
+        // Lưu thông tin vào bảng restaurant_change_requests theo yêu cầu của Nhóm trưởng Thọ
+        try {
+            Map<String, Object> payloadMap = new LinkedHashMap<>();
+            payloadMap.put("name", updated.getName());
+            payloadMap.put("address", updated.getAddress());
+            payloadMap.put("ownerId", updated.getOwnerId());
+            payloadMap.put("imageUrl", updated.getImageUrl());
+            payloadMap.put("latitude", updated.getLatitude());
+            payloadMap.put("longitude", updated.getLongitude());
+            payloadMap.put("openingTime", updated.getOpeningTime() != null ? updated.getOpeningTime().toString() : "07:00:00");
+            payloadMap.put("closingTime", updated.getClosingTime() != null ? updated.getClosingTime().toString() : "22:00:00");
+            payloadMap.put("ratingAvg", updated.getRatingAvg());
+
+            String payloadJson = objectMapper.writeValueAsString(payloadMap);
+
+            RestaurantChangeRequest changeRequest = RestaurantChangeRequest.builder()
+                    .restaurantId(updated.getId())
+                    .requestedBy(ownerId != null ? ownerId : updated.getOwnerId())
+                    .payload(payloadJson)
+                    .status("PENDING")
+                    .build();
+
+            restaurantChangeRequestRepository.save(changeRequest);
+        } catch (Exception e) {
+            log.error("Lỗi khi lưu restaurant_change_requests", e);
+        }
+
+        return mapToDto(updated);
     }
 
     @Override
