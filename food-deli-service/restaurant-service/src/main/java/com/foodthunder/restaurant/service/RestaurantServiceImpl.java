@@ -19,10 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -43,9 +40,6 @@ public class RestaurantServiceImpl implements RestaurantService {
     private final ProductRepository productRepository;
     private final RestaurantChangeRequestRepository restaurantChangeRequestRepository;
     private final ObjectMapper objectMapper;
-
-    @Autowired(required = false)
-    private PlatformTransactionManager transactionManager;
 
     @Override
     @Transactional(readOnly = true)
@@ -157,20 +151,6 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .build();
         menuCategoryRepository.save(defaultCategory);
 
-        // Also record change request for audit safely without endangering main transaction
-        Map<String, Object> payloadMap = new LinkedHashMap<>();
-        payloadMap.put("name", savedShop.getName());
-        payloadMap.put("address", savedShop.getAddress());
-        payloadMap.put("ownerId", savedShop.getOwnerId());
-        payloadMap.put("imageUrl", savedShop.getImageUrl());
-        payloadMap.put("latitude", savedShop.getLatitude());
-        payloadMap.put("longitude", savedShop.getLongitude());
-        payloadMap.put("openingTime", savedShop.getOpeningTime() != null ? savedShop.getOpeningTime().toString() : "07:00:00");
-        payloadMap.put("closingTime", savedShop.getClosingTime() != null ? savedShop.getClosingTime().toString() : "22:00:00");
-        payloadMap.put("ratingAvg", savedShop.getRatingAvg());
-
-        saveChangeRequestSafely(savedShop.getId(), savedShop.getOwnerId(), "APPROVED", payloadMap);
-
         return mapToDto(savedShop);
     }
 
@@ -271,42 +251,17 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     private void saveChangeRequestSafely(Integer restaurantId, Integer requestedBy, String status, Map<String, Object> payloadMap) {
-        if (transactionManager == null) {
-            try {
-                String payloadJson = objectMapper.writeValueAsString(payloadMap);
-                RestaurantChangeRequest changeRequest = RestaurantChangeRequest.builder()
-                        .restaurantId(restaurantId)
-                        .requestedBy(requestedBy != null ? requestedBy : 3)
-                        .payload(payloadJson)
-                        .status(status)
-                        .build();
-                restaurantChangeRequestRepository.save(changeRequest);
-            } catch (Throwable t) {
-                log.warn("Không thể lưu audit restaurant_change_requests (non-fatal): {}", t.getMessage());
-            }
-            return;
-        }
-
-        TransactionTemplate template = new TransactionTemplate(transactionManager);
-        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         try {
-            template.execute(txStatus -> {
-                try {
-                    String payloadJson = objectMapper.writeValueAsString(payloadMap);
-                    RestaurantChangeRequest changeRequest = RestaurantChangeRequest.builder()
-                            .restaurantId(restaurantId)
-                            .requestedBy(requestedBy != null ? requestedBy : 3)
-                            .payload(payloadJson)
-                            .status(status)
-                            .build();
-                    restaurantChangeRequestRepository.save(changeRequest);
-                } catch (Exception e) {
-                    log.warn("Lỗi khi ghi nhận restaurant_change_requests (REQUIRES_NEW): {}", e.getMessage());
-                }
-                return null;
-            });
-        } catch (Throwable t) {
-            log.warn("Lỗi khi thực thi transaction audit restaurant_change_requests: {}", t.getMessage());
+            String payloadJson = objectMapper.writeValueAsString(payloadMap);
+            RestaurantChangeRequest changeRequest = RestaurantChangeRequest.builder()
+                    .restaurantId(restaurantId)
+                    .requestedBy(requestedBy != null ? requestedBy : 3)
+                    .payload(payloadJson)
+                    .status(status)
+                    .build();
+            restaurantChangeRequestRepository.save(changeRequest);
+        } catch (Exception e) {
+            log.warn("Lỗi khi ghi nhận restaurant_change_requests: {}", e.getMessage());
         }
     }
 }
