@@ -115,7 +115,12 @@ export const MerchantOnboardingModal: React.FC<MerchantOnboardingModalProps> = (
         onSuccess(res.data);
       }
     } catch (err: any) {
-      message.error(err?.message || 'Có lỗi xảy ra khi tạo quán ăn, vui lòng thử lại!');
+      const serverMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Có lỗi xảy ra khi tạo quán ăn, vui lòng thử lại!';
+      message.error(serverMsg);
     } finally {
       setSubmitting(false);
     }

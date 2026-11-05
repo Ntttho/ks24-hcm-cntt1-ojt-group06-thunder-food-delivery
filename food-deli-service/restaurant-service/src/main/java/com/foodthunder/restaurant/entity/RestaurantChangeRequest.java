@@ -3,6 +3,8 @@ package com.foodthunder.restaurant.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -25,6 +27,7 @@ public class RestaurantChangeRequest {
     @Column(name = "requested_by", nullable = false)
     private Integer requestedBy;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload", columnDefinition = "json", nullable = false)
     private String payload;
 

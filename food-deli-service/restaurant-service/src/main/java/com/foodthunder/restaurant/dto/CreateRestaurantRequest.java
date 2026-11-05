@@ -24,10 +24,10 @@ public class CreateRestaurantRequest {
     private Double latitude;
     private Double longitude;
 
-    @JsonFormat(pattern = "HH:mm:ss")
+    @JsonFormat(pattern = "HH:mm[:ss]")
     private LocalTime openingTime;
 
-    @JsonFormat(pattern = "HH:mm:ss")
+    @JsonFormat(pattern = "HH:mm[:ss]")
     private LocalTime closingTime;
 
     private String imageUrl;
