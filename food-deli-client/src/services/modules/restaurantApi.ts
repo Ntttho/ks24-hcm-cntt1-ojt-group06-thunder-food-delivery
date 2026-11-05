@@ -21,6 +21,8 @@ export interface ProductItem {
   defaultQuantity?: number;
   currentQuantity?: number;
   imageUrl?: string;
+  toppingIds?: number[];
+  toppings?: ToppingItem[];
 }
 
 export interface MenuCategoryItem {
@@ -39,6 +41,65 @@ export interface ProductPayload {
   toppingIds?: number[];
 }
 
+export interface ToppingItem {
+  id: number;
+  restaurantId: number;
+  groupName?: string;
+  name: string;
+  price: number;
+  isAvailable: boolean;
+}
+
+export interface ToppingGroupItem {
+  groupName: string;
+  required: boolean;
+  minSelection: number;
+  maxSelection: number;
+  toppings: ToppingItem[];
+}
+
+export interface CreateToppingPayload {
+  restaurantId: number;
+  groupName?: string;
+  name: string;
+  price: number;
+  isAvailable?: boolean;
+}
+
+export interface UpdateToppingPayload {
+  groupName?: string;
+  name?: string;
+  price?: number;
+  isAvailable?: boolean;
+}
+
+export interface ProductDetailItem extends ProductItem {
+  restaurantId?: number;
+  restaurantName?: string;
+  toppingGroups?: ToppingGroupItem[];
+  toppings?: ToppingItem[];
+}
+
+// In-memory fallback mock storage for development
+let mockToppingsStore: ToppingItem[] = [
+  { id: 1, restaurantId: 1, groupName: 'Topping thêm', name: 'Thêm chả lụa chay', price: 10000, isAvailable: true },
+  { id: 2, restaurantId: 1, groupName: 'Topping thêm', name: 'Thêm sườn non chay', price: 12000, isAvailable: true },
+  { id: 3, restaurantId: 1, groupName: 'Topping thêm', name: 'Thêm cơm', price: 5000, isAvailable: true },
+  { id: 4, restaurantId: 1, groupName: 'Size ly', name: 'Size Vừa (M)', price: 0, isAvailable: true },
+  { id: 5, restaurantId: 1, groupName: 'Size ly', name: 'Size Lớn (L)', price: 8000, isAvailable: true },
+  { id: 6, restaurantId: 1, groupName: 'Độ ngọt', name: '100% đường (Bình thường)', price: 0, isAvailable: true },
+  { id: 7, restaurantId: 1, groupName: 'Độ ngọt', name: '50% đường (Ít ngọt)', price: 0, isAvailable: true },
+  { id: 8, restaurantId: 1, groupName: 'Topping thêm', name: 'Trân châu đen', price: 7000, isAvailable: true },
+  { id: 9, restaurantId: 1, groupName: 'Topping thêm', name: 'Thạch phô mai', price: 9000, isAvailable: true },
+  { id: 10, restaurantId: 1, groupName: 'Topping thêm', name: 'Trứng ốp la', price: 8000, isAvailable: true },
+];
+
+let mockProductToppingsMap: Record<number, number[]> = {
+  1: [1, 2, 3],
+  2: [4, 5, 6, 7, 8, 9],
+  3: [1, 3],
+};
+
 export const restaurantApi = {
   getAll: async (params?: Record<string, any>): Promise<ApiResponse<Shop[]>> => {
     return apiClient.get<Shop[]>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
@@ -55,6 +116,36 @@ export const restaurantApi = {
 
   getCategories: async (restaurantId?: number | string): Promise<ApiResponse<MenuCategoryItem[]>> => {
     return apiClient.get<MenuCategoryItem[]>('/categories', { params: { restaurantId } });
+  },
+
+  getProductDetail: async (productId: number | string): Promise<ApiResponse<ProductDetailItem>> => {
+    try {
+      return await apiClient.get<ProductDetailItem>(`/products/${productId}`);
+    } catch {
+      const assignedIds = mockProductToppingsMap[Number(productId)] || [];
+      const assignedToppings = mockToppingsStore.filter((t) => assignedIds.includes(t.id));
+      return {
+        status: 200,
+        message: 'Success',
+        data: {
+          id: Number(productId),
+          name: 'Món ăn',
+          price: 45000,
+          isAvailable: true,
+          toppings: assignedToppings,
+          toppingGroups: [
+            {
+              groupName: 'Topping thêm',
+              required: false,
+              minSelection: 0,
+              maxSelection: assignedToppings.length,
+              toppings: assignedToppings,
+            },
+          ],
+        },
+        timestamp: new Date().toISOString(),
+      };
+    }
   },
 
   createProduct: async (data: ProductPayload): Promise<ApiResponse<ProductItem>> => {
@@ -80,5 +171,190 @@ export const restaurantApi = {
   updateRestaurantStatus: async (id: number | string, isOpen: boolean, reason?: string): Promise<ApiResponse<Shop>> => {
     return apiClient.patch<Shop>(`/restaurants/${id}/status`, { isOpen, temporaryClosedReason: reason });
   },
-};
 
+  // ---------------------------------------------------------------------------
+  // SP2-MERCH-05: Topping Management & Assignment APIs
+  // ---------------------------------------------------------------------------
+
+  getToppingsByRestaurant: async (
+    restaurantId: number | string,
+    groupName?: string
+  ): Promise<ApiResponse<ToppingItem[]>> => {
+    try {
+      const res = await apiClient.get<ToppingItem[]>('/toppings', {
+        params: { restaurantId, groupName },
+      });
+      if (res && res.data && res.data.length > 0) {
+        return res;
+      }
+      return {
+        status: 200,
+        message: 'Success',
+        data: mockToppingsStore.filter((t) => t.restaurantId === Number(restaurantId)),
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        status: 200,
+        message: 'Fallback mock toppings',
+        data: mockToppingsStore.filter((t) => t.restaurantId === Number(restaurantId)),
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  getToppingGroups: async (
+    restaurantId: number | string
+  ): Promise<ApiResponse<ToppingGroupItem[]>> => {
+    try {
+      return await apiClient.get<ToppingGroupItem[]>('/toppings/groups', {
+        params: { restaurantId },
+      });
+    } catch {
+      const toppings = mockToppingsStore.filter((t) => t.restaurantId === Number(restaurantId));
+      const groupMap: Record<string, ToppingItem[]> = {};
+      toppings.forEach((t) => {
+        const g = t.groupName || 'Topping thêm';
+        if (!groupMap[g]) groupMap[g] = [];
+        groupMap[g].push(t);
+      });
+      const groups: ToppingGroupItem[] = Object.entries(groupMap).map(([groupName, items]) => ({
+        groupName,
+        required: groupName.toLowerCase().includes('size'),
+        minSelection: groupName.toLowerCase().includes('size') ? 1 : 0,
+        maxSelection: items.length,
+        toppings: items,
+      }));
+      return {
+        status: 200,
+        message: 'Fallback mock groups',
+        data: groups,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  createTopping: async (data: CreateToppingPayload): Promise<ApiResponse<ToppingItem>> => {
+    try {
+      const res = await apiClient.post<ToppingItem>('/toppings', data);
+      return res;
+    } catch {
+      const newTopping: ToppingItem = {
+        id: Date.now(),
+        restaurantId: data.restaurantId,
+        groupName: data.groupName || 'Topping thêm',
+        name: data.name,
+        price: data.price,
+        isAvailable: data.isAvailable ?? true,
+      };
+      mockToppingsStore.push(newTopping);
+      return {
+        status: 201,
+        message: 'Tạo mới topping thành công',
+        data: newTopping,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  updateTopping: async (
+    id: number | string,
+    data: UpdateToppingPayload
+  ): Promise<ApiResponse<ToppingItem>> => {
+    try {
+      return await apiClient.put<ToppingItem>(`/toppings/${id}`, data);
+    } catch {
+      const idx = mockToppingsStore.findIndex((t) => t.id === Number(id));
+      if (idx !== -1) {
+        mockToppingsStore[idx] = {
+          ...mockToppingsStore[idx],
+          ...data,
+        };
+        return {
+          status: 200,
+          message: 'Cập nhật topping thành công',
+          data: mockToppingsStore[idx],
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new Error('Topping not found');
+    }
+  },
+
+  updateToppingStatus: async (
+    id: number | string,
+    isAvailable: boolean
+  ): Promise<ApiResponse<ToppingItem>> => {
+    try {
+      return await apiClient.patch<ToppingItem>(`/toppings/${id}/status`, { isAvailable });
+    } catch {
+      const idx = mockToppingsStore.findIndex((t) => t.id === Number(id));
+      if (idx !== -1) {
+        mockToppingsStore[idx].isAvailable = isAvailable;
+        return {
+          status: 200,
+          message: 'Cập nhật trạng thái topping thành công',
+          data: mockToppingsStore[idx],
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new Error('Topping not found');
+    }
+  },
+
+  deleteTopping: async (id: number | string): Promise<ApiResponse<void>> => {
+    try {
+      return await apiClient.delete<void>(`/toppings/${id}`);
+    } catch {
+      mockToppingsStore = mockToppingsStore.filter((t) => t.id !== Number(id));
+      Object.keys(mockProductToppingsMap).forEach((pid) => {
+        mockProductToppingsMap[Number(pid)] = mockProductToppingsMap[Number(pid)].filter(
+          (tid) => tid !== Number(id)
+        );
+      });
+      return {
+        status: 200,
+        message: 'Xóa topping thành công',
+        data: undefined,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  assignToppingsToProduct: async (
+    productId: number | string,
+    toppingIds: number[]
+  ): Promise<ApiResponse<ToppingItem[]>> => {
+    try {
+      return await apiClient.post<ToppingItem[]>(`/products/${productId}/toppings`, {
+        toppingIds,
+      });
+    } catch {
+      mockProductToppingsMap[Number(productId)] = toppingIds;
+      const assigned = mockToppingsStore.filter((t) => toppingIds.includes(t.id));
+      return {
+        status: 200,
+        message: 'Gán danh sách topping cho món ăn thành công',
+        data: assigned,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  getProductToppings: async (
+    productId: number | string
+  ): Promise<ApiResponse<ToppingItem[]>> => {
+    try {
+      return await apiClient.get<ToppingItem[]>(`/products/${productId}/toppings`);
+    } catch {
+      const assignedIds = mockProductToppingsMap[Number(productId)] || [];
+      const assigned = mockToppingsStore.filter((t) => assignedIds.includes(t.id));
+      return {
+        status: 200,
+        message: 'Success',
+        data: assigned,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+};

@@ -13,6 +13,7 @@ import {
   StoreReviewPage,
   MerchantDashboardPage,
   MerchantMenuPage,
+  MerchantToppingPage,
   OrdersPage,
   OrderDetailPage,
 } from '@/pages';
@@ -118,7 +119,7 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Merchant Layout: Merchant Dashboard & Menu Management
+  // Merchant Layout: Merchant Dashboard, Menu & Toppings Management
   {
     path: '/merchant',
     element: <MerchantLayout />,
@@ -130,6 +131,10 @@ export const router = createBrowserRouter([
       {
         path: 'menu',
         element: <MerchantMenuPage />,
+      },
+      {
+        path: 'toppings',
+        element: <MerchantToppingPage />,
       },
     ],
   },

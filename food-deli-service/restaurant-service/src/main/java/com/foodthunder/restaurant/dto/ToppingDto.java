@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 public class ToppingDto {
     private Integer id;
     private Integer restaurantId;
+    private String groupName;
     private String name;
     private BigDecimal price;
     private Boolean isAvailable;

@@ -12,4 +12,10 @@ public interface ToppingRepository extends JpaRepository<Topping, Integer> {
     List<Topping> findByRestaurantId(Integer restaurantId);
 
     List<Topping> findByRestaurantIdAndIsAvailableTrue(Integer restaurantId);
+
+    List<Topping> findByRestaurantIdAndGroupName(Integer restaurantId, String groupName);
+
+    boolean existsByRestaurantIdAndNameIgnoreCase(Integer restaurantId, String name);
+
+    boolean existsByRestaurantIdAndNameIgnoreCaseAndIdNot(Integer restaurantId, String name, Integer id);
 }

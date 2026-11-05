@@ -12,5 +12,9 @@ public interface ProductToppingRepository extends JpaRepository<ProductTopping, 
 
     List<ProductTopping> findByIdFoodId(Integer foodId);
 
+    List<ProductTopping> findByIdToppingId(Integer toppingId);
+
     void deleteByIdFoodId(Integer foodId);
+
+    void deleteByIdToppingId(Integer toppingId);
 }

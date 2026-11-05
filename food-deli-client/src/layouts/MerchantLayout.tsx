@@ -22,6 +22,7 @@ import {
   ThunderboltFilled,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  TagsOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
@@ -73,7 +74,9 @@ export const MerchantLayout: React.FC = () => {
   ];
 
   // Determine active menu item based on current URL
-  const selectedKey = location.pathname.includes('/merchant/menu')
+  const selectedKey = location.pathname.includes('/merchant/toppings')
+    ? '/merchant/toppings'
+    : location.pathname.includes('/merchant/menu')
     ? '/merchant/menu'
     : '/merchant';
 
@@ -90,6 +93,12 @@ export const MerchantLayout: React.FC = () => {
       label: 'Quản lý thực đơn',
       onClick: () => navigate('/merchant/menu'),
     },
+    {
+      key: '/merchant/toppings',
+      icon: <TagsOutlined style={{ fontSize: '18px' }} />,
+      label: 'Quản lý Topping',
+      onClick: () => navigate('/merchant/toppings'),
+    },
   ];
 
   return (
@@ -99,121 +108,111 @@ export const MerchantLayout: React.FC = () => {
         collapsible
         collapsed={collapsed}
         onCollapse={(value) => setCollapsed(value)}
+        trigger={null}
         width={250}
         theme="light"
-        className="border-r border-slate-200 shadow-sm fixed h-full z-20 left-0 top-0 bottom-0"
-        style={{
-          overflow: 'auto',
-          height: '100vh',
-          position: 'sticky',
-          top: 0,
-          left: 0,
-        }}
+        className="border-r border-slate-200/80 shadow-xs fixed left-0 top-0 bottom-0 z-30"
       >
-        {/* Brand Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100 bg-white">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center text-white shadow-md shadow-orange-500/30 flex-shrink-0">
+        {/* Brand Logo Header */}
+        <div className="h-16 flex items-center px-4 border-b border-slate-100 gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center text-white shadow-sm flex-shrink-0">
             <ThunderboltFilled className="text-xl" />
           </div>
           {!collapsed && (
-            <div className="overflow-hidden">
-              <Title level={5} className="!mb-0 !text-slate-800 !font-bold tracking-tight truncate">
-                Food Thunder
-              </Title>
-              <div className="flex items-center gap-1.5">
-                <Tag color="orange" className="!mr-0 text-[10px] font-semibold border-0 py-0 px-1.5">
-                  MERCHANT PORTAL
-                </Tag>
-              </div>
+            <div className="overflow-hidden leading-tight">
+              <span className="font-extrabold text-base tracking-tight text-slate-800 block">
+                THUNDER<span className="text-orange-500">FOOD</span>
+              </span>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                Merchant Portal
+              </span>
             </div>
           )}
         </div>
 
-        {/* Current Restaurant Badge in Sidebar */}
+        {/* Quick Restaurant Status Block */}
         {!collapsed && (
-          <div className="m-3 p-3 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 rounded-xl">
-            <div className="flex items-center gap-2 text-xs font-medium text-orange-800 mb-1">
-              <ShopOutlined /> <span>Quán đang quản lý</span>
+          <div className="p-3 m-3 rounded-xl bg-orange-50/70 border border-orange-100/80 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-700">Trạng thái quán:</span>
+              <Switch
+                checked={isOpen}
+                onChange={handleToggleShopStatus}
+                checkedChildren="Mở"
+                unCheckedChildren="Đóng"
+                size="small"
+                style={{ backgroundColor: isOpen ? '#10b981' : undefined }}
+              />
             </div>
-            <Text strong className="text-xs text-slate-800 line-clamp-1 block">
-              {shopName}
-            </Text>
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span
+                className={`inline-block w-2 h-2 rounded-full ${
+                  isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                }`}
+              />
+              <span className={`font-semibold ${isOpen ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {isOpen ? 'Đang mở cửa nhận đơn' : 'Tạm dừng nhận đơn'}
+              </span>
+            </div>
           </div>
         )}
 
         {/* Navigation Menu */}
-        <Menu
-          mode="inline"
-          selectedKeys={[selectedKey]}
-          items={siderMenuItems}
-          className="border-0 px-2 pt-2 text-slate-700 font-medium"
-        />
-
-        {/* Bottom Sider Actions */}
-        {!collapsed && (
-          <div className="absolute bottom-14 left-0 right-0 p-3 border-t border-slate-100 bg-white">
-            <Link to={APP_ROUTES.HOME}>
-              <Button
-                type="text"
-                icon={<HomeOutlined />}
-                block
-                className="text-left text-slate-600 hover:text-orange-600 hover:bg-orange-50 mb-1"
-              >
-                Về trang Khách hàng
-              </Button>
-            </Link>
-          </div>
-        )}
+        <div className="px-2 py-2">
+          <Menu
+            mode="inline"
+            selectedKeys={[selectedKey]}
+            items={siderMenuItems}
+            className="border-none font-medium"
+          />
+        </div>
       </Sider>
 
       {/* Main Content Layout */}
-      <Layout className="bg-slate-50 flex-1 min-w-0">
-        {/* Top Header */}
-        <Header className="bg-white px-6 h-16 border-b border-slate-200 flex items-center justify-between sticky top-0 z-10 shadow-xs">
-          {/* Left: Collapse Button & Shop Status Toggle */}
-          <div className="flex items-center gap-4">
+      <Layout
+        className="transition-all duration-200"
+        style={{ marginLeft: collapsed ? 80 : 250 }}
+      >
+        {/* Top Navbar */}
+        <Header className="h-16 px-6 bg-white border-b border-slate-200/80 flex items-center justify-between sticky top-0 z-20 shadow-2xs">
+          <div className="flex items-center gap-3">
             <Button
               type="text"
               icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
               onClick={() => setCollapsed(!collapsed)}
-              className="text-slate-600 hover:text-orange-500"
+              className="text-slate-600 hover:text-orange-500 text-lg"
             />
-            <div className="hidden sm:flex items-center gap-3 pl-2 border-l border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Trạng thái nhận đơn:</span>
-              <Switch
-                checked={isOpen}
-                onChange={handleToggleShopStatus}
-                checkedChildren="Mở quán"
-                unCheckedChildren="Nghỉ"
-                style={{ backgroundColor: isOpen ? '#10b981' : undefined }}
-              />
-              <Tag color={isOpen ? 'success' : 'default'} className="font-medium">
-                {isOpen ? '● Đang nhận đơn' : '○ Tạm dừng'}
+            <div className="hidden sm:flex items-center gap-2">
+              <ShopOutlined className="text-orange-500 text-base" />
+              <span className="font-bold text-slate-800 text-sm">{shopName}</span>
+              <Tag color={isOpen ? 'success' : 'default'} className="ml-1 text-[11px] font-semibold">
+                {isOpen ? 'Đang hoạt động' : 'Tạm nghỉ'}
               </Tag>
             </div>
           </div>
 
-          {/* Right: Merchant Profile */}
           <div className="flex items-center gap-3">
-            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow>
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full hover:bg-slate-100 cursor-pointer transition">
+            {/* User Profile Dropdown */}
+            <Dropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
+              <div className="flex items-center gap-2.5 cursor-pointer p-1.5 rounded-xl hover:bg-slate-50 transition-colors">
                 <Avatar
-                  style={{ backgroundColor: '#f97316' }}
+                  size={34}
                   icon={<UserOutlined />}
                   src={user?.avatarUrl}
+                  className="bg-orange-500 border border-orange-200 shadow-2xs"
                 />
-                <div className="hidden md:block text-left">
-                  <div className="text-xs font-semibold text-slate-800 leading-tight">
-                    {user?.fullName || 'Chủ Quán Đối Tác'}
+                <div className="hidden md:block text-left leading-tight">
+                  <div className="font-bold text-slate-800 text-xs truncate max-w-[140px]">
+                    {user?.fullName || 'Chủ Quán Ăn'}
                   </div>
-                  <span className="text-[10px] text-slate-500">Đối tác Quán ăn</span>
+                  <span className="text-[10px] text-slate-400 font-medium">Chủ Quán (#1)</span>
                 </div>
               </div>
             </Dropdown>
           </div>
         </Header>
 
-        {/* Dynamic Nested Content */}
+        {/* Content Body */}
         <Content className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           <Outlet />
         </Content>
@@ -221,4 +220,5 @@ export const MerchantLayout: React.FC = () => {
     </Layout>
   );
 };
+
 export default MerchantLayout;
