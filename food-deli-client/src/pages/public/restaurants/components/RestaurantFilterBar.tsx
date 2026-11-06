@@ -199,3 +199,4 @@ export const RestaurantFilterBar: React.FC<RestaurantFilterBarProps> = ({
     </div>
   );
 };
+

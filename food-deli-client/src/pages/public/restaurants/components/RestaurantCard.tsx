@@ -146,3 +146,4 @@ export const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant }) =>
     </div>
   );
 };
+
