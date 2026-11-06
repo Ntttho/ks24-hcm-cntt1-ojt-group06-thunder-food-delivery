@@ -126,8 +126,6 @@ export const authSlice = createSlice({
       state.error = null;
       storage.removeToken();
       storage.removeUser();
-      // Also try calling authApi.logout asynchronously without blocking
-      authApi.logout().catch(() => {});
     },
     clearAuthError: (state) => {
       state.error = null;

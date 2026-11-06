@@ -19,7 +19,7 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const { login, isLoading, error, clearError } = useAuth();
   const [form] = Form.useForm();
-  const [selectedRole, setSelectedRole] = useState<string>('CUSTOMER');
+  const [selectedRole, setSelectedRole] = useState<string>('ALL');
 
   // Check if redirected from another page (e.g. from /checkout)
   const queryParams = new URLSearchParams(location.search);
@@ -97,10 +97,11 @@ export const LoginPage: React.FC = () => {
         <div className="text-xs font-semibold text-gray-500 mb-1.5 px-1 flex items-center justify-between">
           <span>Chọn cổng vai trò đăng nhập:</span>
           <span className="text-orange-600 font-bold">
+            {selectedRole === 'ALL' && 'Tự động nhận diện'}
             {selectedRole === 'CUSTOMER' && 'Khách hàng'}
             {selectedRole === 'MERCHANT' && 'Chủ quán'}
             {selectedRole === 'DRIVER' && 'Tài xế'}
-            {selectedRole === 'ALL' && 'Tất cả'}
+            {selectedRole === 'ADMIN' && 'Quản trị viên'}
           </span>
         </div>
         <Segmented
@@ -114,30 +115,48 @@ export const LoginPage: React.FC = () => {
           options={[
             {
               label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
+                <div className="py-1 flex items-center justify-center gap-1">
+                  <ThunderboltFilled className="text-orange-500 text-xs" />
+                  <span className="font-semibold text-xs">Tự động</span>
+                </div>
+              ),
+              value: 'ALL',
+            },
+            {
+              label: (
+                <div className="py-1 flex items-center justify-center gap-1">
                   <UserOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Khách hàng</span>
+                  <span className="font-semibold text-xs">Khách hàng</span>
                 </div>
               ),
               value: 'CUSTOMER',
             },
             {
               label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
+                <div className="py-1 flex items-center justify-center gap-1">
                   <ShopOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Chủ quán</span>
+                  <span className="font-semibold text-xs">Chủ quán</span>
                 </div>
               ),
               value: 'MERCHANT',
             },
             {
               label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
+                <div className="py-1 flex items-center justify-center gap-1">
                   <CarOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Tài xế</span>
+                  <span className="font-semibold text-xs">Tài xế</span>
                 </div>
               ),
               value: 'DRIVER',
+            },
+            {
+              label: (
+                <div className="py-1 flex items-center justify-center gap-1">
+                  <SafetyOutlined />
+                  <span className="font-semibold text-xs">Admin</span>
+                </div>
+              ),
+              value: 'ADMIN',
             },
           ]}
         />
@@ -229,29 +248,36 @@ export const LoginPage: React.FC = () => {
       <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-3.5 space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
           <SafetyOutlined />
-          <span>Tài khoản kiểm thử nhanh (Demo Seed Data):</span>
+          <span>Tài khoản kiểm thử nhanh (Demo Seed Data - Pass: 123456):</span>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <button
             type="button"
-            onClick={() => handleQuickFill('0987654321', 'Password@123', 'CUSTOMER')}
+            onClick={() => handleQuickFill('0900000001', '123456', 'CUSTOMER')}
             className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
           >
             👤 Khách hàng
           </button>
           <button
             type="button"
-            onClick={() => handleQuickFill('0901234567', 'Password@123', 'MERCHANT')}
+            onClick={() => handleQuickFill('0900000003', '123456', 'MERCHANT')}
             className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
           >
             🏪 Chủ quán
           </button>
           <button
             type="button"
-            onClick={() => handleQuickFill('0912345678', 'Password@123', 'DRIVER')}
+            onClick={() => handleQuickFill('0900000002', '123456', 'DRIVER')}
             className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
           >
             🛵 Tài xế
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickFill('0900000005', '123456', 'ADMIN')}
+            className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
+          >
+            🛡️ Admin
           </button>
         </div>
       </div>
