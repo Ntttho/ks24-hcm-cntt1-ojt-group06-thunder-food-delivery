@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { message } from 'antd';
 import { useAppDispatch } from './useAppDispatch';
 import { useAppSelector } from './useAppSelector';
 import {
@@ -19,11 +20,24 @@ export const useAuth = () => {
     (state) => state.auth
   );
 
-  // Proactive token expiration check on hook invocation / mount
+  // Proactive real-time token expiration check (ticks every 2s)
   useEffect(() => {
-    if (token && isTokenExpired(token)) {
-      dispatch(logoutAction());
-    }
+    if (!token) return;
+
+    const checkExpiration = () => {
+      if (isTokenExpired(token)) {
+        dispatch(logoutAction());
+        message.warning({
+          content: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+          key: 'token-expired-toast',
+        });
+      }
+    };
+
+    checkExpiration();
+    const timer = setInterval(checkExpiration, 2000);
+
+    return () => clearInterval(timer);
   }, [token, dispatch]);
 
   const login = async (credentials: LoginRequest) => {

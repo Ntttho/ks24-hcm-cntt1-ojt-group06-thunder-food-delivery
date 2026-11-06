@@ -106,6 +106,7 @@ services:
       - MYSQL_PORT=3306
       - MYSQL_USER=root
       - MYSQL_PASSWORD=root
+      - APPLICATION_JWT_EXPIRATION_MS=60000
     networks:
       - foodthunder-network
 
