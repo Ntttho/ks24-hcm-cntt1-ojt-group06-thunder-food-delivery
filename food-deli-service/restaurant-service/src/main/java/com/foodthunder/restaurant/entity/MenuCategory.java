@@ -26,6 +26,10 @@ public class MenuCategory {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    @Column(name = "display_order")
+    @Builder.Default
+    private Integer displayOrder = 0;
+
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @Builder.Default
     private List<Product> products = new ArrayList<>();

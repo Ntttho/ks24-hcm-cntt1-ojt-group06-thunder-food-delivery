@@ -2,9 +2,11 @@ package com.foodthunder.restaurant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.restaurant.dto.CategoryRequestDto;
+import com.foodthunder.restaurant.dto.ReorderCategoryRequest;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Shop;
 import com.foodthunder.restaurant.repository.MenuCategoryRepository;
+import com.foodthunder.restaurant.repository.ProductRepository;
 import com.foodthunder.restaurant.repository.ShopRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,9 +21,9 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -41,22 +43,29 @@ class CategoryControllerTest {
     @MockBean
     private ShopRepository shopRepository;
 
+    @MockBean
+    private ProductRepository productRepository;
+
     @Test
-    @DisplayName("GET /api/v1/restaurants/{id}/categories thành công")
+    @DisplayName("GET /api/v1/restaurants/{id}/categories thành công và sắp xếp theo thứ tự hiển thị")
     void getCategoriesByRestaurant_success() throws Exception {
         when(shopRepository.existsById(1)).thenReturn(true);
 
         Shop shop = Shop.builder().id(1).name("Quán Hạnh Dung").build();
-        MenuCategory cat1 = MenuCategory.builder().id(10).restaurant(shop).name("Món Chay").build();
-        MenuCategory cat2 = MenuCategory.builder().id(11).restaurant(shop).name("Nước Uống").build();
+        MenuCategory cat1 = MenuCategory.builder().id(10).restaurant(shop).name("Món Chay").displayOrder(0).build();
+        MenuCategory cat2 = MenuCategory.builder().id(11).restaurant(shop).name("Nước Uống").displayOrder(1).build();
 
-        when(menuCategoryRepository.findByRestaurantId(1)).thenReturn(List.of(cat1, cat2));
+        when(menuCategoryRepository.findByRestaurantIdOrderByDisplayOrderAscIdAsc(1)).thenReturn(List.of(cat1, cat2));
+        when(productRepository.countByCategoryIdAndDeletedAtIsNull(10)).thenReturn(5L);
+        when(productRepository.countByCategoryIdAndDeletedAtIsNull(11)).thenReturn(2L);
 
         mockMvc.perform(get("/api/v1/restaurants/1/categories"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].name").value("Món Chay"));
+                .andExpect(jsonPath("$.data[0].name").value("Món Chay"))
+                .andExpect(jsonPath("$.data[0].displayOrder").value(0))
+                .andExpect(jsonPath("$.data[0].productCount").value(5));
     }
 
     @Test
@@ -66,7 +75,7 @@ class CategoryControllerTest {
         when(shopRepository.findByIdAndDeletedAtIsNull(1)).thenReturn(Optional.of(shop));
         when(menuCategoryRepository.existsByRestaurantIdAndNameIgnoreCase(1, "Món Tráng Miệng")).thenReturn(false);
 
-        MenuCategory saved = MenuCategory.builder().id(20).restaurant(shop).name("Món Tráng Miệng").build();
+        MenuCategory saved = MenuCategory.builder().id(20).restaurant(shop).name("Món Tráng Miệng").displayOrder(0).build();
         when(menuCategoryRepository.save(any(MenuCategory.class))).thenReturn(saved);
 
         CategoryRequestDto request = CategoryRequestDto.builder()
@@ -104,5 +113,94 @@ class CategoryControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value("Danh mục 'Món Chay' đã tồn tại trong quán ăn này"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/categories/{id} đổi tên danh mục thành công")
+    void updateCategory_success() throws Exception {
+        Shop shop = Shop.builder().id(1).ownerId(3).name("Quán Hạnh Dung").build();
+        MenuCategory cat = MenuCategory.builder().id(10).restaurant(shop).name("Món Cũ").displayOrder(1).build();
+
+        when(menuCategoryRepository.findById(10)).thenReturn(Optional.of(cat));
+        when(menuCategoryRepository.existsByRestaurantIdAndNameIgnoreCaseAndIdNot(1, "Món Mới", 10)).thenReturn(false);
+        when(menuCategoryRepository.save(any(MenuCategory.class))).thenReturn(cat);
+
+        CategoryRequestDto request = CategoryRequestDto.builder()
+                .name("Món Mới")
+                .displayOrder(2)
+                .build();
+
+        mockMvc.perform(put("/api/v1/categories/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("X-User-Id", 3)
+                        .header("X-User-Role", "ROLE_MERCHANT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data.name").value("Món Mới"));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/categories/{id} xóa thành công khi danh mục không có món")
+    void deleteCategory_success() throws Exception {
+        Shop shop = Shop.builder().id(1).ownerId(3).name("Quán Hạnh Dung").build();
+        MenuCategory cat = MenuCategory.builder().id(10).restaurant(shop).name("Danh mục trống").build();
+
+        when(menuCategoryRepository.findById(10)).thenReturn(Optional.of(cat));
+        when(productRepository.countByCategoryIdAndDeletedAtIsNull(10)).thenReturn(0L);
+
+        mockMvc.perform(delete("/api/v1/categories/10")
+                        .header("X-User-Id", 3)
+                        .header("X-User-Role", "ROLE_MERCHANT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200));
+
+        verify(menuCategoryRepository).delete(cat);
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/categories/{id} trả về 400 BadRequest khi danh mục còn món")
+    void deleteCategory_hasProducts_badRequest() throws Exception {
+        Shop shop = Shop.builder().id(1).ownerId(3).name("Quán Hạnh Dung").build();
+        MenuCategory cat = MenuCategory.builder().id(10).restaurant(shop).name("Món Chay").build();
+
+        when(menuCategoryRepository.findById(10)).thenReturn(Optional.of(cat));
+        when(productRepository.countByCategoryIdAndDeletedAtIsNull(10)).thenReturn(3L);
+
+        mockMvc.perform(delete("/api/v1/categories/10")
+                        .header("X-User-Id", 3)
+                        .header("X-User-Role", "ROLE_MERCHANT"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("3 món ăn")));
+
+        verify(menuCategoryRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("PUT /api/v1/categories/reorder sắp xếp lại danh mục thành công")
+    void reorderCategories_success() throws Exception {
+        Shop shop = Shop.builder().id(1).ownerId(3).name("Quán Hạnh Dung").build();
+        when(shopRepository.findByIdAndDeletedAtIsNull(1)).thenReturn(Optional.of(shop));
+
+        MenuCategory cat1 = MenuCategory.builder().id(10).restaurant(shop).name("Cat 1").displayOrder(0).build();
+        MenuCategory cat2 = MenuCategory.builder().id(11).restaurant(shop).name("Cat 2").displayOrder(1).build();
+
+        when(menuCategoryRepository.findByIdAndRestaurantId(11, 1)).thenReturn(Optional.of(cat2));
+        when(menuCategoryRepository.findByIdAndRestaurantId(10, 1)).thenReturn(Optional.of(cat1));
+        when(menuCategoryRepository.findByRestaurantIdOrderByDisplayOrderAscIdAsc(1)).thenReturn(List.of(cat2, cat1));
+
+        ReorderCategoryRequest req = ReorderCategoryRequest.builder()
+                .restaurantId(1)
+                .categoryIds(List.of(11, 10))
+                .build();
+
+        mockMvc.perform(put("/api/v1/categories/reorder")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req))
+                        .header("X-User-Id", 3)
+                        .header("X-User-Role", "ROLE_MERCHANT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200));
     }
 }

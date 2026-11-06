@@ -16,5 +16,9 @@ public interface VoucherService {
     List<VoucherDto> getVouchers(Integer restaurantId);
 
     VoucherDto getVoucherById(Integer id);
+
+    VoucherDto updateVoucherStatus(Integer id, Boolean isActive, Integer requesterUserId, String role);
+
+    void deleteVoucher(Integer id, Integer requesterUserId, String role);
 }
 

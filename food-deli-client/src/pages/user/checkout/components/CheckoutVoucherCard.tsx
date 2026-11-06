@@ -3,11 +3,17 @@ import React from 'react';
 interface CheckoutVoucherCardProps {
   totalDiscount: number;
   onOpenVoucherPicker?: () => void;
+  appliedVoucherCode?: string;
+  appliedVoucherDiscount?: number;
+  onRemoveVoucher?: () => void;
 }
 
 export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
   totalDiscount,
   onOpenVoucherPicker,
+  appliedVoucherCode,
+  appliedVoucherDiscount = 25000,
+  onRemoveVoucher,
 }) => {
   return (
     <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-3">
@@ -29,7 +35,7 @@ export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
           type="button"
           aria-label="Chọn hoặc nhập mã khác"
           className="font-label-md text-label-md text-primary font-bold flex items-center gap-0.5 active:scale-95 transition-transform cursor-pointer"
-          onClick={onOpenVoucherPicker || (() => alert('Mã giảm giá tốt nhất đã được tự động áp dụng!'))}
+          onClick={onOpenVoucherPicker}
         >
           Nhập mã khác
           <span className="material-symbols-outlined text-[16px]">chevron_right</span>
@@ -38,24 +44,26 @@ export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
 
       {/* Applied Vouchers Badges */}
       <div className="flex flex-col gap-2">
-        {/* Voucher 1 */}
+        {/* Restaurant/Food Voucher */}
         <div className="flex items-center justify-between bg-secondary-fixed/30 rounded-xl p-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-secondary-container text-on-primary flex items-center justify-center flex-shrink-0">
               <span className="material-symbols-outlined text-[18px]">sell</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-label-md text-label-md text-on-surface truncate font-bold">
-                THUNDERNEW
+              <span className="font-label-md text-label-md text-on-surface truncate font-bold uppercase">
+                {appliedVoucherCode || 'THUNDERNEW'}
               </span>
               <span className="font-body-sm text-body-sm text-secondary truncate">
-                Giảm 25.000đ cho đơn đầu tiên
+                {appliedVoucherCode
+                  ? `Mã ưu đãi của quán (${appliedVoucherCode})`
+                  : 'Giảm giá ưu đãi cho đơn hàng'}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <span className="font-label-md text-label-md text-secondary font-bold">
-              -25.000đ
+              -{appliedVoucherDiscount.toLocaleString('vi-VN')}đ
             </span>
             <span
               className="material-symbols-outlined text-primary text-[18px]"
@@ -66,7 +74,7 @@ export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
           </div>
         </div>
 
-        {/* Voucher 2 */}
+        {/* Shipping Voucher */}
         <div className="flex items-center justify-between bg-primary-fixed/20 rounded-xl p-2.5">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center flex-shrink-0">
@@ -106,4 +114,3 @@ export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
 };
 
 export default CheckoutVoucherCard;
-

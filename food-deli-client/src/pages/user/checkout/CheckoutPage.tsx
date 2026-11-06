@@ -14,12 +14,22 @@ import {
   CheckoutPriceSummary,
   CheckoutBottomBar,
   CheckoutSuccessModal,
+  CheckoutVoucherModal,
 } from './components';
 
 export const CheckoutPage: React.FC = () => {
   // Modals
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    code: string;
+    discountAmount: number;
+    voucherId?: number;
+  }>({
+    code: 'THUNDERNEW',
+    discountAmount: 25000,
+  });
 
   // Countdown timer (07:59)
   const [countdown, setCountdown] = useState<number>(7 * 60 + 59);
@@ -85,7 +95,7 @@ export const CheckoutPage: React.FC = () => {
   const prioritySurcharge = deliverySpeed === 'priority' ? 5000 : 0;
   const shippingFee = baseShippingFee + prioritySurcharge;
   const serviceFee = 4000;
-  const foodVoucherDiscount = 25000;
+  const foodVoucherDiscount = appliedVoucher.discountAmount;
   const shipVoucherDiscount = 15000;
   const paymentMethodDiscount = paymentMethod.extraDiscount;
 
@@ -233,6 +243,22 @@ export const CheckoutPage: React.FC = () => {
           setPaymentMethod({ id, name, extraDiscount: extraDiscount || 0 });
         }}
         totalAmount={finalTotal}
+      />
+
+      {/* Voucher Selector & Code Validator Modal */}
+      <CheckoutVoucherModal
+        open={isVoucherModalOpen}
+        onClose={() => setIsVoucherModalOpen(false)}
+        orderAmount={itemsSubtotal}
+        restaurantId={1}
+        appliedCode={appliedVoucher.code}
+        onApplyVoucher={(res: any) => {
+          setAppliedVoucher({
+            code: res.code,
+            discountAmount: res.discountAmount || 0,
+            voucherId: res.voucherId,
+          });
+        }}
       />
 
       {/* 12. Success Modal Dialogue if Order Placed */}

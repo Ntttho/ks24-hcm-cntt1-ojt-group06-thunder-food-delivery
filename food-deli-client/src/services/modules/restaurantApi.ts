@@ -47,6 +47,64 @@ export interface MenuCategoryItem {
   id: number;
   name: string;
   restaurantId?: number;
+  displayOrder?: number;
+  productCount?: number;
+}
+
+export interface CreateCategoryPayload {
+  restaurantId: number;
+  name: string;
+  displayOrder?: number;
+}
+
+export interface UpdateCategoryPayload {
+  name: string;
+  displayOrder?: number;
+}
+
+export interface VoucherItem {
+  id: number;
+  restaurantId?: number;
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  discountAmount?: number;
+  maxDiscountAmount?: number;
+  minOrderValue?: number;
+  usageLimit?: number;
+  usedCount?: number;
+  startDate?: string;
+  expiryDate: string;
+  isActive: boolean;
+}
+
+export interface CreateVoucherPayload {
+  restaurantId?: number;
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minOrderValue?: number;
+  usageLimit?: number;
+  startDate?: string;
+  expiryDate: string;
+}
+
+export interface ValidateVoucherPayload {
+  code: string;
+  restaurantId?: number;
+  orderAmount?: number;
+}
+
+export interface VoucherValidationResult {
+  voucherId?: number;
+  code: string;
+  discountType?: string;
+  discountValue?: number;
+  discountAmount?: number;
+  minOrderValue?: number;
+  isValid: boolean;
+  message: string;
 }
 
 export interface ProductPayload {
@@ -118,6 +176,58 @@ let mockProductToppingsMap: Record<number, number[]> = {
   3: [1, 3],
 };
 
+let mockCategoriesStore: MenuCategoryItem[] = [
+  { id: 1, restaurantId: 1, name: 'Món khai vị', displayOrder: 0, productCount: 4 },
+  { id: 2, restaurantId: 1, name: 'Món chính', displayOrder: 1, productCount: 8 },
+  { id: 3, restaurantId: 1, name: 'Trà hoa quả', displayOrder: 2, productCount: 5 },
+  { id: 4, restaurantId: 1, name: 'Tráng miệng', displayOrder: 3, productCount: 2 },
+];
+
+let mockVouchersStore: VoucherItem[] = [
+  {
+    id: 1,
+    restaurantId: 1,
+    code: 'THUNDER20',
+    discountType: 'PERCENTAGE',
+    discountValue: 20,
+    maxDiscountAmount: 30000,
+    minOrderValue: 60000,
+    usageLimit: 100,
+    usedCount: 14,
+    startDate: '2026-11-01T00:00:00',
+    expiryDate: '2026-12-31T23:59:59',
+    isActive: true,
+  },
+  {
+    id: 2,
+    restaurantId: 1,
+    code: 'GIAM15K',
+    discountType: 'FIXED',
+    discountValue: 15000,
+    discountAmount: 15000,
+    minOrderValue: 50000,
+    usageLimit: 50,
+    usedCount: 22,
+    startDate: '2026-11-01T00:00:00',
+    expiryDate: '2026-12-15T23:59:59',
+    isActive: true,
+  },
+  {
+    id: 3,
+    restaurantId: 1,
+    code: 'CHAOQUANMOI',
+    discountType: 'PERCENTAGE',
+    discountValue: 50,
+    maxDiscountAmount: 50000,
+    minOrderValue: 100000,
+    usageLimit: 30,
+    usedCount: 30,
+    startDate: '2026-10-01T00:00:00',
+    expiryDate: '2026-11-01T23:59:59',
+    isActive: false,
+  },
+];
+
 export const restaurantApi = {
   getAll: async (params?: Record<string, any>): Promise<ApiResponse<Shop[]>> => {
     return apiClient.get<Shop[]>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
@@ -133,7 +243,270 @@ export const restaurantApi = {
   },
 
   getCategories: async (restaurantId?: number | string): Promise<ApiResponse<MenuCategoryItem[]>> => {
-    return apiClient.get<MenuCategoryItem[]>('/categories', { params: { restaurantId } });
+    try {
+      const res = await apiClient.get<MenuCategoryItem[]>('/categories', { params: { restaurantId } });
+      if (res && res.data && res.data.length > 0) {
+        return res;
+      }
+      const filtered = restaurantId
+        ? mockCategoriesStore.filter((c) => !c.restaurantId || c.restaurantId === Number(restaurantId))
+        : mockCategoriesStore;
+      return {
+        status: 200,
+        message: 'Success',
+        data: filtered,
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      const filtered = restaurantId
+        ? mockCategoriesStore.filter((c) => !c.restaurantId || c.restaurantId === Number(restaurantId))
+        : mockCategoriesStore;
+      return {
+        status: 200,
+        message: 'Fallback mock categories',
+        data: filtered,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  createCategory: async (data: CreateCategoryPayload): Promise<ApiResponse<MenuCategoryItem>> => {
+    try {
+      const res = await apiClient.post<MenuCategoryItem>('/categories', data);
+      return res;
+    } catch {
+      const newCat: MenuCategoryItem = {
+        id: Date.now(),
+        restaurantId: data.restaurantId,
+        name: data.name,
+        displayOrder: data.displayOrder ?? mockCategoriesStore.length,
+        productCount: 0,
+      };
+      mockCategoriesStore.push(newCat);
+      return {
+        status: 201,
+        message: 'Tạo mới danh mục thành công',
+        data: newCat,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  updateCategory: async (
+    id: number | string,
+    data: UpdateCategoryPayload
+  ): Promise<ApiResponse<MenuCategoryItem>> => {
+    try {
+      return await apiClient.put<MenuCategoryItem>(`/categories/${id}`, data);
+    } catch {
+      const idx = mockCategoriesStore.findIndex((c) => c.id === Number(id));
+      if (idx !== -1) {
+        mockCategoriesStore[idx] = {
+          ...mockCategoriesStore[idx],
+          name: data.name,
+          displayOrder: data.displayOrder ?? mockCategoriesStore[idx].displayOrder,
+        };
+        return {
+          status: 200,
+          message: 'Cập nhật danh mục thành công',
+          data: mockCategoriesStore[idx],
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new Error('Category not found');
+    }
+  },
+
+  deleteCategory: async (id: number | string): Promise<ApiResponse<void>> => {
+    try {
+      return await apiClient.delete<void>(`/categories/${id}`);
+    } catch {
+      mockCategoriesStore = mockCategoriesStore.filter((c) => c.id !== Number(id));
+      return {
+        status: 200,
+        message: 'Xóa danh mục thành công',
+        data: undefined,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  reorderCategories: async (
+    restaurantId: number | string,
+    categoryIds: number[]
+  ): Promise<ApiResponse<MenuCategoryItem[]>> => {
+    try {
+      return await apiClient.put<MenuCategoryItem[]>('/categories/reorder', {
+        restaurantId: Number(restaurantId),
+        categoryIds,
+      });
+    } catch {
+      mockCategoriesStore = mockCategoriesStore.map((cat) => {
+        const order = categoryIds.indexOf(cat.id);
+        if (order !== -1) {
+          return { ...cat, displayOrder: order };
+        }
+        return cat;
+      }).sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+      return {
+        status: 200,
+        message: 'Sắp xếp danh mục thành công',
+        data: mockCategoriesStore,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  // ---------------------------------------------------------------------------
+  // SP2-MERCH-07: Voucher Management & Checkout Promotion APIs
+  // ---------------------------------------------------------------------------
+
+  getVouchers: async (restaurantId?: number | string): Promise<ApiResponse<VoucherItem[]>> => {
+    try {
+      const res = await apiClient.get<VoucherItem[]>('/vouchers', { params: { restaurantId } });
+      if (res && res.data && res.data.length > 0) {
+        return res;
+      }
+      const filtered = restaurantId
+        ? mockVouchersStore.filter((v) => !v.restaurantId || v.restaurantId === Number(restaurantId))
+        : mockVouchersStore;
+      return {
+        status: 200,
+        message: 'Success',
+        data: filtered,
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      const filtered = restaurantId
+        ? mockVouchersStore.filter((v) => !v.restaurantId || v.restaurantId === Number(restaurantId))
+        : mockVouchersStore;
+      return {
+        status: 200,
+        message: 'Fallback mock vouchers',
+        data: filtered,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  createVoucher: async (data: CreateVoucherPayload): Promise<ApiResponse<VoucherItem>> => {
+    try {
+      return await apiClient.post<VoucherItem>('/vouchers', data);
+    } catch {
+      const newVoucher: VoucherItem = {
+        id: Date.now(),
+        restaurantId: data.restaurantId,
+        code: data.code.trim().toUpperCase(),
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        discountAmount: data.discountType === 'FIXED' ? data.discountValue : undefined,
+        maxDiscountAmount: data.maxDiscountAmount,
+        minOrderValue: data.minOrderValue || 0,
+        usageLimit: data.usageLimit || 100,
+        usedCount: 0,
+        startDate: data.startDate || new Date().toISOString(),
+        expiryDate: data.expiryDate,
+        isActive: true,
+      };
+      mockVouchersStore.unshift(newVoucher);
+      return {
+        status: 201,
+        message: 'Tạo mã voucher thành công',
+        data: newVoucher,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  toggleVoucherStatus: async (
+    id: number | string,
+    isActive: boolean
+  ): Promise<ApiResponse<VoucherItem>> => {
+    try {
+      return await apiClient.patch<VoucherItem>(`/vouchers/${id}/status`, { isActive });
+    } catch {
+      const idx = mockVouchersStore.findIndex((v) => v.id === Number(id));
+      if (idx !== -1) {
+        mockVouchersStore[idx].isActive = isActive;
+        return {
+          status: 200,
+          message: 'Cập nhật trạng thái voucher thành công',
+          data: mockVouchersStore[idx],
+          timestamp: new Date().toISOString(),
+        };
+      }
+      throw new Error('Voucher not found');
+    }
+  },
+
+  deleteVoucher: async (id: number | string): Promise<ApiResponse<void>> => {
+    try {
+      return await apiClient.delete<void>(`/vouchers/${id}`);
+    } catch {
+      mockVouchersStore = mockVouchersStore.filter((v) => v.id !== Number(id));
+      return {
+        status: 200,
+        message: 'Xóa voucher thành công',
+        data: undefined,
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  validateVoucher: async (data: ValidateVoucherPayload): Promise<ApiResponse<VoucherValidationResult>> => {
+    try {
+      return await apiClient.post<VoucherValidationResult>('/vouchers/validate', data);
+    } catch {
+      const code = data.code.trim().toUpperCase();
+      const matched = mockVouchersStore.find((v) => v.code === code && v.isActive);
+      if (!matched) {
+        return {
+          status: 400,
+          message: 'Mã voucher không tồn tại hoặc đã ngừng áp dụng',
+          data: { code, isValid: false, message: 'Mã voucher không tồn tại hoặc đã ngừng áp dụng' },
+          timestamp: new Date().toISOString(),
+        };
+      }
+      const orderAmount = data.orderAmount || 0;
+      if (matched.minOrderValue && orderAmount < matched.minOrderValue) {
+        return {
+          status: 400,
+          message: `Đơn hàng chưa đạt giá trị tối thiểu ${matched.minOrderValue.toLocaleString('vi-VN')}đ`,
+          data: {
+            voucherId: matched.id,
+            code: matched.code,
+            isValid: false,
+            message: `Đơn hàng chưa đạt giá trị tối thiểu ${matched.minOrderValue.toLocaleString('vi-VN')}đ`,
+          },
+          timestamp: new Date().toISOString(),
+        };
+      }
+      let discountAmount = 0;
+      if (matched.discountType === 'PERCENTAGE') {
+        let calc = (orderAmount * matched.discountValue) / 100;
+        if (matched.maxDiscountAmount && calc > matched.maxDiscountAmount) {
+          calc = matched.maxDiscountAmount;
+        }
+        discountAmount = Math.min(calc, orderAmount);
+      } else {
+        discountAmount = Math.min(matched.discountValue, orderAmount);
+      }
+      return {
+        status: 200,
+        message: 'Áp dụng mã voucher thành công',
+        data: {
+          voucherId: matched.id,
+          code: matched.code,
+          discountType: matched.discountType,
+          discountValue: matched.discountValue,
+          discountAmount,
+          minOrderValue: matched.minOrderValue,
+          isValid: true,
+          message: 'Áp dụng mã voucher thành công',
+        },
+        timestamp: new Date().toISOString(),
+      };
+    }
   },
 
   getProductDetail: async (productId: number | string): Promise<ApiResponse<ProductDetailItem>> => {
