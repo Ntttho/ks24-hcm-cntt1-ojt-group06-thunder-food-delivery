@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/vouchers")
@@ -70,5 +71,35 @@ public class VoucherController {
     public ResponseEntity<ApiResponse<VoucherDto>> getVoucherById(@PathVariable Integer id) {
         VoucherDto voucher = voucherService.getVoucherById(id);
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin voucher thành công", voucher));
+    }
+
+    /**
+     * Cập nhật trạng thái kích hoạt của voucher
+     * PATCH /api/v1/vouchers/{id}/status
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<VoucherDto>> updateVoucherStatus(
+            @PathVariable Integer id,
+            @RequestBody Map<String, Boolean> body,
+            @RequestHeader(value = "X-User-Id", required = false) Integer userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    ) {
+        Boolean isActive = body.getOrDefault("isActive", true);
+        VoucherDto updated = voucherService.updateVoucherStatus(id, isActive, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái voucher thành công", updated));
+    }
+
+    /**
+     * Xóa voucher
+     * DELETE /api/v1/vouchers/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteVoucher(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    ) {
+        voucherService.deleteVoucher(id, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success("Xoá voucher thành công", null));
     }
 }

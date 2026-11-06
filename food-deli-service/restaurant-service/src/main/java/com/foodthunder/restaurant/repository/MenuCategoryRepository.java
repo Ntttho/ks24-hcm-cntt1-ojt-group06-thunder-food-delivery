@@ -12,7 +12,11 @@ public interface MenuCategoryRepository extends JpaRepository<MenuCategory, Inte
 
     List<MenuCategory> findByRestaurantId(Integer restaurantId);
 
+    List<MenuCategory> findByRestaurantIdOrderByDisplayOrderAscIdAsc(Integer restaurantId);
+
     Optional<MenuCategory> findByIdAndRestaurantId(Integer id, Integer restaurantId);
 
     boolean existsByRestaurantIdAndNameIgnoreCase(Integer restaurantId, String name);
+
+    boolean existsByRestaurantIdAndNameIgnoreCaseAndIdNot(Integer restaurantId, String name, Integer id);
 }

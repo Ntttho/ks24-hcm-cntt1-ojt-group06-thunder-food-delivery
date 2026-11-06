@@ -20,6 +20,8 @@ export const APP_ROUTES = {
   ADDRESSES: '/profile/addresses',
   ADMIN_DASHBOARD: '/admin',
   MERCHANT_DASHBOARD: '/merchant',
+  MERCHANT_CATEGORIES: '/merchant/categories',
+  MERCHANT_VOUCHERS: '/merchant/vouchers',
   SHIPPER_DASHBOARD: '/shipper',
   NOT_FOUND: '*',
 } as const;

@@ -27,6 +27,8 @@ import {
   PlusCircleOutlined,
   DownOutlined,
   CheckOutlined,
+  FolderOutlined,
+  GiftOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
@@ -183,7 +185,11 @@ export const MerchantLayout: React.FC = () => {
   ];
 
   // Active navigation key
-  const selectedKey = location.pathname.includes('/merchant/toppings')
+  const selectedKey = location.pathname.includes('/merchant/vouchers')
+    ? '/merchant/vouchers'
+    : location.pathname.includes('/merchant/categories')
+    ? '/merchant/categories'
+    : location.pathname.includes('/merchant/toppings')
     ? '/merchant/toppings'
     : location.pathname.includes('/merchant/menu')
     ? '/merchant/menu'
@@ -199,14 +205,26 @@ export const MerchantLayout: React.FC = () => {
     {
       key: '/merchant/menu',
       icon: <AppstoreOutlined style={{ fontSize: '18px' }} />,
-      label: 'Quản lý thực đơn',
+      label: 'Quản lý món ăn',
       onClick: () => navigate('/merchant/menu'),
+    },
+    {
+      key: '/merchant/categories',
+      icon: <FolderOutlined style={{ fontSize: '18px' }} />,
+      label: 'Quản lý danh mục',
+      onClick: () => navigate('/merchant/categories'),
     },
     {
       key: '/merchant/toppings',
       icon: <TagsOutlined style={{ fontSize: '18px' }} />,
       label: 'Quản lý Topping',
       onClick: () => navigate('/merchant/toppings'),
+    },
+    {
+      key: '/merchant/vouchers',
+      icon: <GiftOutlined style={{ fontSize: '18px' }} />,
+      label: 'Khuyến mãi & Voucher',
+      onClick: () => navigate('/merchant/vouchers'),
     },
   ];
 

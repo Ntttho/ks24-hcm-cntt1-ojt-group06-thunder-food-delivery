@@ -202,6 +202,46 @@ public class VoucherServiceImpl implements VoucherService {
         return mapToDto(voucher);
     }
 
+    @Override
+    @Transactional
+    public VoucherDto updateVoucherStatus(Integer id, Boolean isActive, Integer requesterUserId, String role) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
+
+        if (voucher.getRestaurantId() != null) {
+            Shop shop = shopRepository.findByIdAndDeletedAtIsNull(voucher.getRestaurantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán với ID: " + voucher.getRestaurantId()));
+            if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
+                if (!shop.getOwnerId().equals(requesterUserId)) {
+                    throw new ForbiddenException("Bạn không có quyền thay đổi trạng thái voucher của quán khác");
+                }
+            }
+        }
+
+        voucher.setIsActive(Boolean.TRUE.equals(isActive));
+        Voucher saved = voucherRepository.save(voucher);
+        return mapToDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteVoucher(Integer id, Integer requesterUserId, String role) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
+
+        if (voucher.getRestaurantId() != null) {
+            Shop shop = shopRepository.findByIdAndDeletedAtIsNull(voucher.getRestaurantId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán với ID: " + voucher.getRestaurantId()));
+            if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
+                if (!shop.getOwnerId().equals(requesterUserId)) {
+                    throw new ForbiddenException("Bạn không có quyền xoá voucher của quán khác");
+                }
+            }
+        }
+
+        voucherRepository.delete(voucher);
+    }
+
     private VoucherDto mapToDto(Voucher v) {
         return VoucherDto.builder()
                 .id(v.getId())

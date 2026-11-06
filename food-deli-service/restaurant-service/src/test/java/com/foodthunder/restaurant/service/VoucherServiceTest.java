@@ -279,4 +279,28 @@ class VoucherServiceTest {
         assertThat(res.getIsValid()).isFalse();
         assertThat(res.getMessage()).contains("hết hạn");
     }
+
+    @Test
+    @DisplayName("Cập nhật trạng thái voucher (bật/tắt) thành công")
+    void updateVoucherStatus_success() {
+        when(voucherRepository.findById(10)).thenReturn(Optional.of(sampleVoucher));
+        when(shopRepository.findByIdAndDeletedAtIsNull(1)).thenReturn(Optional.of(sampleShop));
+        when(voucherRepository.save(any(Voucher.class))).thenAnswer(i -> i.getArgument(0));
+
+        VoucherDto updated = voucherService.updateVoucherStatus(10, false, 3, "ROLE_MERCHANT");
+
+        assertThat(updated.getIsActive()).isFalse();
+        verify(voucherRepository).save(sampleVoucher);
+    }
+
+    @Test
+    @DisplayName("Xoá voucher thành công khi chủ quán yêu cầu")
+    void deleteVoucher_success() {
+        when(voucherRepository.findById(10)).thenReturn(Optional.of(sampleVoucher));
+        when(shopRepository.findByIdAndDeletedAtIsNull(1)).thenReturn(Optional.of(sampleShop));
+
+        voucherService.deleteVoucher(10, 3, "ROLE_MERCHANT");
+
+        verify(voucherRepository).delete(sampleVoucher);
+    }
 }

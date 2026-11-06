@@ -14,6 +14,8 @@ import {
   MerchantDashboardPage,
   MerchantMenuPage,
   MerchantToppingPage,
+  MerchantCategoryPage,
+  MerchantVoucherPage,
   OrdersPage,
   OrderDetailPage,
 } from '@/pages';
@@ -145,10 +147,26 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'categories',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantCategoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'toppings',
         element: (
           <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
             <MerchantToppingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'vouchers',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantVoucherPage />
           </ProtectedRoute>
         ),
       },

@@ -11,5 +11,7 @@ public class CategoryDto {
     private Integer id;
     private Integer restaurantId;
     private String name;
+    private Integer displayOrder;
+    private Integer productCount;
 }
 

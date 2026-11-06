@@ -14,5 +14,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     List<Product> findByCategoryIdAndDeletedAtIsNull(Integer categoryId);
 
+    long countByCategoryIdAndDeletedAtIsNull(Integer categoryId);
+
     List<Product> findByCategoryRestaurantIdAndDeletedAtIsNull(Integer restaurantId);
 }
