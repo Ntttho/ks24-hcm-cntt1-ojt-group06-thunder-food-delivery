@@ -1,5 +1,5 @@
 import { apiClient, API_ENDPOINTS } from '@/services/api';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, PaginatedData } from '@/types';
 
 export interface Shop {
   id: number;
@@ -16,6 +16,20 @@ export interface Shop {
   closingTime?: string;
   ratingAvg?: number;
   approvalStatus?: string;
+  categories?: Array<{
+    id: number;
+    name: string;
+    products: Array<{
+      id: number;
+      name: string;
+      price: number;
+      description?: string;
+      imageUrl?: string;
+      isAvailable?: boolean;
+      categoryId?: number;
+      categoryName?: string;
+    }>;
+  }>;
 }
 
 export interface CreateRestaurantPayload {
@@ -33,7 +47,10 @@ export interface ProductItem {
   id: number;
   categoryId?: number;
   categoryName?: string;
+  restaurantId?: number;
+  restaurantName?: string;
   name: string;
+  description?: string;
   price: number;
   isAvailable: boolean;
   defaultQuantity?: number;
@@ -47,10 +64,51 @@ export interface MenuCategoryItem {
   id: number;
   name: string;
   restaurantId?: number;
+  itemCount?: number;
+}
+
+export interface VoucherItem {
+  id: number;
+  restaurantId?: number;
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  discountAmount?: number;
+  maxDiscountAmount?: number;
+  minOrderValue?: number;
+  usageLimit?: number;
+  usedCount?: number;
+  startDate?: string;
+  expiryDate: string;
+  isActive?: boolean;
+}
+
+export interface CreateVoucherPayload {
+  restaurantId?: number;
+  code: string;
+  discountType: 'FIXED' | 'PERCENTAGE';
+  discountValue: number;
+  maxDiscountAmount?: number;
+  minOrderValue?: number;
+  usageLimit?: number;
+  startDate?: string;
+  expiryDate: string;
+}
+
+export interface UpdateVoucherPayload {
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountValue?: number;
+  maxDiscountAmount?: number;
+  minOrderValue?: number;
+  usageLimit?: number;
+  startDate?: string;
+  expiryDate?: string;
+  isActive?: boolean;
 }
 
 export interface ProductPayload {
   name: string;
+  description?: string;
   categoryId: number;
   price: number;
   imageUrl?: string;
@@ -119,21 +177,107 @@ let mockProductToppingsMap: Record<number, number[]> = {
 };
 
 export const restaurantApi = {
-  getAll: async (params?: Record<string, any>): Promise<ApiResponse<Shop[]>> => {
-    return apiClient.get<Shop[]>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
+  /**
+   * Lấy danh sách quán ăn có phân trang và tìm kiếm theo tên / danh mục / trạng thái
+   */
+  getAll: async (params?: {
+    page?: number;
+    size?: number;
+    search?: string;
+    categoryId?: number;
+    isOpen?: boolean;
+  }): Promise<ApiResponse<PaginatedData<Shop>>> => {
+    return apiClient.get<PaginatedData<Shop>>(API_ENDPOINTS.RESTAURANTS.LIST, { params });
+  },
+
+  /**
+   * Lấy toàn bộ danh sách quán ăn không phân trang (dropdown chọn quán)
+   */
+  getAllRestaurantsNoPaging: async (): Promise<ApiResponse<Shop[]>> => {
+    return apiClient.get<Shop[]>('/restaurants/all');
   },
 
   getById: async (id: number | string): Promise<ApiResponse<Shop>> => {
     return apiClient.get<Shop>(API_ENDPOINTS.RESTAURANTS.DETAIL(id));
   },
 
+  /**
+   * Lấy danh sách món ăn toàn hệ thống hoặc theo quán (hỗ trợ phân trang, tìm kiếm và lọc danh mục qua API)
+   */
+  getProducts: async (params?: {
+    restaurantId?: number | string;
+    page?: number;
+    size?: number;
+    search?: string;
+    categoryId?: number;
+    categoryName?: string;
+    isAvailable?: boolean;
+  }): Promise<ApiResponse<PaginatedData<ProductItem>>> => {
+    return apiClient.get<PaginatedData<ProductItem>>('/products', { params });
+  },
+
   // Merchant Portal: Menu & Catalog Management APIs
-  getProductsByRestaurant: async (restaurantId: number | string): Promise<ApiResponse<ProductItem[]>> => {
-    return apiClient.get<ProductItem[]>(`/restaurants/${restaurantId}/products`);
+  /**
+   * Lấy danh sách món ăn theo quán ăn có phân trang và tìm kiếm
+   */
+  getProductsByRestaurant: async (
+    restaurantId: number | string,
+    params?: {
+      page?: number;
+      size?: number;
+      search?: string;
+      categoryId?: number;
+      isAvailable?: boolean;
+    }
+  ): Promise<ApiResponse<PaginatedData<ProductItem>>> => {
+    return apiClient.get<PaginatedData<ProductItem>>(`/restaurants/${restaurantId}/products`, { params });
+  },
+
+  /**
+   * Lấy toàn bộ món ăn không phân trang
+   */
+  getAllProducts: async (restaurantId: number | string): Promise<ApiResponse<ProductItem[]>> => {
+    return apiClient.get<ProductItem[]>(`/restaurants/${restaurantId}/products/all`);
   },
 
   getCategories: async (restaurantId?: number | string): Promise<ApiResponse<MenuCategoryItem[]>> => {
     return apiClient.get<MenuCategoryItem[]>('/categories', { params: { restaurantId } });
+  },
+
+  createCategory: async (payload: { restaurantId: number; name: string }): Promise<ApiResponse<MenuCategoryItem>> => {
+    return apiClient.post<MenuCategoryItem>('/categories', payload);
+  },
+
+  updateCategory: async (id: number | string, payload: { name: string; restaurantId?: number }): Promise<ApiResponse<MenuCategoryItem>> => {
+    return apiClient.put<MenuCategoryItem>(`/categories/${id}`, payload);
+  },
+
+  deleteCategory: async (id: number | string): Promise<ApiResponse<void>> => {
+    return apiClient.delete<void>(`/categories/${id}`);
+  },
+
+  getVouchers: async (restaurantId?: number | string): Promise<ApiResponse<VoucherItem[]>> => {
+    return apiClient.get<VoucherItem[]>('/vouchers', { params: { restaurantId } });
+  },
+
+  getVoucherById: async (id: number | string): Promise<ApiResponse<VoucherItem>> => {
+    return apiClient.get<VoucherItem>(`/vouchers/${id}`);
+  },
+
+  createVoucher: async (payload: CreateVoucherPayload): Promise<ApiResponse<VoucherItem>> => {
+    return apiClient.post<VoucherItem>('/vouchers', payload);
+  },
+
+  updateVoucher: async (id: number | string, payload: UpdateVoucherPayload): Promise<ApiResponse<VoucherItem>> => {
+    return apiClient.put<VoucherItem>(`/vouchers/${id}`, payload);
+  },
+
+  deleteVoucher: async (id: number | string): Promise<ApiResponse<void>> => {
+    return apiClient.delete<void>(`/vouchers/${id}`);
+  },
+
+  toggleVoucher: async (id: number | string): Promise<ApiResponse<VoucherItem>> => {
+    return apiClient.patch<VoucherItem>(`/vouchers/${id}/toggle`);
   },
 
   getProductDetail: async (productId: number | string): Promise<ApiResponse<ProductDetailItem>> => {
@@ -182,8 +326,18 @@ export const restaurantApi = {
     return apiClient.patch<ProductItem>(`/products/${id}/status`, { isAvailable });
   },
 
-  getMyRestaurants: async (ownerId?: number): Promise<ApiResponse<Shop[]>> => {
-    return apiClient.get<Shop[]>('/restaurants/mine', {
+  getMyRestaurants: async (
+    ownerId?: number,
+    params?: { page?: number; size?: number; search?: string }
+  ): Promise<ApiResponse<PaginatedData<Shop>>> => {
+    return apiClient.get<PaginatedData<Shop>>('/restaurants/mine', {
+      params: { ...params, ...(ownerId ? { ownerId } : {}) },
+      headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
+    });
+  },
+
+  getMyRestaurantsAll: async (ownerId?: number): Promise<ApiResponse<Shop[]>> => {
+    return apiClient.get<Shop[]>('/restaurants/mine/all', {
       params: ownerId ? { ownerId } : undefined,
       headers: ownerId ? { 'X-User-Id': String(ownerId) } : undefined,
     });
@@ -220,13 +374,47 @@ export const restaurantApi = {
 
   getToppingsByRestaurant: async (
     restaurantId: number | string,
+    params?: { page?: number; size?: number; search?: string; groupName?: string; isAvailable?: boolean } | string
+  ): Promise<ApiResponse<PaginatedData<ToppingItem>>> => {
+    const queryParams = typeof params === 'string' ? { groupName: params } : (params || {});
+    try {
+      const res = await apiClient.get<PaginatedData<ToppingItem>>(API_ENDPOINTS.TOPPINGS.LIST, {
+        params: { restaurantId, ...queryParams },
+      });
+      if (res && res.data) {
+        return res;
+      }
+      return await apiClient.get<PaginatedData<ToppingItem>>(
+        API_ENDPOINTS.RESTAURANTS.TOPPINGS(restaurantId),
+        { params: queryParams }
+      );
+    } catch {
+      const filtered = mockToppingsStore.filter((t) => t.restaurantId === Number(restaurantId));
+      return {
+        status: 200,
+        message: 'Success',
+        data: {
+          content: filtered,
+          totalElements: filtered.length,
+          totalPages: 1,
+          pageNumber: 0,
+          pageSize: 10,
+          last: true,
+        },
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  getAllToppings: async (
+    restaurantId: number | string,
     groupName?: string
   ): Promise<ApiResponse<ToppingItem[]>> => {
     try {
-      const res = await apiClient.get<ToppingItem[]>('/toppings', {
-        params: { restaurantId, groupName },
+      const res = await apiClient.get<ToppingItem[]>(API_ENDPOINTS.RESTAURANTS.TOPPINGS(restaurantId) + '/all', {
+        params: groupName ? { groupName } : undefined,
       });
-      if (res && res.data && res.data.length > 0) {
+      if (res && res.data) {
         return res;
       }
       return {
@@ -238,7 +426,7 @@ export const restaurantApi = {
     } catch {
       return {
         status: 200,
-        message: 'Fallback mock toppings',
+        message: 'Success',
         data: mockToppingsStore.filter((t) => t.restaurantId === Number(restaurantId)),
         timestamp: new Date().toISOString(),
       };
@@ -249,7 +437,7 @@ export const restaurantApi = {
     restaurantId: number | string
   ): Promise<ApiResponse<ToppingGroupItem[]>> => {
     try {
-      return await apiClient.get<ToppingGroupItem[]>('/toppings/groups', {
+      return await apiClient.get<ToppingGroupItem[]>(API_ENDPOINTS.TOPPINGS.GROUPS, {
         params: { restaurantId },
       });
     } catch {
@@ -278,7 +466,7 @@ export const restaurantApi = {
 
   createTopping: async (data: CreateToppingPayload): Promise<ApiResponse<ToppingItem>> => {
     try {
-      const res = await apiClient.post<ToppingItem>('/toppings', data);
+      const res = await apiClient.post<ToppingItem>(API_ENDPOINTS.TOPPINGS.LIST, data);
       return res;
     } catch {
       const newTopping: ToppingItem = {
@@ -304,7 +492,7 @@ export const restaurantApi = {
     data: UpdateToppingPayload
   ): Promise<ApiResponse<ToppingItem>> => {
     try {
-      return await apiClient.put<ToppingItem>(`/toppings/${id}`, data);
+      return await apiClient.put<ToppingItem>(API_ENDPOINTS.TOPPINGS.DETAIL(id), data);
     } catch {
       const idx = mockToppingsStore.findIndex((t) => t.id === Number(id));
       if (idx !== -1) {
@@ -328,7 +516,7 @@ export const restaurantApi = {
     isAvailable: boolean
   ): Promise<ApiResponse<ToppingItem>> => {
     try {
-      return await apiClient.patch<ToppingItem>(`/toppings/${id}/status`, { isAvailable });
+      return await apiClient.patch<ToppingItem>(API_ENDPOINTS.TOPPINGS.STATUS(id), { isAvailable });
     } catch {
       const idx = mockToppingsStore.findIndex((t) => t.id === Number(id));
       if (idx !== -1) {
@@ -346,7 +534,7 @@ export const restaurantApi = {
 
   deleteTopping: async (id: number | string): Promise<ApiResponse<void>> => {
     try {
-      return await apiClient.delete<void>(`/toppings/${id}`);
+      return await apiClient.delete<void>(API_ENDPOINTS.TOPPINGS.DETAIL(id));
     } catch {
       mockToppingsStore = mockToppingsStore.filter((t) => t.id !== Number(id));
       Object.keys(mockProductToppingsMap).forEach((pid) => {
@@ -368,9 +556,12 @@ export const restaurantApi = {
     toppingIds: number[]
   ): Promise<ApiResponse<ToppingItem[]>> => {
     try {
-      return await apiClient.post<ToppingItem[]>(`/products/${productId}/toppings`, {
-        toppingIds,
-      });
+      return await apiClient.post<ToppingItem[]>(
+        API_ENDPOINTS.TOPPINGS.PRODUCT_TOPPINGS(productId),
+        {
+          toppingIds,
+        }
+      );
     } catch {
       mockProductToppingsMap[Number(productId)] = toppingIds;
       const assigned = mockToppingsStore.filter((t) => toppingIds.includes(t.id));
@@ -387,7 +578,7 @@ export const restaurantApi = {
     productId: number | string
   ): Promise<ApiResponse<ToppingItem[]>> => {
     try {
-      return await apiClient.get<ToppingItem[]>(`/products/${productId}/toppings`);
+      return await apiClient.get<ToppingItem[]>(API_ENDPOINTS.TOPPINGS.PRODUCT_TOPPINGS(productId));
     } catch {
       const assignedIds = mockProductToppingsMap[Number(productId)] || [];
       const assigned = mockToppingsStore.filter((t) => assignedIds.includes(t.id));

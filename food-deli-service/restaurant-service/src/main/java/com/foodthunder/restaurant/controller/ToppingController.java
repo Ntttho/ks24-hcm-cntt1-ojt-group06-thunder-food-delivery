@@ -5,6 +5,7 @@ import com.foodthunder.restaurant.service.ToppingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,16 +22,52 @@ public class ToppingController {
     private final ToppingService toppingService;
 
     /**
-     * Lấy danh sách topping theo quán ăn (hỗ trợ lọc theo groupName)
-     * GET /api/v1/toppings?restaurantId=1&groupName=Size+ly
+     * Lấy danh sách topping theo quán ăn (hỗ trợ phân trang và tìm kiếm theo tên/nhóm)
+     * GET /api/v1/toppings?restaurantId=1&page=0&size=10&search=pho+mai&groupName=Vien+banh
      */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<ToppingDto>>> getToppings(
-            @RequestParam Integer restaurantId,
+    public ResponseEntity<ApiResponse<PageResponse<ToppingDto>>> getToppings(
+            @RequestParam(required = false) Integer restaurantId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String groupName,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        if (restaurantId == null) {
+            return ResponseEntity.ok(ApiResponse.success("Danh sách topping", PageResponse.of(Page.empty())));
+        }
+        PageResponse<ToppingDto> paged = toppingService.getToppingsByRestaurantPaged(restaurantId, search, groupName, isAvailable, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping thành công", paged));
+    }
+
+    /**
+     * Lấy toàn bộ topping của quán không phân trang (phục vụ modal gán topping hoặc dropdown)
+     * GET /api/v1/toppings/all?restaurantId=1
+     */
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<ToppingDto>>> getAllToppings(
+            @RequestParam(required = false) Integer restaurantId,
             @RequestParam(required = false) String groupName
     ) {
+        if (restaurantId == null) {
+            return ResponseEntity.ok(ApiResponse.success("Danh sách topping", List.of()));
+        }
         List<ToppingDto> list = toppingService.getToppingsByRestaurant(restaurantId, groupName);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping thành công", list));
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả topping thành công", list));
+    }
+
+    @GetMapping({"/restaurants/{restaurantId}", "/restaurant/{restaurantId}"})
+    public ResponseEntity<ApiResponse<PageResponse<ToppingDto>>> getToppingsByRestaurantPath(
+            @PathVariable Integer restaurantId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String groupName,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<ToppingDto> paged = toppingService.getToppingsByRestaurantPaged(restaurantId, search, groupName, isAvailable, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping thành công", paged));
     }
 
     /**
@@ -39,8 +76,11 @@ public class ToppingController {
      */
     @GetMapping("/groups")
     public ResponseEntity<ApiResponse<List<ToppingGroupDto>>> getToppingGroups(
-            @RequestParam Integer restaurantId
+            @RequestParam(required = false) Integer restaurantId
     ) {
+        if (restaurantId == null) {
+            return ResponseEntity.ok(ApiResponse.success("Danh sách nhóm topping", List.of()));
+        }
         List<ToppingGroupDto> groups = toppingService.getToppingGroupsByRestaurant(restaurantId);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách nhóm topping thành công", groups));
     }

@@ -1,4 +1,5 @@
 export * from './MainLayout';
-export * from './AuthLayout';
-export * from './MerchantLayout';
+export * from './auth/AuthLayout';
+export * from './merchant/MerchantLayout';
+export * from './user/UserLayout';
 

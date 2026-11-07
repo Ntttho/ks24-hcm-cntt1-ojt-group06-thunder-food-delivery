@@ -3,6 +3,7 @@ package com.foodthunder.restaurant.controller;
 import com.foodthunder.restaurant.dto.*;
 import com.foodthunder.restaurant.service.ProductService;
 import com.foodthunder.restaurant.service.RestaurantService;
+import com.foodthunder.restaurant.service.ToppingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,7 @@ public class RestaurantController {
 
     private final RestaurantService restaurantService;
     private final ProductService productService;
+    private final ToppingService toppingService;
 
     /**
      * API 1.2: Lấy danh sách quán ăn (hỗ trợ phân trang, tìm kiếm theo tên, lọc theo danh mục)
@@ -37,6 +39,16 @@ public class RestaurantController {
     }
 
     /**
+     * Lấy toàn bộ quán ăn không phân trang (dùng cho dropdown/tiện ích)
+     * GET /api/v1/restaurants/all
+     */
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<RestaurantDto>>> getAllRestaurants() {
+        PageResponse<RestaurantDto> response = restaurantService.getRestaurants(null, null, null, 0, 100);
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả quán ăn thành công", response.getContent()));
+    }
+
+    /**
      * API 1.3: Xem chi tiết quán kèm toàn bộ thực đơn đã được nhóm theo danh mục
      * GET /api/v1/restaurants/{id}
      */
@@ -47,17 +59,34 @@ public class RestaurantController {
     }
 
     /**
-     * API 4.2: Danh sách quán ăn của chủ quán (Merchant Multi-shops)
-     * GET /api/v1/restaurants/mine
+     * API 4.2: Danh sách quán ăn của chủ quán có phân trang & tìm kiếm (Merchant Multi-shops)
+     * GET /api/v1/restaurants/mine?search=quan&page=0&size=10
      */
     @GetMapping("/mine")
-    public ResponseEntity<ApiResponse<List<RestaurantDto>>> getMyRestaurants(
+    public ResponseEntity<ApiResponse<PageResponse<RestaurantDto>>> getMyRestaurants(
+            @RequestHeader(value = "X-User-Id", required = false) Integer headerOwnerId,
+            @RequestParam(required = false) Integer ownerId,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        PageResponse<RestaurantDto> restaurants = restaurantService.getRestaurantsByOwnerPaged(effectiveOwnerId, search, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách quán của bạn thành công", restaurants));
+    }
+
+    /**
+     * Danh sách toàn bộ quán ăn của chủ quán không phân trang (dropdown chọn quán)
+     * GET /api/v1/restaurants/mine/all
+     */
+    @GetMapping("/mine/all")
+    public ResponseEntity<ApiResponse<List<RestaurantDto>>> getMyRestaurantsAll(
             @RequestHeader(value = "X-User-Id", required = false) Integer headerOwnerId,
             @RequestParam(required = false) Integer ownerId
     ) {
         Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
         List<RestaurantDto> restaurants = restaurantService.getRestaurantsByOwner(effectiveOwnerId);
-        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách quán của bạn thành công", restaurants));
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả quán của bạn thành công", restaurants));
     }
 
     /**
@@ -106,13 +135,52 @@ public class RestaurantController {
     }
 
     /**
-     * Lấy danh sách món ăn theo quán ăn
-     * GET /api/v1/restaurants/{id}/products
+     * Lấy danh sách món ăn theo quán ăn (hỗ trợ phân trang và tìm kiếm theo tên)
+     * GET /api/v1/restaurants/{id}/products?page=0&size=10&search=tra+sua&categoryId=1&isAvailable=true
      */
     @GetMapping("/{id}/products")
-    public ResponseEntity<ApiResponse<List<ProductDto>>> getProductsByRestaurant(@PathVariable Integer id) {
-        List<ProductDto> products = productService.getProductsByRestaurant(id);
+    public ResponseEntity<ApiResponse<PageResponse<ProductDto>>> getProductsByRestaurant(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<ProductDto> products = productService.getProductsByRestaurantPaged(id, search, categoryId, null, isAvailable, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách món của quán thành công", products));
+    }
+
+    @GetMapping("/{id}/products/all")
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getProductsByRestaurantAll(@PathVariable Integer id) {
+        List<ProductDto> products = productService.getProductsByRestaurant(id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả món của quán thành công", products));
+    }
+
+    /**
+     * Lấy danh sách topping theo quán ăn (hỗ trợ phân trang và tìm kiếm theo tên)
+     * GET /api/v1/restaurants/{id}/toppings?page=0&size=10&search=pho+mai
+     */
+    @GetMapping("/{id}/toppings")
+    public ResponseEntity<ApiResponse<PageResponse<ToppingDto>>> getRestaurantToppings(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String groupName,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<ToppingDto> paged = toppingService.getToppingsByRestaurantPaged(id, search, groupName, isAvailable, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping của quán thành công", paged));
+    }
+
+    @GetMapping("/{id}/toppings/all")
+    public ResponseEntity<ApiResponse<List<ToppingDto>>> getRestaurantAllToppings(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String groupName
+    ) {
+        List<ToppingDto> list = toppingService.getToppingsByRestaurant(id, groupName);
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả topping của quán thành công", list));
     }
 
     /**

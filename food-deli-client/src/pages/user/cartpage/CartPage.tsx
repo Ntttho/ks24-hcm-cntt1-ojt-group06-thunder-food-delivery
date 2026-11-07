@@ -1,338 +1,487 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { message, Button, Card, Tag } from 'antd';
+import {
+  ShoppingCartOutlined,
+  ArrowLeftOutlined,
+  RightOutlined,
+  SyncOutlined,
+} from '@ant-design/icons';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
-import { addToCart, updateQuantity, removeFromCart } from '@/store/slices/cartSlice';
-import { RestaurantConflictModal } from '../components/RestaurantConflictModal';
+import {
+  updateQuantity,
+  updateItemToppings,
+  removeFromCart,
+  clearCart,
+  toggleSelectItem,
+  toggleSelectShop,
+  fetchCartFromRedis,
+} from '@/store/slices/cartSlice';
+import { orderApi } from '@/services/modules/orderApi';
+import { formatCurrency, formatDate } from '@/utils/formatters';
 import { PaymentMethodModal } from '../components/PaymentMethodModal';
 import {
   CartHeader,
   CartRestaurantCard,
-  CartConflictBanner,
   FreeshipProgressBar,
   CartItemList,
   EcoCutlerySection,
-  CartUpsellRail,
   CartPriceSummary,
   CartBottomBar,
 } from '../components/cart';
-import type { CartItemType, UpsellItemType } from '../types';
-
-const INITIAL_FALLBACK_ITEMS: CartItemType[] = [
-  {
-    id: 'item-1',
-    name: 'Cơm Tấm Sườn Bì Chả Đặc Biệt',
-    price: 87000,
-    quantity: 1,
-    options: 'Thêm ốp la chín lòng đào (+8.000đ), Ít mỡ hành',
-    note: 'Để nước mắm riêng',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAIqfTI5s8Q8ASaoe0eenWqww4cUBT5Qndph9kSGOPYbs1F1lc3YSgyIp98tLIRpxAgVziH2jroEu4J3Lm7sSxvt_ZYhlJ-5cAO7yFUGC0B-zfUsVSOEQJgLrBcPS-2JM4UJWXfKrWnqYhSgqDZ0SKVb1PkH5MqQFKI-umi-MtJpVS2KNDAzQWnfvmP968_J5KRwMh_yLu3icf_iU7IHTDx3wnoXLLF2CLwt08eOsO6uO1-Vu4Km2lyEg',
-    shopId: 1,
-    shopName: 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-  },
-  {
-    id: 'item-2',
-    name: 'Canh Khổ Qua Nhồi Thịt',
-    price: 35000,
-    quantity: 1,
-    options: 'Nóng hổi, đậm vị thanh ngọt',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD5xddBWdavFNppRvgJfZ-98sSI-55_jOOTZ78Qypan6fiv63Malq-00eOk0ly36_G0fH7UuQbgBjaEijPgHIbCMNa57oRbWN8ELerPyOl-5ZtOn02rkIIaFPKLIuX-bbdIh51ICzw7yby5ewLv35H3_pFwpatAvydIXHcgyTtU3cn7vYgJsz2OOnAf7JbL8x-Irk3JkkVZOCF1TOL8TsCgRLcZG_WLb0ULMgL1dsj1Pqq9UiL5EfI59w',
-    shopId: 1,
-    shopName: 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-  },
-  {
-    id: 'item-3',
-    name: 'Trà Tắc Xí Muội Khổng Lồ',
-    price: 25000,
-    quantity: 2,
-    options: 'Size L, 50% đường, 70% đá',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCtdW3utsF1II3NyfRaQbJ4PCJ1N_IIX1n6T3Idti3hHUbMj8r9J8C0j1BHIlAwTtA8wZxkcjJBkTLUSHMJuEDUCC2VpLRfpL8-E_ljpLGxa9sPki6e8NjNHXkMvZdBNtXNdRmgAN0hKX_Ooo-1hZtBQBexu6fdcTEZQjG317qYrBr3M1oB_CwlCNtQ2UdMy1VtkPue4bj7_wl_WxJm0yFDSxErzlcXS5eJPaQL4FS5tBY5d10FjFdQYw',
-    shopId: 1,
-    shopName: 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-  },
-];
-
-const UPSELL_ITEMS: UpsellItemType[] = [
-  {
-    id: 'upsell-1',
-    name: 'Chả trứng hấp thêm',
-    price: 15000,
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuDiE6DtiK6elJx982NJFnl4-Qr1AvO2VT9kdfo9DDSTF99sswTRpIzud6brNhpbijnbmzvj9ndtgL50KytKZ8pdWOZ9vgtFh0NJNA-6daJ2hc8KKizP6wBTvlotae7G6mxkfbu3pIYKTvR-MA5lhHe8Wk8bkFJri1iNzXV2zNRY2ETiqWF-KYkYHWwDx052D2-f-LbbcBRHRoq45qEh_S10Mk7_4AcYSBa4Gc6tiH_IlW70ieTsdwWB7Q',
-  },
-  {
-    id: 'upsell-2',
-    name: 'Canh rong biển thịt bằm',
-    price: 20000,
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAiCUfFW0oIdlsdc6LxoZcF3edvStw0IbxcMFrWXOIGuBEFMWW1fjfOtgAIeO8amdHOF_Iqav19ci6H9bMDTgaRi-y6thcbrrdi8j576QmRBn6yEds_3fdwpxCNSGKIY9oLcgofaUVbTJ2h-JIZqb6ZVwHF6OvMxZdx7_8LqCesGMwoxR5Ls7OP4RqVwCciFVDsXVBw0nJCMmBq3VsuR6uCH13dSydqqrspPMgcz3YnuA9xSYtM8n4nJw',
-  },
-  {
-    id: 'upsell-3',
-    name: 'Trà đào cam sả',
-    price: 28000,
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCYTOCsQhWpehtSfIaVBg--khW253SrSOhmMUZ9XtiQrCxyE3ikSDxd6S0ssIdrg14C8QZ5hO-SfGCYyrNXoKjo5nlOf6w4gqefYMSdF8EJ3G_xclpZ0tCqyxizipN0QaEtIM2N6YrUXrRXqinCvoRLGI62-BUWnEunIMFDXQWo8MH6es4xtnr1tOkrQxSTMw9iv4ijB75wOCheTw4cBaX_yL0GEgQmdDkn1g2YY5RnYYU0L0hfOtEQug',
-  },
-  {
-    id: 'upsell-4',
-    name: 'Trứng ốp la lòng đào',
-    price: 8000,
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC9Q0wNnf-PiEQvQAIOHJ28yRQ_uj_eHz6LpBEz8l7tvprOBT-mzXDOr5pqFndvgWKuKSMi-oUsv_QqJBuB-A1dzL0Rjxd4gxMKSemll0zJnRjWDs6Ygf7R8sxa3Dx_r7DLc1v7oCQDAD48-JRINkYJS-wreV-jHyL6RqEBoccVmeAQrR1KpsvKcFfUaMvGW5en2c9zhCrQP83Jm60mgYk7BtJfm4SFzpnuPqosBmq7utSbJ6OKjU_Spw',
-  },
-];
+import { AwaitingPaymentOrdersCard } from './components/AwaitingPaymentOrdersCard';
+import { CartEditToppingsModal } from './components/CartEditToppingsModal';
+import type { CartItemType } from '../types';
 
 export const CartPage: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const reduxCart = useAppSelector((state) => state.cart);
 
-  // Fallback to local sample items if Redux cart is initially empty for UI demo
-  const [localItems, setLocalItems] = useState<CartItemType[]>(INITIAL_FALLBACK_ITEMS);
-  const [includeCutlery, setIncludeCutlery] = useState<boolean>(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  // Modals state
-  const [isConflictOpen, setIsConflictOpen] = useState<boolean>(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('Tiền mặt khi nhận');
-
-  // Use Redux items if present; otherwise fallback to local items
-  const items: CartItemType[] = useMemo(() => {
-    if (reduxCart.items.length > 0) {
-      return reduxCart.items.map((ri) => ({
-        id: String(ri.id),
-        name: ri.productName,
-        price: ri.price,
-        quantity: ri.quantity,
-        imageUrl: ri.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600',
-        options: ri.toppings?.length
-          ? ri.toppings.map((t) => t.name).join(', ')
-          : undefined,
-        shopId: ri.shopId,
-        shopName: ri.shopName,
-      }));
+  // Synchronize cart with Redis on mount if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchCartFromRedis(user?.id ? Number(user.id) : undefined));
     }
-    return localItems;
-  }, [reduxCart.items, localItems]);
+  }, [isAuthenticated, user?.id, dispatch]);
 
-  // Calculations
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
-    [items]
-  );
-  const totalItemCount = useMemo(
-    () => items.reduce((sum, item) => sum + item.quantity, 0),
-    [items]
-  );
-  const shippingFee = items.length > 0 ? 18000 : 0;
+  const [includeCutlery, setIncludeCutlery] = useState<boolean>(true);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('Chuyển khoản VietQR');
+  const [activeOrders, setActiveOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<CartItemType | null>(null);
+  const [isEditToppingsOpen, setIsEditToppingsOpen] = useState<boolean>(false);
+
+  // Fetch recent active orders (including AWAITING_PAYMENT within 8 minutes)
+  const fetchActiveOrders = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingOrders(true);
+    try {
+      const res = await orderApi.getMyOrders({ page: 0, size: 10 });
+      const list = Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.content)
+        ? res.data.content
+        : [];
+      const ongoing = list.filter((o: any) =>
+        ['AWAITING_PAYMENT', 'PENDING', 'CONFIRMED', 'DELIVERING'].includes(o.statusCode)
+      );
+      setActiveOrders(ongoing);
+    } catch {
+      setActiveOrders([]);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchActiveOrders();
+  }, [fetchActiveOrders]);
+
+  // Map items directly from Redux Cart
+  const items: CartItemType[] = useMemo(() => {
+    return (reduxCart.items || []).map((ri) => ({
+      id: String(ri.id),
+      productId: ri.productId,
+      name: ri.productName,
+      price: ri.price,
+      quantity: ri.quantity,
+      imageUrl: ri.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600',
+      options: ri.toppings?.length
+        ? ri.toppings.map((t) => `${t.name} (+${t.price.toLocaleString('vi-VN')}đ)`).join(', ')
+        : undefined,
+      toppings: ri.toppings,
+      shopId: ri.shopId,
+      shopName: ri.shopName,
+      selected: ri.selected !== false,
+    }));
+  }, [reduxCart.items]);
+
+  // Selected items calculations (Shopee style - only selected items are summed up)
+  const selectedItems = useMemo(() => {
+    return items.filter((it) => it.selected !== false);
+  }, [items]);
+
+  const selectedSubtotal = useMemo(() => {
+    return selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  }, [selectedItems]);
+
+  const selectedItemCount = useMemo(() => {
+    return selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [selectedItems]);
+
+  const totalItemCount = useMemo(() => {
+    return items.reduce((sum, item) => sum + item.quantity, 0);
+  }, [items]);
+
+  const shippingFee = selectedItems.length > 0 ? 18000 : 0;
   const freeshipThreshold = 200000;
-  const remainingForFreeship = Math.max(0, freeshipThreshold - subtotal);
-  const freeshipProgress = Math.min(100, Math.round((subtotal / freeshipThreshold) * 100));
+  const remainingForFreeship = Math.max(0, freeshipThreshold - selectedSubtotal);
+  const freeshipProgress = Math.min(100, Math.round((selectedSubtotal / freeshipThreshold) * 100));
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
-  };
-
+  // Handlers
   const handleUpdateQuantity = (id: string, delta: number) => {
     const currentItem = items.find((i) => i.id === id);
     if (!currentItem) return;
-
     const nextQty = currentItem.quantity + delta;
-
-    if (reduxCart.items.length > 0) {
-      if (nextQty <= 0) {
-        dispatch(removeFromCart(id));
-      } else {
-        dispatch(updateQuantity({ id, quantity: nextQty }));
-      }
+    if (nextQty <= 0) {
+      dispatch(removeFromCart(id));
+      message.info('Đã xóa món khỏi giỏ hàng');
     } else {
-      setLocalItems((prev) =>
-        prev
-          .map((item) => (item.id === id ? { ...item, quantity: nextQty } : item))
-          .filter((item) => item.quantity > 0)
-      );
+      dispatch(updateQuantity({ id, quantity: nextQty }));
     }
   };
 
   const handleRemoveItem = (id: string) => {
-    if (reduxCart.items.length > 0) {
-      dispatch(removeFromCart(id));
-    } else {
-      setLocalItems((prev) => prev.filter((item) => item.id !== id));
-    }
-    showToast('Đã xóa món khỏi giỏ hàng');
+    dispatch(removeFromCart(id));
+    message.info('Đã xóa món khỏi giỏ hàng');
   };
 
-  const handleAddUpsell = (upsell: UpsellItemType) => {
-    const existing = items.find((i) => i.name === upsell.name);
-    if (existing) {
-      handleUpdateQuantity(existing.id, 1);
-    } else {
-      if (reduxCart.items.length > 0) {
-        dispatch(
-          addToCart({
-            id: `upsell-${Date.now()}`,
-            productId: Math.floor(Math.random() * 9000) + 1000,
-            productName: upsell.name,
-            price: upsell.price,
-            quantity: 1,
-            imageUrl: upsell.imageUrl,
-            shopId: reduxCart.shopId || 1,
-            shopName: reduxCart.shopName || 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-          })
-        );
-      } else {
-        const newItem: CartItemType = {
-          id: `upsell-${Date.now()}`,
-          name: upsell.name,
-          price: upsell.price,
-          quantity: 1,
-          imageUrl: upsell.imageUrl,
-          options: 'Món gọi kèm',
-        };
-        setLocalItems((prev) => [...prev, newItem]);
-      }
-    }
-    showToast(`Đã thêm "${upsell.name}" vào giỏ hàng!`);
+  const handleOpenEditToppings = (item: CartItemType) => {
+    setEditingItem(item);
+    setIsEditToppingsOpen(true);
+  };
+
+  const handleSaveToppings = (
+    oldItemId: string,
+    newItemId: string,
+    toppings: Array<{ id: number; name: string; price: number }>,
+    quantity: number
+  ) => {
+    dispatch(
+      updateItemToppings({
+        oldItemId,
+        newItemId,
+        toppings,
+        quantity,
+      })
+    );
+    message.success('Đã cập nhật tùy chọn topping cho món ăn!');
+    setIsEditToppingsOpen(false);
+    setEditingItem(null);
+  };
+
+  const handleClearCart = () => {
+    dispatch(clearCart());
+    message.success('Đã làm trống giỏ hàng');
   };
 
   const handleCutleryToggle = (checked: boolean) => {
     setIncludeCutlery(checked);
     if (!checked) {
-      showToast('Cảm ơn bạn đã bảo vệ môi trường: Không lấy dụng cụ ăn uống nhựa!');
-    } else {
-      showToast('Đã chọn lấy muỗng, nĩa, đũa dùng 1 lần');
+      message.info('Cảm ơn bạn đã bảo vệ môi trường: Không lấy dụng cụ ăn uống nhựa!');
     }
   };
 
-  // Requirement: If not authenticated when proceeding to checkout, alert and redirect to /login with state: { from: '/checkout' }
   const handleProceedToCheckout = () => {
+    if (selectedItems.length === 0) {
+      message.warning('Vui lòng tích chọn ít nhất 1 món ăn để thanh toán!');
+      return;
+    }
     if (!isAuthenticated) {
-      message.warning('Vui lòng đăng nhập để tiến hành đặt hàng và thanh toán!');
+      message.warning('Vui lòng đăng nhập để tiến hành thanh toán!');
       navigate(APP_ROUTES.LOGIN, { state: { from: APP_ROUTES.CHECKOUT } });
       return;
     }
     navigate(APP_ROUTES.CHECKOUT);
   };
 
-  const currentShopName = reduxCart.shopName || 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi';
+  const activeShopName = useMemo(() => {
+    if (selectedItems.length > 0) return selectedItems[0].shopName || 'Quán ăn đã chọn';
+    return reduxCart.shopName || 'Thunder Food Delivery';
+  }, [selectedItems, reduxCart.shopName]);
+
+  const activeShopId = useMemo(() => {
+    if (selectedItems.length > 0) return selectedItems[0].shopId || 1;
+    return reduxCart.shopId || 1;
+  }, [selectedItems, reduxCart.shopId]);
+
+  // Separate non-awaiting ongoing orders
+  const ongoingOrders = useMemo(() => {
+    return activeOrders.filter((o) => o.statusCode !== 'AWAITING_PAYMENT');
+  }, [activeOrders]);
+
+  // Render Empty State
+  if (items.length === 0) {
+    return (
+      <div className="bg-gray-50 min-h-screen flex flex-col font-sans">
+        <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+          <div className="max-w-xl mx-auto h-16 px-4 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl text-gray-700 hover:bg-orange-50 hover:text-orange-600 cursor-pointer"
+            >
+              <ArrowLeftOutlined className="text-lg" />
+            </button>
+            <div
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 cursor-pointer group hover:scale-105 transition-all"
+              title="Quay về Trang chủ"
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white font-black text-sm">
+                ⚡
+              </div>
+              <h1 className="text-base font-extrabold text-gray-900 group-hover:text-orange-600 transition-colors !mb-0">
+                Giỏ hàng của bạn
+              </h1>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="text-xs font-bold text-gray-500 hover:text-orange-600 cursor-pointer px-2 py-1 rounded-lg hover:bg-orange-50"
+            >
+              Trang chủ
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-xl mx-auto w-full pt-20 px-4 pb-12">
+          {/* SePay Awaiting Payment Section with 8-min countdown */}
+          <AwaitingPaymentOrdersCard
+            orders={activeOrders}
+            onRefresh={fetchActiveOrders}
+          />
+
+          {/* Ongoing Kitchen/Delivery Orders */}
+          {ongoingOrders.length > 0 ? (
+            <div className="space-y-4 mb-6">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  ĐƠN HÀNG ĐANG ĐƯỢC XỬ LÝ ({ongoingOrders.length})
+                </span>
+                <Button
+                  type="link"
+                  size="small"
+                  onClick={fetchActiveOrders}
+                  icon={<SyncOutlined spin={loadingOrders} />}
+                  className="text-xs text-orange-600 font-semibold"
+                >
+                  Cập nhật
+                </Button>
+              </div>
+
+              {ongoingOrders.map((order) => {
+                const isPending = order.statusCode === 'PENDING';
+                const isConfirmed = order.statusCode === 'CONFIRMED';
+                return (
+                  <Card
+                    key={order.id}
+                    className="rounded-2xl border-orange-200/90 bg-gradient-to-br from-white to-orange-50/40 shadow-xs text-left overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between border-b border-orange-100/80 pb-2 mb-3">
+                      <div>
+                        <span className="text-xs text-slate-400">Mã đơn:</span>
+                        <span className="font-bold text-slate-800 ml-1.5 font-mono text-sm">
+                          {order.orderCode}
+                        </span>
+                      </div>
+                      <Tag
+                        color={isPending ? 'gold' : isConfirmed ? 'blue' : 'green'}
+                        className="font-bold px-2 py-0.5 rounded-full"
+                      >
+                        {isPending
+                          ? '⏳ Chờ quán xác nhận'
+                          : isConfirmed
+                          ? '🍳 Quán đang nấu'
+                          : '🛵 Đang giao hàng'}
+                      </Tag>
+                    </div>
+
+                    <div className="space-y-1 text-xs text-slate-600 mb-4">
+                      <div className="font-extrabold text-slate-800 text-sm">
+                        {order.restaurantName || `Quán ăn #${order.restaurantId}`}
+                      </div>
+                      <div className="text-slate-500 line-clamp-1">{order.receiverAddress}</div>
+                      <div className="flex justify-between items-center pt-2 font-semibold">
+                        <span className="text-slate-500">
+                          {order.createdAt ? formatDate(order.createdAt) : 'Vừa đặt'}
+                        </span>
+                        <div className="text-right">
+                          <span className="text-slate-500 text-xs mr-1">Tổng thanh toán:</span>
+                          <span className="text-orange-600 font-extrabold text-base">
+                            {formatCurrency(Number(order.totalAmount || 0))}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="primary"
+                      block
+                      icon={<RightOutlined />}
+                      className="bg-orange-500 hover:bg-orange-600 rounded-xl font-bold border-none h-10 shadow-xs"
+                      onClick={() => navigate(APP_ROUTES.ORDERS)}
+                    >
+                      Xem chi tiết tiến độ đơn hàng
+                    </Button>
+                  </Card>
+                );
+              })}
+
+              {/* Empty Cart Prompt */}
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-2xs text-center mt-6">
+                <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-2">
+                  <ShoppingCartOutlined />
+                </div>
+                <h3 className="font-bold text-gray-800 text-sm mb-1">Giỏ hàng món mới đang trống</h3>
+                <p className="text-gray-400 text-xs mb-3">
+                  Bạn có muốn chọn thêm món tráng miệng hoặc nước uống khác không?
+                </p>
+                <Button
+                  onClick={() => navigate(APP_ROUTES.HOME)}
+                  className="rounded-xl font-semibold border-orange-200 text-orange-600 hover:border-orange-400"
+                >
+                  Khám phá món ngon khác
+                </Button>
+              </div>
+            </div>
+          ) : activeOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center py-12">
+              <div className="w-28 h-28 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-5xl mb-6 shadow-inner border border-orange-100">
+                <ShoppingCartOutlined />
+              </div>
+              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
+                Giỏ hàng của bạn đang trống
+              </h2>
+              <p className="text-gray-500 text-sm max-w-xs mb-8">
+                Bạn chưa chọn món nào vào giỏ. Hãy dạo quanh các quán ăn nổi bật và thêm món nhé!
+              </p>
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => navigate(APP_ROUTES.HOME)}
+                className="bg-orange-500 hover:bg-orange-600 rounded-2xl font-bold h-12 px-8 shadow-md shadow-orange-500/20 text-base"
+              >
+                Khám phá món ngon ngay
+              </Button>
+            </div>
+          ) : null}
+        </main>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-surface font-body-md text-on-surface flex flex-col min-h-screen">
-      {/* 1. Top Header */}
-      <CartHeader shopName={currentShopName} distance="1.8 km" />
+    <div className="bg-gray-50 min-h-screen flex flex-col font-sans">
+      {/* 1. Header with Hover Animation & Click Home */}
+      <CartHeader shopName={activeShopName} distance="1.8 km" />
 
       {/* Main Body */}
-      <main className="flex flex-col relative w-full pt-16 bg-surface min-h-screen pb-safe">
-        <div className="max-w-xl mx-auto w-full flex flex-col pb-36">
-          {/* 2. Restaurant Conflict Warning Demo Bar */}
-          <CartConflictBanner onTriggerConflict={() => setIsConflictOpen(true)} />
+      <main className="flex-1 w-full pt-16 pb-36">
+        <div className="max-w-xl mx-auto w-full flex flex-col gap-1">
+          {/* SePay Awaiting Payment Alert if customer has pending VietQR orders */}
+          <div className="px-4 pt-3">
+            <AwaitingPaymentOrdersCard
+              orders={activeOrders}
+              onRefresh={fetchActiveOrders}
+            />
+          </div>
 
-          {/* 3. Restaurant Header Card */}
-          <CartRestaurantCard shopName={currentShopName} deliveryTime="20-25 phút" distance="1.8 km" />
+          {/* Active Orders Banner if any */}
+          {ongoingOrders.length > 0 && (
+            <div className="px-4 mb-2">
+              <div
+                className="bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl p-3 px-4 shadow-xs flex items-center justify-between cursor-pointer"
+                onClick={() => navigate(APP_ROUTES.ORDERS)}
+              >
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                  </span>
+                  <span>Bạn có {ongoingOrders.length} đơn hàng đang được chuẩn bị!</span>
+                </div>
+                <span className="text-xs font-extrabold flex items-center gap-1 hover:underline">
+                  Theo dõi ngay <RightOutlined className="text-[10px]" />
+                </span>
+              </div>
+            </div>
+          )}
 
-          {/* 4. Freeship Milestone Bar */}
+          {/* 2. Restaurant Header Card */}
+          <CartRestaurantCard
+            shopName={activeShopName}
+            deliveryTime="20-25 phút"
+            distance="1.8 km"
+            shopId={activeShopId}
+          />
+
+          {/* 3. Freeship Milestone Bar */}
           <FreeshipProgressBar
             remainingForFreeship={remainingForFreeship}
             freeshipProgress={freeshipProgress}
           />
 
-          {/* 5. Cart Items List */}
+          {/* 4. Cart Items List (Shopee Multi-shop Grouping & Checkbox) */}
           <CartItemList
             items={items}
             totalItemCount={totalItemCount}
+            onToggleSelectItem={(id) => dispatch(toggleSelectItem(id))}
+            onToggleSelectShop={(shopId, selected) => dispatch(toggleSelectShop({ shopId, selected }))}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
-            onRestoreSampleItems={() => setLocalItems(INITIAL_FALLBACK_ITEMS)}
-            onEditOptions={(item) => showToast(`Chỉnh sửa tùy chọn cho ${item.name}`)}
+            onEditOptions={handleOpenEditToppings}
+            onClearCart={handleClearCart}
           />
 
-          {/* 6. Eco Cutlery Toggle */}
+          {/* 5. Eco Cutlery Section */}
           <EcoCutlerySection
             includeCutlery={includeCutlery}
             onToggleCutlery={handleCutleryToggle}
           />
 
-          {/* 7. Upsell Carousel */}
-          <CartUpsellRail upsellItems={UPSELL_ITEMS} onAddUpsell={handleAddUpsell} />
-
-          {/* 8. Pricing & Voucher Summary */}
+          {/* 6. Pricing Summary (Calculated on selected items) */}
           <CartPriceSummary
-            totalItemCount={totalItemCount}
-            subtotal={subtotal}
+            totalItemCount={selectedItemCount}
+            subtotal={selectedSubtotal}
             shippingFee={shippingFee}
-            onOpenPromoSelector={() => showToast('Mã giảm giá đã được đồng bộ tự động')}
+            onOpenPromoSelector={() => message.info('Mã giảm giá sẽ được áp dụng tại bước Thanh toán')}
           />
         </div>
       </main>
 
-      {/* 9. Sticky Bottom Checkout Bar */}
+      {/* 7. Sticky Bottom Bar (Calculated on selected items) */}
       <CartBottomBar
         selectedPaymentMethod={selectedPaymentMethod}
-        totalAmount={subtotal + shippingFee}
-        itemCount={items.length}
+        totalAmount={selectedSubtotal + (selectedItemCount > 0 ? shippingFee : 0)}
+        itemCount={selectedItemCount}
         onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
         onProceedToCheckout={handleProceedToCheckout}
-        disabled={items.length === 0}
+        disabled={selectedItemCount === 0}
       />
 
-      {/* 10. Modals */}
-      <RestaurantConflictModal
-        isOpen={isConflictOpen}
-        onClose={() => setIsConflictOpen(false)}
-        onConfirmReplace={() => {
-          setIsConflictOpen(false);
-          setLocalItems([
-            {
-              id: 'phela-1',
-              name: 'Ô Long Sữa Phê La',
-              price: 55000,
-              quantity: 1,
-              options: 'Size L, 50% đường, Trân châu Ô Long',
-              imageUrl:
-                'https://lh3.googleusercontent.com/aida-public/AB6AXuDSWxqpTOjUNZH3ddU_vv3mZuORXEJT6pjyGrq-Wo3MaBeZELuDxDMJledJhZNRVw84R8nEmlJ8k6GPrELJjZPeNupoNLXz83ArrRnvy3AnPE7j4sAh542NlSka8caclPX9PiKBoAczJBvgVzl7DVPUQBeytlHRgcZJWe5HCWDyqi1UJUaspml0ryt2jgowa4bvP8FEqXcQPnFc4hi9cqRhOFm-u7U_3xQ1A4KyBz1MM6hP_-IjUP6Csg',
-            },
-          ]);
-          showToast('Đã làm mới giỏ hàng với quán Phê La');
-        }}
-        currentShopName={currentShopName}
-        currentItemsCount={items.length}
-        currentTotal={subtotal}
-        newShopName="Phê La - Trương Định"
-      />
-
+      {/* 8. Payment Method Selector Drawer/Modal */}
       <PaymentMethodModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
         selectedMethodId={selectedPaymentMethod.includes('VietQR') ? 'vietqr' : 'cod'}
         onSelectMethod={(_, name) => {
           setSelectedPaymentMethod(name);
-          showToast(`Đã chọn phương thức: ${name}`);
+          message.success(`Đã chọn phương thức: ${name}`);
         }}
-        totalAmount={subtotal + shippingFee}
+        totalAmount={selectedSubtotal + (selectedItemCount > 0 ? shippingFee : 0)}
       />
 
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-24 left-4 right-4 z-50 pointer-events-none flex justify-center animate-bounce">
-          <div className="bg-inverse-surface text-inverse-on-surface px-space-lg py-space-sm rounded-full shadow-lg flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px] text-primary-fixed">
-              check_circle
-            </span>
-            <span className="font-body-sm text-body-sm font-medium">{toastMessage}</span>
-          </div>
-        </div>
-      )}
+      {/* 9. Edit Toppings Modal */}
+      <CartEditToppingsModal
+        isOpen={isEditToppingsOpen}
+        onClose={() => {
+          setIsEditToppingsOpen(false);
+          setEditingItem(null);
+        }}
+        item={editingItem}
+        onSave={handleSaveToppings}
+      />
     </div>
   );
 };

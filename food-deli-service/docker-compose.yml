@@ -25,6 +25,25 @@ services:
       retries: 10
       start_period: 20s
 
+  # 0.1 Redis In-Memory Cart & Cache Storage
+  redis:
+    image: redis:7.2-alpine
+    container_name: ft-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   # 1. Netflix Eureka Service Registry
   discovery-service:
     build:
@@ -155,6 +174,8 @@ services:
       - DB_NAME=grabfood_db
       - DB_USERNAME=root
       - DB_PASSWORD=root
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - foodthunder-network
     healthcheck:
@@ -187,6 +208,8 @@ services:
       - DB_NAME=grabfood_db
       - DB_USERNAME=root
       - DB_PASSWORD=root
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     networks:
       - foodthunder-network
     healthcheck:
@@ -233,6 +256,9 @@ services:
 volumes:
   mysql_data:
     name: ft_mysql_data
+    driver: local
+  redis_data:
+    name: ft_redis_data
     driver: local
 
 networks:

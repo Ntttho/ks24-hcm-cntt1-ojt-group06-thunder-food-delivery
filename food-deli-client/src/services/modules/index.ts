@@ -2,3 +2,7 @@ export * from './authApi';
 export * from './addressApi';
 export * from './restaurantApi';
 export * from './orderApi';
+export * from './paymentApi';
+export * from './userApi';
+export * from './cartApi';
+export * from './cloudinaryService';

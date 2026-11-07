@@ -20,6 +20,7 @@ public class ProductDetailDto {
     private Integer restaurantId;
     private String restaurantName;
     private String name;
+    private String description;
     private BigDecimal price;
     private Boolean isAvailable;
     private Integer defaultQuantity;

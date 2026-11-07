@@ -42,7 +42,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Profile Header Card */}
       <Card className="rounded-2xl border border-gray-100 shadow-2xs overflow-hidden">
         <div className="flex flex-col sm:flex-row items-center gap-6 p-2">

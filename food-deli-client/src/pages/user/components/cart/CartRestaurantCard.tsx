@@ -18,41 +18,41 @@ export const CartRestaurantCard: React.FC<CartRestaurantCardProps> = ({
   const navigate = useNavigate();
 
   return (
-    <section className="px-gutter pt-space-md">
-      <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-xs">
-        <div className="flex items-center justify-between gap-space-xs">
-          <div className="flex items-center gap-space-xs min-w-0">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-primary text-[20px]">
-                restaurant
+    <section className="px-4 pt-4">
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0 font-bold">
+              <span className="material-symbols-outlined text-[20px]">
+                storefront
               </span>
             </div>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface truncate font-bold">
+            <h2 className="text-base text-gray-900 truncate font-extrabold !mb-0">
               {shopName}
             </h2>
           </div>
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary-container/15 text-primary text-label-sm font-label-sm whitespace-nowrap">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-orange-50 text-orange-600 text-xs font-bold whitespace-nowrap border border-orange-200">
             <span
-              className="material-symbols-outlined text-[14px] mr-1"
+              className="material-symbols-outlined text-[13px] mr-1 text-orange-500"
               style={{ fontVariationSettings: "'FILL' 1" }}
             >
               verified
             </span>
-            Đối tác ưu tiên
+            Đối tác chính thức
           </span>
         </div>
-        <div className="flex items-center gap-space-md text-on-surface-variant text-body-sm font-body-sm pl-10">
-          <span className="inline-flex items-center gap-1">
-            <span className="material-symbols-outlined text-[15px] text-primary">schedule</span>
+        <div className="flex items-center gap-3 text-gray-500 text-xs pl-11">
+          <span className="inline-flex items-center gap-1 font-medium">
+            <span className="material-symbols-outlined text-[15px] text-orange-500">schedule</span>
             {deliveryTime} ({distance})
           </span>
           <span>•</span>
           <button
             type="button"
             onClick={() => navigate(shopId ? `/restaurants/${shopId}` : APP_ROUTES.HOME)}
-            className="text-primary font-label-md hover:underline inline-flex items-center gap-0.5 cursor-pointer font-semibold"
+            className="text-orange-600 hover:text-orange-700 font-bold hover:underline inline-flex items-center gap-0.5 cursor-pointer"
           >
-            Thêm món khác
+            <span>Thêm món khác</span>
             <span className="material-symbols-outlined text-[14px]">chevron_right</span>
           </button>
         </div>
@@ -62,4 +62,3 @@ export const CartRestaurantCard: React.FC<CartRestaurantCardProps> = ({
 };
 
 export default CartRestaurantCard;
-

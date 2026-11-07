@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Row, Col } from 'antd';
+import { Card, Button, Row, Col, Pagination, Spin } from 'antd';
 import { StarFilled, ClockCircleOutlined, ShopOutlined } from '@ant-design/icons';
+import { getOptimizedCloudinaryUrl } from '@/services/modules/cloudinaryService';
 
 export interface RestaurantItem {
   id: number;
@@ -18,6 +19,11 @@ interface HomeRestaurantDirectoryProps {
   selectedCuisine: string;
   onSelectCuisine: (cuisine: string) => void;
   restaurants: RestaurantItem[];
+  page?: number;
+  pageSize?: number;
+  totalElements?: number;
+  onPageChange?: (page: number, pageSize: number) => void;
+  loading?: boolean;
 }
 
 export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = ({
@@ -25,6 +31,11 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
   selectedCuisine,
   onSelectCuisine,
   restaurants,
+  page,
+  pageSize,
+  totalElements,
+  onPageChange,
+  loading,
 }) => {
   const navigate = useNavigate();
 
@@ -49,44 +60,63 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
         ))}
       </div>
 
-      <Row gutter={[20, 20]}>
-        {restaurants.map((restaurant) => (
-          <Col key={restaurant.id} xs={24} sm={12} lg={6}>
-            <Card
-              hoverable
-              onClick={() => navigate(`/restaurants/${restaurant.id}`)}
-              cover={
-                <div className="relative h-44 w-full overflow-hidden group">
-                  <img
-                    alt={restaurant.name}
-                    src={restaurant.imageUrl}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
-                    <StarFilled className="text-amber-500" /> {restaurant.rating}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <Spin size="large" />
+        </div>
+      ) : (
+        <Row gutter={[20, 20]}>
+          {restaurants.map((restaurant) => (
+            <Col key={restaurant.id} xs={24} sm={12} lg={6}>
+              <Card
+                hoverable
+                onClick={() => navigate(`/restaurants/${restaurant.id}`)}
+                cover={
+                  <div className="relative h-44 w-full overflow-hidden group">
+                    <img
+                      alt={restaurant.name}
+                      src={getOptimizedCloudinaryUrl(restaurant.imageUrl, 500, 350)}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
+                      <StarFilled className="text-amber-500" /> {restaurant.rating}
+                    </div>
+                    <div className="absolute bottom-3 left-3 bg-black/65 px-2.5 py-0.5 rounded-full text-xs text-white">
+                      {restaurant.cuisine}
+                    </div>
                   </div>
-                  <div className="absolute bottom-3 left-3 bg-black/65 px-2.5 py-0.5 rounded-full text-xs text-white">
-                    {restaurant.cuisine}
-                  </div>
+                }
+                className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow"
+                bodyStyle={{ padding: 14 }}
+              >
+                <h3 className="font-bold text-gray-900 text-base line-clamp-1">{restaurant.name}</h3>
+                <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                  <ShopOutlined /> {restaurant.address}
                 </div>
-              }
-              className="rounded-2xl overflow-hidden border border-gray-100 shadow-xs hover:shadow-md transition-shadow"
-              bodyStyle={{ padding: 14 }}
-            >
-              <h3 className="font-bold text-gray-900 text-base line-clamp-1">{restaurant.name}</h3>
-              <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                <ShopOutlined /> {restaurant.address}
-              </div>
-              <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                <span className="flex items-center gap-1 text-orange-600 font-semibold">
-                  <ClockCircleOutlined /> {restaurant.deliveryTime}
-                </span>
-                <span className="font-medium text-gray-600">Xem quán &rarr;</span>
-              </div>
-            </Card>
-          </Col>
-        ))}
-      </Row>
+                <div className="mt-3 pt-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
+                  <span className="flex items-center gap-1 text-orange-600 font-semibold">
+                    <ClockCircleOutlined /> {restaurant.deliveryTime}
+                  </span>
+                  <span className="font-medium text-gray-600">Xem quán &rarr;</span>
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      )}
+
+      {totalElements && totalElements > 0 && onPageChange ? (
+        <div className="flex justify-center pt-2">
+          <Pagination
+            current={(page ?? 0) + 1}
+            pageSize={pageSize ?? 8}
+            total={totalElements}
+            onChange={(newPage, newPageSize) => onPageChange(newPage - 1, newPageSize)}
+            showSizeChanger={false}
+            showTotal={(total) => `Tổng cộng ${total} quán ăn`}
+          />
+        </div>
+      ) : null}
     </section>
   );
 };

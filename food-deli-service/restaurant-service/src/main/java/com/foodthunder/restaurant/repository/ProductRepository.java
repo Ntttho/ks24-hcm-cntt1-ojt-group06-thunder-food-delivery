@@ -1,7 +1,11 @@
 package com.foodthunder.restaurant.repository;
 
 import com.foodthunder.restaurant.entity.Product;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,5 +18,21 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     List<Product> findByCategoryIdAndDeletedAtIsNull(Integer categoryId);
 
+    long countByCategoryIdAndDeletedAtIsNull(Integer categoryId);
+
     List<Product> findByCategoryRestaurantIdAndDeletedAtIsNull(Integer restaurantId);
+
+    @Query("SELECT p FROM Product p WHERE (:restaurantId IS NULL OR p.category.restaurant.id = :restaurantId) AND p.deletedAt IS NULL " +
+           "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
+           "AND (:categoryName IS NULL OR LOWER(p.category.name) LIKE LOWER(CONCAT('%', :categoryName, '%'))) " +
+           "AND (:isAvailable IS NULL OR p.isAvailable = :isAvailable)")
+    Page<Product> findByRestaurantIdWithFilters(
+            @Param("restaurantId") Integer restaurantId,
+            @Param("search") String search,
+            @Param("categoryId") Integer categoryId,
+            @Param("categoryName") String categoryName,
+            @Param("isAvailable") Boolean isAvailable,
+            Pageable pageable
+    );
 }

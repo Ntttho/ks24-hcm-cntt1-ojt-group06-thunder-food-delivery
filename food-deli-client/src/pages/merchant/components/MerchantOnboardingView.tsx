@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
 import { useAuth } from '@/hooks/useAuth';
 import { LocationPickerMap } from './LocationPickerMap';
+import { ImageUpload } from '@/components/common/ImageUpload';
 
 const { Text, Title, Paragraph } = Typography;
 
@@ -303,16 +304,14 @@ export const MerchantOnboardingView: React.FC<MerchantOnboardingViewProps> = ({ 
 
           {/* Ảnh đại diện & Gợi ý ảnh nhanh */}
           <Form.Item
-            label={<span className="font-bold text-slate-700 text-sm">Ảnh đại diện quán ăn</span>}
+            label={<span className="font-bold text-slate-700 text-sm">Ảnh đại diện quán ăn (Tải lên Cloudinary)</span>}
             name="imageUrl"
-            rules={[{ required: true, message: 'Vui lòng cung cấp URL ảnh quán!' }]}
+            rules={[{ required: true, message: 'Vui lòng tải lên ảnh quán hoặc chọn ảnh gợi ý!' }]}
           >
-            <Input
-              size="large"
-              prefix={<PictureOutlined className="text-orange-500 mr-1.5" />}
-              placeholder="https://..."
-              className="rounded-xl"
-              onChange={(e) => setSelectedImg(e.target.value)}
+            <ImageUpload
+              folder="foodthunder/restaurants"
+              aspectRatio="video"
+              placeholderText="Nhấp hoặc kéo thả ảnh quán ăn để tải lên Cloudinary"
             />
           </Form.Item>
 

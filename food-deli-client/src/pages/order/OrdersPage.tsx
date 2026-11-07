@@ -142,10 +142,10 @@ export const OrdersPage: React.FC = () => {
         }));
         setOrders(mappedOrders);
       } else {
-        setOrders(DEMO_MY_ORDERS);
+        setOrders([]);
       }
     } catch {
-      setOrders(DEMO_MY_ORDERS);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export const OrdersPage: React.FC = () => {
   }, [orders, activeTab, searchCode]);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
+    <div className="space-y-6 w-full">
       {/* 1. Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-2xs">
         <div>

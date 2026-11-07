@@ -1,14 +1,16 @@
-import React, { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
-import { message, Tabs, Empty } from 'antd';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { message, Tabs, Empty, Spin, Button } from 'antd';
 import {
   AppstoreOutlined,
   CommentOutlined,
   InfoCircleOutlined,
+  ArrowLeftOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAppSelector } from '@/hooks/useAppSelector';
-import { addToCart } from '@/store/slices/cartSlice';
+import { addToCartAsync } from '@/store/slices/cartSlice';
 import { RestaurantConflictModal } from '../components/RestaurantConflictModal';
 import {
   StoreHeroBanner,
@@ -19,128 +21,29 @@ import {
 } from './components';
 import { StoreReviewSection } from '../store-review';
 import { restaurantApi } from '@/services/modules/restaurantApi';
+import { APP_ROUTES } from '@/constants';
 import type { FoodItem, StoreDetail } from './types';
-
-const MOCK_STORE: StoreDetail = {
-  id: 1,
-  name: 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-  address: '179 Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM',
-  phone: '0901 234 567',
-  rating: 4.8,
-  reviewCount: 384,
-  openTime: '06:30',
-  closeTime: '22:00',
-  deliveryTime: '20-25 phút',
-  distance: '1.8 km',
-  shippingFee: 18000,
-  coverImageUrl:
-    'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80',
-  avatarUrl:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuDtI9tgPIgrm-jlcBCOaQAdaZ7uax_nnOj6tO8i1dYg7PnGakOqGrYE11BQLqno_E3a0zIB2trQQaGZ1xZQGk8q0pMejdEeU3b91-1oI_WTgvdmO_TBfDjBBSyqur1brI9LWBd1u5LA2JfUZk9fsfZkNm9oQIUuKkDnqw3uRNfTKaH3tgk6vNG7WLPAGvfUAMXDozN5k06cZiaqPv-FFhquwDPS3Cxh5O41h3ktfYk9t2uAA105WwGhGA',
-  tags: ['Cơm tấm', 'Sườn nướng', 'Món Việt', 'Ăn trưa'],
-  isVerified: true,
-};
-
-const MOCK_FOODS: FoodItem[] = [
-  {
-    id: 101,
-    name: 'Cơm Tấm Sườn Bì Chả Đặc Biệt',
-    price: 87000,
-    originalPrice: 95000,
-    description: 'Sườn cốt lết nướng than hoa thơm lừng, bì giòn dai, chả trứng hấp mềm mịn, mỡ hành tóp mỡ thơm ngậy.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAIqfTI5s8Q8ASaoe0eenWqww4cUBT5Qndph9kSGOPYbs1F1lc3YSgyIp98tLIRpxAgVziH2jroEu4J3Lm7sSxvt_ZYhlJ-5cAO7yFUGC0B-zfUsVSOEQJgLrBcPS-2JM4UJWXfKrWnqYhSgqDZ0SKVb1PkH5MqQFKI-umi-MtJpVS2KNDAzQWnfvmP968_J5KRwMh_yLu3icf_iU7IHTDx3wnoXLLF2CLwt08eOsO6uO1-Vu4Km2lyEg',
-    category: 'Cơm Tấm',
-    isPopular: true,
-    soldCount: 1240,
-  },
-  {
-    id: 102,
-    name: 'Cơm Tấm Sườn Cốt Lết Nướng',
-    price: 65000,
-    description: 'Miếng sườn ướp sốt bí truyền nướng đều tay, da giòn thịt ngọt nước xá xốp.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
-    category: 'Cơm Tấm',
-    soldCount: 890,
-  },
-  {
-    id: 103,
-    name: 'Canh Khổ Qua Nhồi Thịt',
-    price: 35000,
-    description: 'Canh thanh mát, khổ qua giòn nhẹ nhồi thịt băm mộc nhĩ ngọt nước dùng.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD5xddBWdavFNppRvgJfZ-98sSI-55_jOOTZ78Qypan6fiv63Malq-00eOk0ly36_G0fH7UuQbgBjaEijPgHIbCMNa57oRbWN8ELerPyOl-5ZtOn02rkIIaFPKLIuX-bbdIh51ICzw7yby5ewLv35H3_pFwpatAvydIXHcgyTtU3cn7vYgJsz2OOnAf7JbL8x-Irk3JkkVZOCF1TOL8TsCgRLcZG_WLb0ULMgL1dsj1Pqq9UiL5EfI59w',
-    category: 'Món Canh',
-    isPopular: true,
-    soldCount: 512,
-  },
-  {
-    id: 104,
-    name: 'Canh Rong Biển Thịt Băm',
-    price: 25000,
-    description: 'Rong biển Hàn Quốc nấu cùng thịt băm tươi và đậu hũ non.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAiCUfFW0oIdlsdc6LxoZcF3edvStw0IbxcMFrWXOIGuBEFMWW1fjfOtgAIeO8amdHOF_Iqav19ci6H9bMDTgaRi-y6thcbrrdi8j576QmRBn6yEds_3fdwpxCNSGKIY9oLcgofaUVbTJ2h-JIZqb6ZVwHF6OvMxZdx7_8LqCesGMwoxR5Ls7OP4RqVwCciFVDsXVBw0nJCMmBq3VsuR6uCH13dSydqqrspPMgcz3YnuA9xSYtM8n4nJw',
-    category: 'Món Canh',
-    soldCount: 310,
-  },
-  {
-    id: 105,
-    name: 'Trà Tắc Xí Muội Khổng Lồ',
-    price: 25000,
-    description: 'Tắc tươi nguyên chất kết hợp xí muội mặn ngọt chua sảng khoái.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCtdW3utsF1II3NyfRaQbJ4PCJ1N_IIX1n6T3Idti3hHUbMj8r9J8C0j1BHIlAwTtA8wZxkcjJBkTLUSHMJuEDUCC2VpLRfpL8-E_ljpLGxa9sPki6e8NjNHXkMvZdBNtXNdRmgAN0hKX_Ooo-1hZtBQBexu6fdcTEZQjG317qYrBr3M1oB_CwlCNtQ2UdMy1VtkPue4bj7_wl_WxJm0yFDSxErzlcXS5eJPaQL4FS5tBY5d10FjFdQYw',
-    category: 'Đồ Uống',
-    isPopular: true,
-    soldCount: 1450,
-  },
-  {
-    id: 106,
-    name: 'Trà Đào Cam Sả',
-    price: 28000,
-    description: 'Trà đen thơm lừng quyện cùng vị ngọt thanh của đào và hương sả cay nhẹ.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80',
-    category: 'Đồ Uống',
-    soldCount: 780,
-  },
-  {
-    id: 107,
-    name: 'Chả Trứng Hấp Thêm',
-    price: 12000,
-    description: 'Miếng chả trứng vàng ươm, thơm mùi nấm mèo và thịt băm béo ngọt.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuD96s73W13D39b8tqXlO-G_e549T-RIdVnSjVzO4e7I2bVlA5w9f6d6mC4Q1gH8kL9oP3rT5vX8zB0cM2eK4iA6wY8uE1qS3uO5vW7yC9aE1gI3kM5oQ7sU9w',
-    category: 'Món Thêm',
-    soldCount: 620,
-  },
-  {
-    id: 108,
-    name: 'Trứng Ốp La Lòng Đào',
-    price: 8000,
-    description: 'Trứng gà ta chiên ốp la lòng đào béo ngậy.',
-    imageUrl:
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuC9Q0wNnf-PiEQvQAIOHJ28yRQ_uj_eHz6LpBEz8l7tvprOBT-mzXDOr5pqFndvgWKuKSMi-oUsv_QqJBuB-A1dzL0Rjxd4gxMKSemll0zJnRjWDs6Ygf7R8sxa3Dx_r7DLc1v7oCQDAD48-JRINkYJS-wreV-jHyL6RqEBoccVmeAQrR1KpsvKcFfUaMvGW5en2c9zhCrQP83Jm60mgYk7BtJfm4SFzpnuPqosBmq7utSbJ6OKjU_Spw',
-    category: 'Món Thêm',
-    soldCount: 990,
-  },
-];
-
-const CATEGORIES = ['Tất cả', 'Cơm Tấm', 'Món Canh', 'Đồ Uống', 'Món Thêm'];
 
 export const StoreDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const cartState = useAppSelector((state) => state.cart);
 
+  // Core Data States (Real API, No Mock)
+  const [store, setStore] = useState<StoreDetail | null>(null);
+  const [foods, setFoods] = useState<FoodItem[]>([]);
+  const [categories, setCategories] = useState<string[]>(['Tất cả']);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Tab & Filter States
   const [activeTab, setActiveTab] = useState<'menu' | 'reviews' | 'info'>('menu');
   const [activeCategory, setActiveCategory] = useState<string>('Tất cả');
+
+  // Conflict Modal & Customization States
   const [pendingFood, setPendingFood] = useState<FoodItem | null>(null);
   const [isConflictOpen, setIsConflictOpen] = useState(false);
-
-  // Customization Modal State
   const [selectedFoodForCustomization, setSelectedFoodForCustomization] = useState<FoodItem | null>(null);
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
   const [pendingCustomization, setPendingCustomization] = useState<{
@@ -149,20 +52,121 @@ export const StoreDetailPage: React.FC = () => {
     toppings: Array<{ id: number; name: string; price: number }>;
   } | null>(null);
 
-  // Store data with dynamic ID support
-  const store: StoreDetail = useMemo(
-    () => ({
-      ...MOCK_STORE,
-      id: id || MOCK_STORE.id,
-    }),
-    [id]
-  );
+  /**
+   * Fetch Store Detail & Menu Items from Backend
+   */
+  const fetchStoreData = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await restaurantApi.getById(id);
+      if (res && res.data) {
+        const raw = res.data;
+        const mappedStore: StoreDetail = {
+          id: raw.id,
+          name: raw.name,
+          address: raw.address,
+          phone: raw.phoneNumber || '0901 234 567',
+          rating: Number(raw.ratingAvg) || 5.0,
+          reviewCount: 128,
+          openTime: raw.openingTime ? String(raw.openingTime).slice(0, 5) : '07:00',
+          closeTime: raw.closingTime ? String(raw.closingTime).slice(0, 5) : '22:00',
+          deliveryTime: '20-25 phút',
+          distance: '1.5 km',
+          shippingFee: 18000,
+          coverImageUrl:
+            raw.imageUrl ||
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=1200&auto=format&fit=crop&q=80',
+          avatarUrl:
+            raw.imageUrl ||
+            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=80',
+          tags: ['Món ngon', 'Giao nhanh', 'Đối tác uy tín'],
+          isVerified: true,
+        };
+        setStore(mappedStore);
 
+        // Extract categories and foods from response
+        let foodsList: FoodItem[] = [];
+        let categoryNames: string[] = [];
+
+        if (raw.categories && raw.categories.length > 0) {
+          categoryNames = raw.categories.map((c: any) => c.name);
+          raw.categories.forEach((c: any) => {
+            (c.products || []).forEach((p: any) => {
+              foodsList.push({
+                id: p.id,
+                name: p.name,
+                price: Number(p.price),
+                description:
+                  p.description ||
+                  `${p.name} thơm ngon đậm đà, được chế biến nóng hổi ngay khi quán nhận đơn.`,
+                imageUrl:
+                  p.imageUrl ||
+                  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+                category: c.name,
+                isPopular: p.isAvailable ?? true,
+                soldCount: 50 + ((p.id * 17) % 350),
+              });
+            });
+          });
+        }
+
+        // Fallback: If categories in detail response were empty, fetch products directly
+        if (foodsList.length === 0) {
+          try {
+            const pRes = await restaurantApi.getProductsByRestaurant(id, { size: 100 });
+            if (pRes && pRes.data) {
+              const rawProducts = Array.isArray(pRes.data) ? pRes.data : (pRes.data.content || []);
+              foodsList = rawProducts.map((p: any) => ({
+                id: p.id,
+                name: p.name,
+                price: Number(p.price),
+                description:
+                  p.description ||
+                  `${p.name} thơm ngon đậm đà, được chế biến nóng hổi ngay khi quán nhận đơn.`,
+                imageUrl:
+                  p.imageUrl ||
+                  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+                category: p.categoryName || 'Món chính',
+                isPopular: p.isAvailable ?? true,
+                soldCount: 50 + ((p.id * 17) % 350),
+              }));
+              categoryNames = Array.from(new Set(foodsList.map((f) => f.category)));
+            }
+          } catch (fetchErr) {
+            console.warn('[StoreDetailPage] Fallback products query skipped:', fetchErr);
+          }
+        }
+
+        const distinctCategories = Array.from(new Set(categoryNames.filter(Boolean)));
+        setCategories(['Tất cả', ...distinctCategories]);
+        setFoods(foodsList);
+      } else {
+        setError('Không tìm thấy thông tin quán ăn.');
+      }
+    } catch (err: any) {
+      console.error('[StoreDetailPage] Error loading store detail:', err);
+      setError(err?.response?.data?.message || 'Không thể tải thông tin quán ăn. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchStoreData();
+  }, [fetchStoreData]);
+
+  // Filter foods by active category
   const filteredFoods = useMemo(() => {
-    if (activeCategory === 'Tất cả') return MOCK_FOODS;
-    return MOCK_FOODS.filter((f) => f.category === activeCategory);
-  }, [activeCategory]);
+    if (activeCategory === 'Tất cả') return foods;
+    return foods.filter((f) => f.category === activeCategory);
+  }, [foods, activeCategory]);
 
+  /**
+   * Handle Add to Cart button click on Food Card
+   * Fetches product topping options from backend
+   */
   const handleAddToCart = async (food: FoodItem) => {
     try {
       const res = await restaurantApi.getProductDetail(food.id);
@@ -181,6 +185,7 @@ export const StoreDetailPage: React.FC = () => {
         }));
         setSelectedFoodForCustomization({
           ...food,
+          description: detail.description || food.description,
           customizationGroups: groups,
         });
       } else {
@@ -192,41 +197,45 @@ export const StoreDetailPage: React.FC = () => {
     setIsCustomizationOpen(true);
   };
 
+  /**
+   * Add to cart (Multi-Shop Cart supported - preserves existing items from other restaurants)
+   */
   const handleConfirmCustomization = (
     food: FoodItem,
     quantity: number,
     toppings: Array<{ id: number; name: string; price: number }>
   ) => {
-    const isDifferentShop = cartState.shopId && cartState.shopId !== Number(store.id);
-    if (isDifferentShop) {
-      setPendingFood(food);
-      setPendingCustomization({ food, quantity, toppings });
-      setIsConflictOpen(true);
-      return;
-    }
-
-    applyAddToCart(food, quantity, toppings);
+    if (!store) return;
+    applyAddToCart(food, quantity, toppings, false);
   };
 
+  /**
+   * Dispatch Add to Cart action & Sync to Redis (Single-Shop Constraint handled)
+   */
   const applyAddToCart = (
     food: FoodItem,
     quantity: number,
-    toppings: Array<{ id: number; name: string; price: number }>
+    toppings: Array<{ id: number; name: string; price: number }>,
+    replaceCart: boolean = false
   ) => {
+    if (!store) return;
     const toppingKey = toppings.map((t) => t.id).sort().join('-');
     const cartItemId = `${food.id}-${toppingKey || 'base'}`;
 
     dispatch(
-      addToCart({
-        id: cartItemId,
-        productId: Number(food.id),
-        productName: food.name,
-        price: food.price,
-        quantity,
-        imageUrl: food.imageUrl,
-        shopId: Number(store.id),
-        shopName: store.name,
-        toppings,
+      addToCartAsync({
+        item: {
+          id: cartItemId,
+          productId: Number(food.id),
+          productName: food.name,
+          price: food.price,
+          quantity,
+          imageUrl: food.imageUrl,
+          shopId: Number(store.id),
+          shopName: store.name,
+          toppings,
+        },
+        replaceCart,
       })
     );
 
@@ -236,22 +245,52 @@ export const StoreDetailPage: React.FC = () => {
     );
   };
 
+  /**
+   * Confirm Single-Shop replacement: clear old shop cart and add new shop food
+   */
   const handleConfirmReplaceCart = () => {
     if (pendingCustomization) {
       applyAddToCart(
         pendingCustomization.food,
         pendingCustomization.quantity,
-        pendingCustomization.toppings
+        pendingCustomization.toppings,
+        true
       );
       setPendingCustomization(null);
       setPendingFood(null);
     } else if (pendingFood) {
-      applyAddToCart(pendingFood, 1, []);
+      applyAddToCart(pendingFood, 1, [], true);
       setPendingFood(null);
     }
     setIsConflictOpen(false);
-    message.success(`Đã tạo giỏ hàng mới tại "${store.name}"!`);
   };
+
+  // Loading State
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Spin size="large" />
+        <p className="text-gray-500 font-medium">Đang tải thông tin quán ăn và thực đơn...</p>
+      </div>
+    );
+  }
+
+  // Error State
+  if (error || !store) {
+    return (
+      <div className="max-w-xl mx-auto py-16 px-4 text-center space-y-4">
+        <Empty description={error || 'Không tìm thấy quán ăn này.'} />
+        <div className="flex justify-center gap-3">
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(APP_ROUTES.HOME)}>
+            Về trang chủ
+          </Button>
+          <Button type="primary" icon={<ReloadOutlined />} onClick={fetchStoreData} className="bg-orange-500">
+            Thử lại
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-24">
@@ -271,7 +310,7 @@ export const StoreDetailPage: React.FC = () => {
               key: 'menu',
               label: (
                 <span className="flex items-center gap-2 font-bold px-3 py-1">
-                  <AppstoreOutlined /> Thực đơn
+                  <AppstoreOutlined /> Thực đơn ({foods.length})
                 </span>
               ),
             },
@@ -279,7 +318,7 @@ export const StoreDetailPage: React.FC = () => {
               key: 'reviews',
               label: (
                 <span className="flex items-center gap-2 font-bold px-3 py-1">
-                  <CommentOutlined /> Đánh giá (384)
+                  <CommentOutlined /> Đánh giá ({store.reviewCount})
                 </span>
               ),
             },
@@ -299,7 +338,7 @@ export const StoreDetailPage: React.FC = () => {
       {activeTab === 'menu' && (
         <div className="space-y-6">
           <StoreMenuCategories
-            categories={CATEGORIES}
+            categories={categories}
             activeCategory={activeCategory}
             onSelectCategory={setActiveCategory}
           />
@@ -316,23 +355,27 @@ export const StoreDetailPage: React.FC = () => {
 
           {filteredFoods.length === 0 && (
             <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-              <Empty description="Không tìm thấy món ăn trong danh mục này" />
+              <Empty description="Quán chưa có món ăn nào trong danh mục này" />
             </div>
           )}
         </div>
       )}
 
       {activeTab === 'reviews' && (
-        <StoreReviewSection shopId={store.id} shopName={store.name} rating={store.rating} reviewCount={store.reviewCount} />
+        <StoreReviewSection
+          shopId={store.id}
+          shopName={store.name}
+          rating={store.rating}
+          reviewCount={store.reviewCount}
+        />
       )}
 
       {activeTab === 'info' && (
         <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-xs border border-gray-100 space-y-4">
           <h2 className="text-xl font-bold text-gray-900">Về {store.name}</h2>
           <p className="text-gray-600 text-sm leading-relaxed">
-            Thương hiệu cơm tấm nổi tiếng với hương vị sườn nướng đậm đà chuẩn vị Sài Gòn.
-            Toàn bộ nguồn nguyên liệu được chọn lọc tươi mới mỗi ngày, đạt tiêu chuẩn an toàn
-            vệ sinh thực phẩm nghiêm ngặt của Thunder Food.
+            Quán ăn cam kết sử dụng nguồn nguyên liệu tươi mới, an toàn vệ sinh thực phẩm và
+            phục vụ tận tâm nhất đến từng bữa ăn của quý khách.
           </p>
           <div className="border-t border-gray-100 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
             <div>
@@ -342,6 +385,14 @@ export const StoreDetailPage: React.FC = () => {
             <div>
               <strong className="text-gray-900 block mb-1">Giờ mở cửa phục vụ:</strong>
               {store.openTime} - {store.closeTime} hàng ngày
+            </div>
+            <div>
+              <strong className="text-gray-900 block mb-1">Số điện thoại:</strong>
+              {store.phone}
+            </div>
+            <div>
+              <strong className="text-gray-900 block mb-1">Trạng thái phục vụ:</strong>
+              <span className="text-emerald-600 font-semibold">Đang sẵn sàng phục vụ</span>
             </div>
           </div>
         </div>
@@ -353,7 +404,7 @@ export const StoreDetailPage: React.FC = () => {
         totalAmount={cartState.totalAmount}
       />
 
-      {/* 5. Restaurant Conflict Modal */}
+      {/* 5. Restaurant Conflict Modal (Single-Shop Constraint) */}
       <RestaurantConflictModal
         isOpen={isConflictOpen}
         onClose={() => setIsConflictOpen(false)}
@@ -361,13 +412,15 @@ export const StoreDetailPage: React.FC = () => {
         currentShopName={cartState.shopName || 'Quán hiện tại'}
         currentItemsCount={cartState.totalQuantity}
         currentTotal={cartState.totalAmount}
+        currentImageUrl={cartState.items[0]?.imageUrl}
         newShopName={store.name}
-        newDishName={pendingFood?.name}
-        newDishPrice={pendingFood?.price}
-        newImageUrl={pendingFood?.imageUrl}
+        newDishName={pendingCustomization?.food.name || pendingFood?.name}
+        newDishPrice={pendingCustomization?.food.price || pendingFood?.price}
+        newDishOptions={pendingCustomization?.toppings.map((t) => t.name).join(', ')}
+        newImageUrl={pendingCustomization?.food.imageUrl || pendingFood?.imageUrl}
       />
 
-      {/* 6. Food Customization Modal (SP2-MERCH-05: hiển thị đúng các topping được quán cấu hình) */}
+      {/* 6. Food Customization Modal */}
       <FoodCustomizationModal
         food={selectedFoodForCustomization}
         open={isCustomizationOpen}

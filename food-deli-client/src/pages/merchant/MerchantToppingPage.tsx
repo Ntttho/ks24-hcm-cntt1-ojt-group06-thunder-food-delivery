@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Card,
@@ -45,54 +45,92 @@ export const MerchantToppingPage: React.FC = () => {
   const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
   const [toppings, setToppings] = useState<ToppingItem[]>([]);
+  const [distinctGroups, setDistinctGroups] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+
+  // Server-side Pagination states
+  const [page, setPage] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalElements, setTotalElements] = useState<number>(0);
 
   // Modal Create/Edit state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingTopping, setEditingTopping] = useState<ToppingItem | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const loadToppings = async () => {
-    setLoading(true);
+  // Load distinct groups from all toppings
+  const loadGroups = useCallback(async () => {
     try {
-      const res = await restaurantApi.getToppingsByRestaurant(currentRestaurantId);
-      if (res && res.data) {
-        setToppings(res.data);
-      }
+      const res = await restaurantApi.getAllToppings(currentRestaurantId);
+      const list = Array.isArray(res.data) ? res.data : ((res.data as any)?.content || []);
+      const set = new Set<string>();
+      list.forEach((t: ToppingItem) => {
+        if (t.groupName) set.add(t.groupName.trim());
+      });
+      setDistinctGroups(Array.from(set));
     } catch {
-      message.error('Không thể tải danh sách topping');
-    } finally {
-      setLoading(false);
+      // fallback
     }
-  };
-
-  useEffect(() => {
-    loadToppings();
   }, [currentRestaurantId]);
 
-  // Extract distinct groups for filter select
-  const distinctGroups = useMemo(() => {
-    const set = new Set<string>();
-    toppings.forEach((t) => {
-      if (t.groupName) set.add(t.groupName.trim());
-    });
-    return Array.from(set);
-  }, [toppings]);
+  // Load toppings with server-side pagination and search (Stable callback)
+  const fetchToppings = useCallback(
+    async (targetPage: number, targetPageSize: number, targetSearch: string, targetGrp: string | null) => {
+      setLoading(true);
+      try {
+        const res = await restaurantApi.getToppingsByRestaurant(currentRestaurantId, {
+          page: targetPage,
+          size: targetPageSize,
+          search: targetSearch.trim() || undefined,
+          groupName: targetGrp || undefined,
+        });
 
-  // Filter toppings by search text and group
-  const filteredToppings = useMemo(() => {
-    return toppings.filter((t) => {
-      const matchSearch =
-        searchText.trim() === '' ||
-        t.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        (t.groupName && t.groupName.toLowerCase().includes(searchText.toLowerCase()));
-      const matchGroup =
-        selectedGroup === null || t.groupName === selectedGroup;
-      return matchSearch && matchGroup;
-    });
-  }, [toppings, searchText, selectedGroup]);
+        if (res && res.data) {
+          const paginated = res.data;
+          if (Array.isArray(paginated)) {
+            setToppings(paginated);
+            setTotalElements(paginated.length);
+          } else if (paginated.content) {
+            setToppings(paginated.content);
+            setTotalElements(paginated.totalElements ?? paginated.content.length);
+          } else {
+            setToppings([]);
+            setTotalElements(0);
+          }
+        } else {
+          setToppings([]);
+          setTotalElements(0);
+        }
+      } catch {
+        message.error('Không thể tải danh sách topping');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [currentRestaurantId]
+  );
+
+  useEffect(() => {
+    loadGroups();
+  }, [loadGroups]);
+
+  // Debounced search and group change effect (Chỉ kích hoạt khi từ khóa hoặc nhóm thay đổi)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0);
+      fetchToppings(0, pageSize, searchText, selectedGroup);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchText, selectedGroup, currentRestaurantId, pageSize, fetchToppings]);
+
+  const handlePageChange = (newPage: number, newPageSize: number) => {
+    const zeroBased = newPage - 1;
+    setPage(zeroBased);
+    setPageSize(newPageSize);
+    fetchToppings(zeroBased, newPageSize, searchText, selectedGroup);
+  };
 
   // Stats
   const activeCount = useMemo(() => toppings.filter((t) => t.isAvailable).length, [toppings]);
@@ -151,7 +189,8 @@ export const MerchantToppingPage: React.FC = () => {
       }
       setIsModalOpen(false);
       setEditingTopping(null);
-      await loadToppings();
+      await fetchToppings(page, pageSize, searchText, selectedGroup);
+      await loadGroups();
     } catch (err: any) {
       message.error(err?.response?.data?.message || 'Có lỗi xảy ra khi lưu topping');
     } finally {
@@ -282,7 +321,7 @@ export const MerchantToppingPage: React.FC = () => {
         <div className="flex items-center gap-2.5">
           <Button
             icon={<SyncOutlined spin={loading} />}
-            onClick={loadToppings}
+            onClick={() => fetchToppings(page, pageSize, searchText, selectedGroup)}
             className="rounded-lg hover:border-orange-500 hover:text-orange-500"
           >
             Làm mới
@@ -304,7 +343,7 @@ export const MerchantToppingPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
             <div className="text-xs text-slate-400 font-semibold uppercase">Tổng Topping</div>
-            <div className="text-2xl font-black text-slate-800 mt-1">{toppings.length}</div>
+            <div className="text-2xl font-black text-slate-800 mt-1">{totalElements}</div>
             <div className="text-[11px] text-slate-500 mt-0.5">Tất cả các lựa chọn</div>
           </Card>
         </Col>
@@ -317,14 +356,14 @@ export const MerchantToppingPage: React.FC = () => {
         </Col>
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Đang phục vụ</div>
+            <div className="text-xs text-slate-400 font-semibold uppercase">Đang phục vụ (Trang này)</div>
             <div className="text-2xl font-black text-emerald-600 mt-1">{activeCount}</div>
             <div className="text-[11px] text-emerald-600/80 mt-0.5">Khách có thể chọn</div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Tạm hết hàng</div>
+            <div className="text-xs text-slate-400 font-semibold uppercase">Tạm hết hàng (Trang này)</div>
             <div className="text-2xl font-black text-rose-500 mt-1">{outOfStockCount}</div>
             <div className="text-[11px] text-rose-500/80 mt-0.5">Đã tắt trên menu</div>
           </Card>
@@ -337,7 +376,7 @@ export const MerchantToppingPage: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
             <Input
-              placeholder="Tìm theo tên topping hoặc nhóm..."
+              placeholder="Tìm kiếm topping (API search)..."
               prefix={<SearchOutlined className="text-slate-400" />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -354,20 +393,24 @@ export const MerchantToppingPage: React.FC = () => {
             />
           </div>
           <span className="text-xs text-slate-500 font-medium">
-            Hiển thị <strong>{filteredToppings.length}</strong> / {toppings.length} topping
+            Trang {page + 1} &bull; Hiển thị <strong>{toppings.length}</strong> / Tổng {totalElements} topping
           </span>
         </div>
 
         {/* Table */}
         <Table
           columns={columns}
-          dataSource={filteredToppings}
+          dataSource={toppings}
           rowKey="id"
           loading={loading}
           pagination={{
-            pageSize: 10,
-            showSizeChanger: false,
+            current: page + 1,
+            pageSize,
+            total: totalElements,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50'],
             showTotal: (total) => `Tổng cộng ${total} topping`,
+            onChange: handlePageChange,
           }}
           className="rounded-xl overflow-hidden"
         />

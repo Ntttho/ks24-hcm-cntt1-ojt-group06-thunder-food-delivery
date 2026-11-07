@@ -13,6 +13,13 @@ interface CheckoutAddressCardProps {
   onOpenAddressModal: () => void;
 }
 
+const QUICK_DRIVER_TAGS = [
+  'Gọi trước khi đến',
+  'Gửi bảo vệ tầng trệt',
+  'Treo cửa phòng',
+  'Không bấm chuông',
+];
+
 export const CheckoutAddressCard: React.FC<CheckoutAddressCardProps> = ({
   selectedAddress,
   dropoffSpot,
@@ -25,11 +32,11 @@ export const CheckoutAddressCard: React.FC<CheckoutAddressCardProps> = ({
   onOpenAddressModal,
 }) => {
   return (
-    <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-3">
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-3">
       {/* Address Header */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-error-container/40 flex items-center justify-center flex-shrink-0 mt-0.5 text-error">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0 mt-0.5">
             <span
               className="material-symbols-outlined text-[20px]"
               style={{ fontVariationSettings: "'FILL' 1" }}
@@ -37,24 +44,28 @@ export const CheckoutAddressCard: React.FC<CheckoutAddressCardProps> = ({
               location_on
             </span>
           </div>
+
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-                Giao tận cửa
+              <span className="text-sm font-extrabold text-gray-900">
+                Địa chỉ nhận hàng
               </span>
-              <span className="bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm px-2 py-0.5 rounded-full font-medium">
-                {selectedAddress.label}
+              <span className="bg-orange-50 text-orange-600 border border-orange-200 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {selectedAddress.label || 'Địa chỉ'}
               </span>
             </div>
-            <p className="font-body-md text-body-md text-on-surface font-semibold mt-0.5 leading-snug">
-              {selectedAddress.title} - {selectedAddress.fullAddress}
+
+            <p className="text-xs text-gray-800 font-semibold mt-1 leading-snug">
+              {selectedAddress.title ? `${selectedAddress.title} - ` : ''}
+              {selectedAddress.fullAddress}
             </p>
-            <div className="flex items-center gap-2 text-on-surface-variant mt-1">
-              <span className="font-body-sm text-body-sm font-medium">
+
+            <div className="flex items-center gap-2 text-gray-500 text-xs mt-1">
+              <span className="font-medium text-gray-800">
                 {selectedAddress.recipientName}
               </span>
-              <span className="w-1 h-1 rounded-full bg-outline" />
-              <span className="font-body-sm text-body-sm">{selectedAddress.phone}</span>
+              <span className="w-1 h-1 rounded-full bg-gray-300" />
+              <span>{selectedAddress.phone}</span>
             </div>
           </div>
         </div>
@@ -62,121 +73,87 @@ export const CheckoutAddressCard: React.FC<CheckoutAddressCardProps> = ({
         <button
           aria-label="Thay đổi địa chỉ"
           type="button"
-          className="w-8 h-8 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant active:scale-95 transition-transform flex-shrink-0 cursor-pointer hover:bg-surface-container"
+          className="text-xs font-bold text-orange-600 hover:text-orange-700 flex items-center gap-0.5 cursor-pointer flex-shrink-0"
           onClick={onOpenAddressModal}
         >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+          <span>Thay đổi</span>
+          <span className="material-symbols-outlined text-[15px]">chevron_right</span>
         </button>
       </div>
 
       {/* Driver Note & Drop-off Box */}
-      <div className="flex flex-col gap-3 pt-1 border-t border-surface-container-high/60">
+      <div className="flex flex-col gap-2.5 pt-2 border-t border-gray-100">
         {/* Location spot picker */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="font-label-md text-label-md text-on-surface font-bold flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-primary text-[18px]">pin_drop</span>
-              Vị trí nhận đồ ăn
-            </span>
-            <span className="font-label-sm text-label-sm text-primary font-medium">Chính xác</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center p-2 rounded-xl gap-1 transition-all cursor-pointer ${
-                dropoffSpot === 'door'
-                  ? 'bg-primary text-on-primary border border-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface border border-transparent hover:bg-surface-container'
-              }`}
-              onClick={() => onSelectDropoffSpot('door')}
-            >
-              <span className="material-symbols-outlined text-[18px]">door_front</span>
-              <span className="font-label-sm text-label-sm font-bold text-center leading-tight">
-                Tận cửa / phòng
-              </span>
-            </button>
+        <div className="grid grid-cols-3 gap-1.5">
+          <button
+            type="button"
+            className={`flex flex-col items-center justify-center p-2 rounded-xl gap-0.5 transition-all cursor-pointer ${
+              dropoffSpot === 'door'
+                ? 'bg-orange-500 text-white shadow-xs font-bold'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100'
+            }`}
+            onClick={() => onSelectDropoffSpot('door')}
+          >
+            <span className="material-symbols-outlined text-[17px]">door_front</span>
+            <span className="text-[11px] leading-tight">Giao tận cửa</span>
+          </button>
 
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center p-2 rounded-xl gap-1 transition-all cursor-pointer ${
-                dropoffSpot === 'lobby'
-                  ? 'bg-primary text-on-primary border border-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface border border-transparent hover:bg-surface-container'
-              }`}
-              onClick={() => onSelectDropoffSpot('lobby')}
-            >
-              <span className="material-symbols-outlined text-[18px]">meeting_room</span>
-              <span className="font-label-sm text-label-sm font-bold text-center leading-tight">
-                Sảnh / Cổng
-              </span>
-            </button>
+          <button
+            type="button"
+            className={`flex flex-col items-center justify-center p-2 rounded-xl gap-0.5 transition-all cursor-pointer ${
+              dropoffSpot === 'lobby'
+                ? 'bg-orange-500 text-white shadow-xs font-bold'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100'
+            }`}
+            onClick={() => onSelectDropoffSpot('lobby')}
+          >
+            <span className="material-symbols-outlined text-[17px]">apartment</span>
+            <span className="text-[11px] leading-tight">Sảnh / Lễ tân</span>
+          </button>
 
-            <button
-              type="button"
-              className={`flex flex-col items-center justify-center p-2 rounded-xl gap-1 transition-all cursor-pointer ${
-                dropoffSpot === 'curb'
-                  ? 'bg-primary text-on-primary border border-primary shadow-sm'
-                  : 'bg-surface-container-low text-on-surface border border-transparent hover:bg-surface-container'
-              }`}
-              onClick={() => onSelectDropoffSpot('curb')}
-            >
-              <span className="material-symbols-outlined text-[18px]">directions_walk</span>
-              <span className="font-label-sm text-label-sm font-bold text-center leading-tight">
-                Gặp ở lề đường
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            className={`flex flex-col items-center justify-center p-2 rounded-xl gap-0.5 transition-all cursor-pointer ${
+              dropoffSpot === 'curb'
+                ? 'bg-orange-500 text-white shadow-xs font-bold'
+                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100'
+            }`}
+            onClick={() => onSelectDropoffSpot('curb')}
+          >
+            <span className="material-symbols-outlined text-[17px]">near_me</span>
+            <span className="text-[11px] leading-tight">Cổng / Vỉa hè</span>
+          </button>
         </div>
 
-        {/* Driver Note Box */}
-        <div className="bg-surface-container-low/70 rounded-xl p-3 flex flex-col gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-tertiary text-[18px]">two_wheeler</span>
-              <span className="font-label-sm text-label-sm font-bold text-on-surface">
-                Ghi chú cho Tài xế
-              </span>
-            </div>
-            <button
-              type="button"
-              className="text-primary font-label-sm text-label-sm flex items-center gap-0.5 cursor-pointer hover:underline font-semibold"
-              onClick={onToggleEditDriverNote}
-            >
-              <span className="material-symbols-outlined text-[14px]">edit</span>
-              {isEditingDriverNote ? 'Xong' : 'Sửa'}
-            </button>
+        {/* Driver Note Input */}
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-600 font-bold flex items-center gap-1">
+              <span className="material-symbols-outlined text-orange-500 text-[15px]">two_wheeler</span>
+              Ghi chú cho tài xế giao hàng
+            </span>
           </div>
 
-          {isEditingDriverNote ? (
-            <input
-              type="text"
-              className="text-body-sm text-on-surface bg-surface-container-lowest p-2 rounded-lg border border-primary focus:outline-none"
-              value={driverNote}
-              onChange={(e) => onChangeDriverNote(e.target.value)}
-              placeholder="Ghi chú thêm cho tài xế..."
-              autoFocus
-            />
-          ) : (
-            <div className="text-body-sm text-on-surface bg-surface-container-lowest p-2 rounded-lg border border-surface-container-high">
-              {driverNote || 'Chưa có ghi chú cho tài xế'}
-            </div>
-          )}
-
-          {/* Quick driver note tags */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            {['+ Bấm chuông cửa', '✓ Gọi trước 5 phút', '+ Để bàn lễ tân', '+ Treo ở cổng'].map(
-              (tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className="flex-shrink-0 px-2.5 py-1 rounded-full bg-surface-container-high/60 text-on-surface-variant font-label-sm text-label-sm hover:bg-primary-fixed/30 hover:text-primary transition-all active:scale-95 cursor-pointer font-medium"
-                  onClick={() => onAppendDriverTag(tag)}
-                >
-                  {tag}
-                </button>
-              )
-            )}
+          <div className="flex flex-wrap gap-1">
+            {QUICK_DRIVER_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onAppendDriverTag(tag)}
+                className="text-[11px] bg-gray-100 hover:bg-orange-50 hover:text-orange-600 text-gray-600 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+              >
+                + {tag}
+              </button>
+            ))}
           </div>
+
+          <input
+            type="text"
+            value={driverNote}
+            onChange={(e) => onChangeDriverNote(e.target.value)}
+            placeholder="VD: Gọi trước khi đến 5 phút, gửi bảo vệ..."
+            className="w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+          />
         </div>
       </div>
     </div>
@@ -184,4 +161,3 @@ export const CheckoutAddressCard: React.FC<CheckoutAddressCardProps> = ({
 };
 
 export default CheckoutAddressCard;
-

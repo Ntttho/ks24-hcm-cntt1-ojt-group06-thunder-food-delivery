@@ -21,6 +21,32 @@ public class ProductController {
     }
 
     /**
+     * Lấy danh sách món ăn toàn hệ thống hoặc theo quán (hỗ trợ phân trang, tìm kiếm theo tên, lọc theo danh mục)
+     * GET /api/v1/products?page=0&size=10&search=tra+sua&categoryId=1&restaurantId=1
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<ProductDto>>> getProducts(
+            @RequestParam(required = false) Integer restaurantId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer categoryId,
+            @RequestParam(required = false) String categoryName,
+            @RequestParam(required = false) Boolean isAvailable,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<ProductDto> products = productService.getProductsByRestaurantPaged(restaurantId, search, categoryId, categoryName, isAvailable, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách món ăn thành công", products));
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<ApiResponse<List<ProductDto>>> getAllProducts(
+            @RequestParam Integer restaurantId
+    ) {
+        List<ProductDto> products = productService.getProductsByRestaurant(restaurantId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy tất cả món ăn thành công", products));
+    }
+
+    /**
      * API 1.4: Lấy chi tiết món ăn kèm các nhóm Topping (bắt buộc / tùy chọn)
      * GET /api/v1/products/{id}
      */

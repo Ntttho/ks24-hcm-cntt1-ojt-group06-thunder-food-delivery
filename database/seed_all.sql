@@ -175,6 +175,7 @@ CREATE TABLE `categories` (
 CREATE TABLE `toppings` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT NOT NULL,
+  `group_name` VARCHAR(100) DEFAULT 'Topping thêm',
   `name` VARCHAR(100) NOT NULL,
   `price` DECIMAL(10,2) NOT NULL,
   `is_available` TINYINT(1) DEFAULT '1',
@@ -188,6 +189,7 @@ CREATE TABLE `food_items` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `category_id` INT DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
   `price` DECIMAL(10,2) NOT NULL,
   `is_available` TINYINT(1) DEFAULT '1',
   `default_quantity` INT NOT NULL DEFAULT '0',
@@ -252,6 +254,8 @@ CREATE TABLE `orders` (
   `order_code` VARCHAR(50) NOT NULL,
   `idempotency_key` VARCHAR(100) NOT NULL,
   `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
+  `customer_name` VARCHAR(100) DEFAULT NULL, -- Snapshot tên khách lúc đặt đơn
+  `customer_phone` VARCHAR(20) DEFAULT NULL,  -- Snapshot SĐT khách lúc đặt đơn
   `restaurant_id` INT NOT NULL,           -- [Logical FK] trỏ sang restaurant-service: restaurants.id
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
   `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
@@ -577,17 +581,22 @@ INSERT INTO `categories` (`id`, `restaurant_id`, `name`) VALUES
 (26, 10, 'Combo');
 
 -- 12. Toppings
-INSERT INTO `toppings` (`id`, `restaurant_id`, `name`, `price`, `is_available`) VALUES
-(1, 1, 'Thêm chả lụa chay', 10000.00, 1),
-(2, 1, 'Thêm sườn non chay', 12000.00, 1),
-(3, 1, 'Thêm cơm', 5000.00, 1),
-(4, 3, 'Trứng ốp la', 8000.00, 1),
-(5, 3, 'Chả trứng hấp', 10000.00, 1),
-(6, 3, 'Bì heo xé sợi', 10000.00, 1),
-(7, 6, 'Trứng kho thêm', 7000.00, 1),
-(8, 8, 'Trân châu đen', 7000.00, 1),
-(9, 8, 'Thạch phô mai', 9000.00, 1),
-(10, 8, 'Pudding trứng', 8000.00, 1);
+INSERT INTO `toppings` (`id`, `restaurant_id`, `group_name`, `name`, `price`, `is_available`) VALUES
+(1, 1, 'Topping thêm', 'Thêm chả lụa chay', 10000.00, 1),
+(2, 1, 'Topping thêm', 'Thêm sườn non chay', 12000.00, 1),
+(3, 1, 'Topping thêm', 'Thêm cơm', 5000.00, 1),
+(4, 3, 'Topping thêm', 'Trứng ốp la', 8000.00, 1),
+(5, 3, 'Topping thêm', 'Chả trứng hấp', 10000.00, 1),
+(6, 3, 'Topping thêm', 'Bì heo xé sợi', 10000.00, 1),
+(7, 6, 'Topping thêm', 'Trứng kho thêm', 7000.00, 1),
+(8, 8, 'Topping thêm', 'Trân châu đen', 7000.00, 1),
+(9, 8, 'Topping thêm', 'Thạch phô mai', 9000.00, 1),
+(10, 8, 'Topping thêm', 'Pudding trứng', 8000.00, 1),
+(20, 9, 'Viền bánh', 'Viền Phô Mai', 39000.00, 1),
+(21, 9, 'Viền bánh', 'Viền Tôm Nướng', 49000.00, 1),
+(22, 9, 'Topping thêm', 'Thêm Phô Mai Mozzarella', 25000.00, 1),
+(23, 9, 'Topping thêm', 'Thêm Xúc Xích Pepperoni', 29000.00, 1),
+(24, 9, 'Nước ngọt', 'Coca Cola Lon', 18000.00, 1);
 
 -- 13. Food Items
 INSERT INTO `food_items` (`id`, `category_id`, `name`, `price`, `is_available`, `default_quantity`, `current_quantity`, `quantity_reset_date`, `deleted_at`, `image_url`) VALUES
@@ -669,7 +678,7 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 (7, 'COMPLETED', 'Hoàn thành', 'Giao hàng và thanh toán thành công', 7),
 (8, 'CANCELLED', 'Đã huỷ', 'Đơn hàng đã bị huỷ', 8),
 (9, 'TIMEOUT', 'Quá thời gian', 'Quá thời hạn tiếp nhận đơn', 9),
-(10, 'AWAITING_PAYMENT', 'Chờ thanh toán VNPay', 'Đơn hàng đang chờ thanh toán qua cổng VNPay', 10);
+(10, 'AWAITING_PAYMENT', 'Chờ thanh toán VietQR', 'Đơn hàng đang chờ thanh toán qua cổng VietQR Napas 247', 10);
 
 -- 16. Orders
 INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `restaurant_id`, `driver_id`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES

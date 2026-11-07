@@ -18,7 +18,7 @@
 | **US-CUST-03** | Modal Tùy biến Món ăn & Topping tính tiền realtime | Customer | 🟠 High | Sprint 2 | 3 SP |
 | **US-CUST-04** | Giỏ hàng thông minh (Ràng buộc 1 quán, đồng bộ Redux) | Customer | 🟠 High | Sprint 2 | 2 SP |
 | **US-CUST-05** | Route Guard bảo vệ thanh toán (Yêu cầu login) | Customer | 🟠 High | Sprint 2 | 2 SP |
-| **US-CUST-06** | Đặt hàng linh hoạt đa phương thức (COD & VNPay) | Customer | 🟠 High | Sprint 2 | 6 SP |
+| **US-CUST-06** | Đặt hàng linh hoạt đa phương thức (COD & VietQR) | Customer | 🟠 High | Sprint 2 | 6 SP |
 | **US-CUST-07** | Xem Lịch sử Đơn hàng & Chi tiết món đã đặt | Customer | 🟡 Medium | Sprint 2 | 3 SP |
 | **US-CUST-08** | Theo dõi Tiến trình Đơn hàng Realtime (Live Stepper) | Customer | 🟠 High | Sprint 3 | 3 SP |
 | **US-CUST-09** | Đánh giá 5★ & Nhận xét cho Quán và Tài xế | Customer | 🟡 Medium | Sprint 3 | 4 SP |
@@ -38,7 +38,7 @@
 | **US-ADM-01**  | Màn hình Quản trị Người dùng & Khóa/Mở tài khoản | Admin | 🟡 Medium | Sprint 3 | 3 SP |
 | **US-ADM-02**  | Phân hệ Phê duyệt Quán ăn mới & Tài xế mới gia nhập sàn| Admin | 🟠 High | Sprint 3 | 4 SP |
 | **US-ADM-03**  | Cấu hình Tham số Toàn sàn (Phí ship, % Hoa hồng sàn) | Admin | 🟡 Medium | Sprint 3 | 2 SP |
-| **US-OPS-01**  | Hạ tầng Cổng thanh toán VNPay Sandbox (SHA512 + IPN)| Core / Backend | 🟠 High | Sprint 2 | 5 SP |
+| **US-OPS-01**  | Hạ tầng Cổng thanh toán VietQR Napas 247 (Dynamic QR + Webhook)| Core / Backend | 🟠 High | Sprint 2 | 5 SP |
 | **US-OPS-02**  | Kiến trúc Microservices Hub, Gateway JWT & Eureka | Architecture | 🟠 High | Sprint 1 | 13 SP |
 | **US-OPS-03**  | Đóng gói Docker Compose, Load Test HikariCP & Nghiệm thu| DevOps / Lead | 🟠 High | Sprint 3 | 7 SP |
 
@@ -80,9 +80,9 @@
   * **Ý chính:** Giỏ hàng đồng bộ Redux Toolkit; áp dụng **ràng buộc 1 quán duy nhất**: nếu khách chọn món từ quán khác, hệ thống cảnh báo xác nhận xóa giỏ cũ để tạo giỏ mới.
 * **US-CUST-05: Route Guard bảo vệ luồng Thanh toán**
   * **Ý chính:** Chặn khách chưa đăng nhập bấm thanh toán; tự động đẩy sang `/login` và chuyển hướng quay lại `/checkout` ngay sau khi đăng nhập thành công.
-* **US-CUST-06: Đặt hàng Đa phương thức (COD & VNPay Sandbox)**
-  * **Ý chính:** Khách chọn thanh toán bằng Tiền mặt (COD) hoặc Cổng trực tuyến (VNPay).
-  * **Tiêu chí nghiệm thu (AC):** Chọn COD $\rightarrow$ Đặt thành công chuyển sang `/orders/:id`; Chọn VNPay $\rightarrow$ Chuyển tiếp sang cổng VNPay Sandbox quét mã/nhập thẻ test $\rightarrow$ Bắt callback cập nhật trạng thái `PAID`.
+* **US-CUST-06: Đặt hàng Đa phương thức (COD & VietQR Napas 247)**
+  * **Ý chính:** Khách chọn thanh toán bằng Tiền mặt (COD) hoặc Quét mã VietQR.
+  * **Tiêu chí nghiệm thu (AC):** Chọn COD $\rightarrow$ Đặt thành công chuyển sang `/orders/:id`; Chọn VietQR $\rightarrow$ Mở modal quét mã VietQR động kèm thông tin chuyển khoản $\rightarrow$ Hệ thống tự động xác nhận qua Webhook/Polling và cập nhật trạng thái `PAID`.
 * **US-CUST-07: Lịch sử Đơn hàng (`/orders`) & Chi tiết đơn đã đặt**
   * **Ý chính:** Xem toàn bộ đơn hàng trong quá khứ kèm trạng thái, chi tiết từng món và phương thức thanh toán.
 
@@ -153,8 +153,8 @@
 ### 🏗️ EPIC 7: HẠ TẦNG KỸ THUẬT, BẢO MẬT & DEVOPS (TECHNICAL & ARCHITECTURE)
 *(Căn cứ: SRS Mục 3, 5 - NFR-01 đến NFR-13)*
 
-* **US-OPS-01: Cổng Thanh toán Điện tử VNPay Sandbox**
-  * **Ý chính:** Module xử lý thanh toán trực tuyến bảo mật chuẩn HMAC-SHA512, xử lý IPN và Return URL đồng bộ trạng thái đơn hàng.
+* **US-OPS-01: Cổng Thanh toán Điện tử VietQR (Napas 247)**
+  * **Ý chính:** Module xử lý thanh toán trực tuyến quét mã VietQR động, Webhook tự động đối soát nội dung đơn hàng và Polling tra cứu trạng thái đồng bộ đơn hàng.
 * **US-OPS-02: Kiến trúc Microservices Hub, Gateway & Service Discovery**
   * **Ý chính:** Spring Cloud Gateway (Port 8080) làm đầu mối duy nhất, Eureka Service Registry (Port 8761), xác thực JWT tập trung và liên kết dữ liệu bằng Plain ID.
 * **US-OPS-03: Đóng gói Docker Compose Production & Kiểm thử Chịu tải**

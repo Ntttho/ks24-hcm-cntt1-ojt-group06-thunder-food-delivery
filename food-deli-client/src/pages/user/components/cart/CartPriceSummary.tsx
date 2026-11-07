@@ -16,43 +16,45 @@ export const CartPriceSummary: React.FC<CartPriceSummaryProps> = ({
   onOpenPromoSelector,
 }) => {
   return (
-    <section className="px-gutter mt-space-md">
-      <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-3">
+    <section className="px-4 mt-4">
+      <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-3">
         {/* Promo code trigger row */}
         <div
-          className="flex items-center justify-between bg-surface-container-low px-3 py-2.5 rounded-lg cursor-pointer hover:bg-surface-container transition-colors"
+          className="flex items-center justify-between bg-orange-50/70 border border-orange-100 px-3.5 py-2.5 rounded-xl cursor-pointer hover:bg-orange-50 transition-colors"
           onClick={onOpenPromoSelector}
         >
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary-container text-[20px]">
+            <span className="material-symbols-outlined text-orange-500 text-[20px]">
               confirmation_number
             </span>
-            <span className="font-label-md text-label-md text-on-surface font-bold">
-              Mã giảm giá ThunderFood
+            <span className="text-xs text-gray-800 font-bold">
+              Mã giảm giá Thunder Food
             </span>
           </div>
-          <div className="flex items-center gap-1 text-primary font-label-md text-label-md font-semibold">
-            <span>Áp dụng</span>
+          <div className="flex items-center gap-1 text-orange-600 text-xs font-bold">
+            <span>Chọn voucher</span>
             <span className="material-symbols-outlined text-[16px]">chevron_right</span>
           </div>
         </div>
 
         {/* Price breakdown rows */}
-        <div className="flex flex-col gap-2 pt-2 text-body-sm font-body-sm text-on-surface-variant">
+        <div className="flex flex-col gap-2 pt-1 text-xs text-gray-500">
           <div className="flex justify-between items-center">
-            <span>Tổng phụ món ăn ({totalItemCount} phần)</span>
-            <span className="text-on-surface font-headline-sm text-headline-sm font-bold">
+            <span>Tổng tiền món ({totalItemCount} phần)</span>
+            <span className="text-gray-900 font-bold text-sm">
               {subtotal.toLocaleString('vi-VN')}đ
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span>Phí áp dụng theo khoảng cách</span>
+            <span>Phí giao hàng dự kiến</span>
             <span className="font-semibold text-gray-800">{shippingFee.toLocaleString('vi-VN')}đ</span>
           </div>
-          <div className="flex justify-between items-center text-primary font-label-md font-semibold">
-            <span>Giảm giá món (Flash Deal)</span>
-            <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
-          </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between items-center text-orange-600 font-semibold">
+              <span>Giảm giá</span>
+              <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -60,4 +62,3 @@ export const CartPriceSummary: React.FC<CartPriceSummaryProps> = ({
 };
 
 export default CartPriceSummary;
-

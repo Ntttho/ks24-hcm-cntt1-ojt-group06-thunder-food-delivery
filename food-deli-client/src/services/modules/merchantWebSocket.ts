@@ -13,9 +13,18 @@ class MerchantWebSocketService {
   private heartbeatTimer: any = null;
   private restaurantId: number | string = 1;
   private isExplicitlyClosed: boolean = false;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 2;
+  private wsFallbackMode: boolean = false;
 
   public getStatus(): 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED' {
     return this.status;
+  }
+
+  public resetConnection() {
+    this.wsFallbackMode = false;
+    this.reconnectAttempts = 0;
+    this.connect(this.restaurantId);
   }
 
   public subscribeOrderNotification(listener: OrderNotificationListener): () => void {
@@ -34,6 +43,7 @@ class MerchantWebSocketService {
   }
 
   private notifyStatus(newStatus: 'CONNECTING' | 'CONNECTED' | 'DISCONNECTED') {
+    if (this.status === newStatus) return; // Tránh emit trạng thái trùng lặp gây re-render component
     this.status = newStatus;
     this.statusListeners.forEach((fn) => {
       try {
@@ -45,6 +55,15 @@ class MerchantWebSocketService {
   }
 
   public connect(restaurantId: number | string = 1) {
+    // If WebSocket endpoint is unavailable, stay in polling fallback mode without spamming
+    if (this.wsFallbackMode) {
+      this.notifyStatus('DISCONNECTED');
+      return;
+    }
+
+    if (this.restaurantId !== restaurantId) {
+      this.reconnectAttempts = 0;
+    }
     this.restaurantId = restaurantId;
     this.isExplicitlyClosed = false;
 
@@ -69,6 +88,8 @@ class MerchantWebSocketService {
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
+        this.reconnectAttempts = 0;
+        this.wsFallbackMode = false;
         // Send STOMP CONNECT frame
         const connectFrame = 'CONNECT\naccept-version:1.2,1.1,1.0\nheart-beat:10000,10000\n\n\0';
         this.socket?.send(connectFrame);
@@ -92,9 +113,11 @@ class MerchantWebSocketService {
             // Subscribe to restaurant topics
             const subOrders = `SUBSCRIBE\nid:sub-orders-all\ndestination:/topic/orders\n\n\0`;
             const subShop = `SUBSCRIBE\nid:sub-orders-shop\ndestination:/topic/orders/${this.restaurantId}\n\n\0`;
+            const subMerchantOrders = `SUBSCRIBE\nid:sub-merchant-orders\ndestination:/topic/merchant/${this.restaurantId}/orders\n\n\0`;
             const subMerchant = `SUBSCRIBE\nid:sub-merchant-notify\ndestination:/user/queue/notifications\n\n\0`;
             this.socket?.send(subOrders);
             this.socket?.send(subShop);
+            this.socket?.send(subMerchantOrders);
             this.socket?.send(subMerchant);
           } else if (raw.startsWith('MESSAGE')) {
             // Extract body of STOMP frame
@@ -121,7 +144,7 @@ class MerchantWebSocketService {
       };
 
       this.socket.onerror = () => {
-        // WS error
+        // Handled silently to avoid uncaught exceptions in console
       };
 
       this.socket.onclose = () => {
@@ -134,7 +157,7 @@ class MerchantWebSocketService {
           this.scheduleReconnect();
         }
       };
-    } catch (err) {
+    } catch {
       this.notifyStatus('DISCONNECTED');
       if (!this.isExplicitlyClosed) {
         this.scheduleReconnect();
@@ -144,12 +167,19 @@ class MerchantWebSocketService {
 
   private scheduleReconnect() {
     if (this.reconnectTimer) return;
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      // Switch cleanly to Smart Polling fallback mode and stop reconnect loop
+      this.wsFallbackMode = true;
+      this.notifyStatus('DISCONNECTED');
+      return;
+    }
+    this.reconnectAttempts++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      if (!this.isExplicitlyClosed) {
+      if (!this.isExplicitlyClosed && !this.wsFallbackMode) {
         this.connect(this.restaurantId);
       }
-    }, 6000);
+    }, 5000);
   }
 
   private handleIncomingOrderMessage(payload: any) {
@@ -233,6 +263,7 @@ class MerchantWebSocketService {
 
   public disconnect() {
     this.isExplicitlyClosed = true;
+    this.reconnectAttempts = 0;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

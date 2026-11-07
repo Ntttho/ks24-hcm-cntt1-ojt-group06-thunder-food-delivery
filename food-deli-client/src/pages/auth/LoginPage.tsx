@@ -36,7 +36,7 @@ export const LoginPage: React.FC = () => {
   // Custom validation rule for Phone or Email
   const validatePhoneOrEmail = (_: any, value: string) => {
     if (!value || value.trim() === '') {
-      return Promise.reject(new Error('Vui lòng nhập số điện thoại hoặc email!'));
+      return Promise.reject(new Error('Vui lòng nhập số điện thoại'));
     }
     const cleanValue = value.trim();
     const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$|^[0-9]{10}$/;
@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
 
     if (!phoneRegex.test(cleanValue) && !emailRegex.test(cleanValue)) {
       return Promise.reject(
-        new Error('Vui lòng nhập đúng định dạng Số điện thoại (10 chữ số) hoặc Email hợp lệ!')
+        new Error('Vui lòng nhập đúng định dạng Số điện thoại (10 chữ số) hợp lệ!')
       );
     }
     return Promise.resolve();
@@ -171,14 +171,14 @@ export const LoginPage: React.FC = () => {
         initialValues={{ remember: true }}
       >
         <Form.Item
-          label={<span className="font-semibold text-gray-700">Số điện thoại hoặc Email</span>}
+          label={<span className="font-semibold text-gray-700">Số điện thoại</span>}
           name="identifier"
           rules={[{ validator: validatePhoneOrEmail }]}
           extra={<span className="text-xs text-gray-400">Ví dụ: 0987654321 hoặc customer@foodthunder.com</span>}
         >
           <Input
             prefix={<UserOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="0987654321 hoặc email@example.com"
+            placeholder="0987654321"
             autoComplete="username"
             className="rounded-xl hover:border-orange-400 focus:border-orange-500"
           />

@@ -1,6 +1,10 @@
 package com.foodthunder.restaurant.service;
 
 import com.foodthunder.restaurant.dto.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Product;
 import com.foodthunder.restaurant.entity.Topping;
@@ -90,6 +94,7 @@ public class ProductServiceImpl implements ProductService {
                 .restaurantId(restaurantId)
                 .restaurantName(restaurantName)
                 .name(product.getName())
+                .description(product.getDescription())
                 .price(product.getPrice())
                 .isAvailable(product.getIsAvailable())
                 .defaultQuantity(product.getDefaultQuantity())
@@ -109,6 +114,27 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ProductDto> getProductsByRestaurantPaged(
+            Integer restaurantId,
+            String search,
+            Integer categoryId,
+            String categoryName,
+            Boolean isAvailable,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "id"));
+        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String cleanCategoryName = (categoryName != null && !categoryName.isBlank()) ? categoryName.trim() : null;
+        Page<Product> productPage = productRepository.findByRestaurantIdWithFilters(
+                restaurantId, cleanSearch, categoryId, cleanCategoryName, isAvailable, pageable
+        );
+        Page<ProductDto> dtoPage = productPage.map(this::mapProductToDto);
+        return PageResponse.of(dtoPage);
+    }
+
+    @Override
     @Transactional
     public ProductDto createProduct(ProductRequestDto request) {
         MenuCategory category = menuCategoryRepository.findById(request.getCategoryId())
@@ -122,6 +148,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .category(category)
                 .name(request.getName().trim())
+                .description(request.getDescription() != null ? request.getDescription().trim() : null)
                 .price(request.getPrice())
                 .imageUrl(request.getImageUrl())
                 .isAvailable(request.getIsAvailable() != null ? request.getIsAvailable() : true)
@@ -147,6 +174,9 @@ public class ProductServiceImpl implements ProductService {
         }
 
         product.setName(request.getName().trim());
+        if (request.getDescription() != null) {
+            product.setDescription(request.getDescription().trim());
+        }
         product.setPrice(request.getPrice());
         if (request.getImageUrl() != null) {
             product.setImageUrl(request.getImageUrl());
@@ -253,11 +283,20 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductDto mapProductToDto(Product product) {
+        Integer restaurantId = null;
+        String restaurantName = null;
+        if (product.getCategory() != null && product.getCategory().getRestaurant() != null) {
+            restaurantId = product.getCategory().getRestaurant().getId();
+            restaurantName = product.getCategory().getRestaurant().getName();
+        }
         return ProductDto.builder()
                 .id(product.getId())
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
+                .restaurantId(restaurantId)
+                .restaurantName(restaurantName)
                 .name(product.getName())
+                .description(product.getDescription())
                 .price(product.getPrice())
                 .isAvailable(product.getIsAvailable())
                 .defaultQuantity(product.getDefaultQuantity())

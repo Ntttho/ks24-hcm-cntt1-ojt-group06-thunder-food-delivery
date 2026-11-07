@@ -9,6 +9,12 @@ export const API_ENDPOINTS = {
     USERS_ME: '/users/me',
     UPDATE_PROFILE: '/auth/profile',
   },
+  // User Management
+  USERS: {
+    LIST: '/users',
+    DETAIL: (id: number | string) => `/users/${id}`,
+    ALL: '/users/all',
+  },
   // Customer User Addresses (Sổ địa chỉ)
   ADDRESSES: {
     MINE: '/users/addresses',
@@ -23,6 +29,33 @@ export const API_ENDPOINTS = {
     CATEGORIES: '/categories',
     PRODUCTS: (shopId: number | string) => `/restaurants/${shopId}/products`,
     PRODUCT_DETAIL: (id: number | string) => `/products/${id}`,
+    TOPPINGS: (restaurantId: number | string) => `/restaurants/${restaurantId}/toppings`,
+  },
+  // Toppings & Topping Groups (SP2-MERCH-05 & Customer Selection)
+  TOPPINGS: {
+    LIST: '/toppings',
+    GROUPS: '/toppings/groups',
+    DETAIL: (id: number | string) => `/toppings/${id}`,
+    STATUS: (id: number | string) => `/toppings/${id}/status`,
+    BY_RESTAURANT: (restaurantId: number | string) => `/toppings?restaurantId=${restaurantId}`,
+    RESTAURANT_TOPPINGS: (restaurantId: number | string) => `/restaurants/${restaurantId}/toppings`,
+    PRODUCT_TOPPINGS: (productId: number | string) => `/products/${productId}/toppings`,
+  },
+  // Vouchers
+  VOUCHERS: {
+    LIST: '/vouchers',
+    DETAIL: (id: number | string) => `/vouchers/${id}`,
+    BY_RESTAURANT: (restaurantId: number | string) => `/vouchers?restaurantId=${restaurantId}`,
+    RESTAURANT_VOUCHERS: (restaurantId: number | string) => `/restaurants/${restaurantId}/vouchers`,
+  },
+  // Cart Service (Redis Sync)
+  CART: {
+    GET: '/cart',
+    ADD_ITEM: '/cart/items',
+    UPDATE_ITEM: (itemId: string) => `/cart/items/${itemId}`,
+    REMOVE_ITEM: (itemId: string) => `/cart/items/${itemId}`,
+    CLEAR: '/cart',
+    SYNC: '/cart/sync',
   },
   // Order Service
   ORDERS: {
@@ -43,5 +76,11 @@ export const API_ENDPOINTS = {
   REVIEWS: {
     SHOP_REVIEWS: (shopId: number | string) => `/reviews/shops/${shopId}`,
     CREATE: '/reviews',
+  },
+  // Payment Service (VietQR Napas 247 & SePay Gateway)
+  PAYMENTS: {
+    SEPAY_GENERATE: '/payments/sepay/generate',
+    ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
+    COD: '/payments/cod',
   },
 } as const;

@@ -100,7 +100,7 @@ export const AddressManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* 1. Page Header */}
       <AddressPageHeader
         isLoading={isLoading}

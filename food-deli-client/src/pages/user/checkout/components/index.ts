@@ -8,4 +8,6 @@ export * from './CheckoutPaymentCard';
 export * from './CheckoutPriceSummary';
 export * from './CheckoutBottomBar';
 export * from './CheckoutSuccessModal';
+export * from './SepayQrPaymentModal';
+export * from './VoucherSelectorModal';
 

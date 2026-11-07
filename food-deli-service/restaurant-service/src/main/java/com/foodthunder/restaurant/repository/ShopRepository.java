@@ -18,6 +18,10 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
 
     List<Shop> findByOwnerIdAndDeletedAtIsNull(Integer ownerId);
 
+    @Query("SELECT s FROM Shop s WHERE s.ownerId = :ownerId AND s.deletedAt IS NULL " +
+           "AND (:search IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.address) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<Shop> searchShopsByOwner(@Param("ownerId") Integer ownerId, @Param("search") String search, Pageable pageable);
+
     @Query("""
         SELECT DISTINCT s FROM Shop s
         LEFT JOIN s.categories c

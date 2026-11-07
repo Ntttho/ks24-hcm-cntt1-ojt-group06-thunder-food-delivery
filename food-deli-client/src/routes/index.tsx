@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { MainLayout, AuthLayout, MerchantLayout } from '@/layouts';
+import { MainLayout, AuthLayout, MerchantLayout, UserLayout } from '@/layouts';
 import {
   HomePage,
   LoginPage,
@@ -13,9 +13,12 @@ import {
   StoreReviewPage,
   MerchantDashboardPage,
   MerchantMenuPage,
+  MerchantCategoryPage,
   MerchantToppingPage,
+  MerchantVoucherPage,
   OrdersPage,
   OrderDetailPage,
+  AdminUserPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { APP_ROUTES } from '@/constants';
@@ -43,46 +46,42 @@ export const router = createBrowserRouter([
         element: <StoreReviewPage />,
       },
       {
-        path: 'profile',
-        element: (
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        ),
+        path: 'users',
+        element: <AdminUserPage />,
       },
       {
-        path: 'profile/addresses',
-        element: (
-          <ProtectedRoute>
-            <AddressManagementPage />
-          </ProtectedRoute>
-        ),
+        path: 'admin/users',
+        element: <AdminUserPage />,
       },
+      // User Account Management Layout (Profile, Orders, Addresses)
       {
-        path: 'addresses',
         element: (
           <ProtectedRoute>
-            <AddressManagementPage />
+            <UserLayout />
           </ProtectedRoute>
         ),
-      },
-      // Customer Orders Route: Protected
-      {
-        path: 'orders',
-        element: (
-          <ProtectedRoute>
-            <OrdersPage />
-          </ProtectedRoute>
-        ),
-      },
-      // Customer Order Detail & Live Tracking Route: Protected
-      {
-        path: 'orders/:id',
-        element: (
-          <ProtectedRoute>
-            <OrderDetailPage />
-          </ProtectedRoute>
-        ),
+        children: [
+          {
+            path: 'profile',
+            element: <ProfilePage />,
+          },
+          {
+            path: 'profile/addresses',
+            element: <AddressManagementPage />,
+          },
+          {
+            path: 'addresses',
+            element: <AddressManagementPage />,
+          },
+          {
+            path: 'orders',
+            element: <OrdersPage />,
+          },
+          {
+            path: 'orders/:id',
+            element: <OrderDetailPage />,
+          },
+        ],
       },
       {
         path: '*',
@@ -145,10 +144,26 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'categories',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantCategoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: 'toppings',
         element: (
           <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
             <MerchantToppingPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'vouchers',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+            <MerchantVoucherPage />
           </ProtectedRoute>
         ),
       },

@@ -188,6 +188,7 @@ CREATE TABLE `food_items` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `category_id` INT DEFAULT NULL,
   `name` VARCHAR(255) NOT NULL,
+  `description` TEXT DEFAULT NULL,
   `price` DECIMAL(10,2) NOT NULL,
   `is_available` TINYINT(1) DEFAULT '1',
   `default_quantity` INT NOT NULL DEFAULT '0',
@@ -669,7 +670,7 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 (7, 'COMPLETED', 'Hoàn thành', 'Giao hàng và thanh toán thành công', 7),
 (8, 'CANCELLED', 'Đã huỷ', 'Đơn hàng đã bị huỷ', 8),
 (9, 'TIMEOUT', 'Quá thời gian', 'Quá thời hạn tiếp nhận đơn', 9),
-(10, 'AWAITING_PAYMENT', 'Chờ thanh toán VNPay', 'Đơn hàng đang chờ thanh toán qua cổng VNPay', 10);
+(10, 'AWAITING_PAYMENT', 'Chờ thanh toán VietQR', 'Đơn hàng đang chờ thanh toán qua cổng VietQR Napas 247', 10);
 
 -- 16. Orders
 INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `restaurant_id`, `driver_id`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES

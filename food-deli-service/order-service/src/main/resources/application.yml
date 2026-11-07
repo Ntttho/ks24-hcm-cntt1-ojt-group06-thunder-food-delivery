@@ -18,6 +18,11 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
     open-in-view: false
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 3000ms
 
 eureka:
   instance:
@@ -45,3 +50,6 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    redis:
+      enabled: false

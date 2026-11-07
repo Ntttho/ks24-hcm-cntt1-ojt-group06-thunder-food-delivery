@@ -13,7 +13,11 @@ public interface OrderService {
 
     OrderResponse getOrderById(Long orderId, Integer requestingUserId, String requestingUserRole);
 
-    PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, int page, int size);
+    PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, String keyword, int page, int size);
 
     OrderResponse updateOrderStatus(Long orderId, UpdateOrderStatusRequest request, Integer requestingUserId, String requestingUserRole);
+
+    OrderResponse confirmPaymentSuccess(Long orderId, String transactionNo);
+
+    OrderResponse cancelOrder(Long orderId, String reason, Integer requestingUserId, String requestingUserRole);
 }

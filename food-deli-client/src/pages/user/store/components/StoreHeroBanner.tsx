@@ -7,6 +7,7 @@ import {
   PhoneOutlined,
   CheckCircleFilled,
 } from '@ant-design/icons';
+import { getOptimizedCloudinaryUrl } from '@/services/modules/cloudinaryService';
 import type { StoreDetail } from '../types';
 
 interface StoreHeroBannerProps {
@@ -20,7 +21,7 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
       {/* Cover Image */}
       <div className="relative h-48 sm:h-64 w-full overflow-hidden bg-gray-100">
         <img
-          src={store.coverImageUrl}
+          src={getOptimizedCloudinaryUrl(store.coverImageUrl, 1200, 400)}
           alt={store.name}
           className="w-full h-full object-cover"
         />
@@ -42,7 +43,7 @@ export const StoreHeroBanner: React.FC<StoreHeroBannerProps> = ({ store, onViewR
         <div className="flex items-start sm:items-end gap-4 sm:gap-6">
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-4 border-white shadow-lg bg-white flex-shrink-0">
             <img
-              src={store.avatarUrl}
+              src={getOptimizedCloudinaryUrl(store.avatarUrl, 200, 200)}
               alt={store.name}
               className="w-full h-full object-cover"
             />

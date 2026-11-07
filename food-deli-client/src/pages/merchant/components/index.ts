@@ -5,6 +5,8 @@ export * from './MerchantOrderCard';
 export * from './MerchantCancelModal';
 export * from './MerchantOrderDetailDrawer';
 export * from './ProductFormModal';
+export * from './CategoryFormModal';
+export * from './VoucherFormModal';
 export * from './AssignToppingModal';
 export * from './ToppingFormModal';
 export * from './MerchantOnboardingModal';

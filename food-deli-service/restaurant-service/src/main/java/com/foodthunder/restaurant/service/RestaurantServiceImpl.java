@@ -112,6 +112,27 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public PageResponse<RestaurantDto> getRestaurantsByOwnerPaged(Integer ownerId, String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        Page<Shop> shopPage = shopRepository.searchShopsByOwner(ownerId, searchParam, pageable);
+        List<RestaurantDto> content = shopPage.getContent().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+
+        return PageResponse.<RestaurantDto>builder()
+                .content(content)
+                .pageNumber(shopPage.getNumber())
+                .pageSize(shopPage.getSize())
+                .totalElements(shopPage.getTotalElements())
+                .totalPages(shopPage.getTotalPages())
+                .last(shopPage.isLast())
+                .build();
+    }
+
+    @Override
     @Transactional
     public RestaurantDto createRestaurant(CreateRestaurantRequest request, Integer ownerId) {
         LocalTime opening = request.getOpeningTime() != null ? request.getOpeningTime() : LocalTime.of(7, 0);
@@ -242,6 +263,7 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .categoryId(product.getCategory() != null ? product.getCategory().getId() : null)
                 .categoryName(product.getCategory() != null ? product.getCategory().getName() : null)
                 .name(product.getName())
+                .description(product.getDescription())
                 .price(product.getPrice())
                 .isAvailable(product.getIsAvailable())
                 .defaultQuantity(product.getDefaultQuantity())

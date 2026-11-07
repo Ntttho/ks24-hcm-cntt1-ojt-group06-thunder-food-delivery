@@ -33,7 +33,7 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
       case 'PENDING':
         return <Tag color="gold" className="font-semibold">Chờ xác nhận</Tag>;
       case 'AWAITING_PAYMENT':
-        return <Tag color="blue" className="font-semibold">Chờ thanh toán VNPay</Tag>;
+        return <Tag color="orange" className="font-semibold">Chờ thanh toán VietQR</Tag>;
       case 'CONFIRMED':
         return <Tag color="cyan" className="font-semibold">Quán đã nhận</Tag>;
       case 'PREPARING':

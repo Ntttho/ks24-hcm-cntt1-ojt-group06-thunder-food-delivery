@@ -1,9 +1,14 @@
 package com.foodthunder.restaurant.service;
 
 import com.foodthunder.restaurant.dto.CreateToppingRequest;
+import com.foodthunder.restaurant.dto.PageResponse;
 import com.foodthunder.restaurant.dto.ToppingDto;
 import com.foodthunder.restaurant.dto.ToppingGroupDto;
 import com.foodthunder.restaurant.dto.UpdateToppingRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import com.foodthunder.restaurant.entity.Shop;
 import com.foodthunder.restaurant.entity.Topping;
 import com.foodthunder.restaurant.exception.BadRequestException;
@@ -46,6 +51,26 @@ public class ToppingServiceImpl implements ToppingService {
                         .thenComparing(ToppingDto::getPrice)
                         .thenComparing(ToppingDto::getName))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<ToppingDto> getToppingsByRestaurantPaged(
+            Integer restaurantId,
+            String search,
+            String groupName,
+            Boolean isAvailable,
+            int page,
+            int size
+    ) {
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.max(1, size), Sort.by(Sort.Direction.DESC, "id"));
+        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String cleanGroup = (groupName != null && !groupName.isBlank()) ? groupName.trim() : null;
+        Page<Topping> toppingPage = toppingRepository.findByRestaurantIdWithFilters(
+                restaurantId, cleanSearch, cleanGroup, isAvailable, pageable
+        );
+        Page<ToppingDto> dtoPage = toppingPage.map(this::mapToDto);
+        return PageResponse.of(dtoPage);
     }
 
     @Override

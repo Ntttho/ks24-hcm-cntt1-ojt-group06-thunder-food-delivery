@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Card,
@@ -17,7 +17,6 @@ import {
   Typography,
   message,
   Tooltip,
-  Tabs,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -37,49 +36,49 @@ import {
 } from '@/services/modules/restaurantApi';
 import { formatCurrency } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
+import { getOptimizedCloudinaryUrl } from '@/services/modules/cloudinaryService';
 import { ProductFormModal, AssignToppingModal } from './components';
-import { MerchantToppingPage } from './MerchantToppingPage';
 
 const { Title, Text } = Typography;
 
 // Mock Fallback Products (Matching seed_all.sql for Restaurant #1 Hạnh Dũng)
 const FALLBACK_PRODUCTS: ProductItem[] = [
-  {
-    id: 1,
-    categoryId: 1,
-    categoryName: 'Món chính',
-    name: 'Cơm Tấm Chay',
-    price: 45000,
-    isAvailable: true,
-    defaultQuantity: 40,
-    currentQuantity: 38,
-    toppingIds: [1, 2, 3],
-    imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60',
-  },
-  {
-    id: 2,
-    categoryId: 2,
-    categoryName: 'Nước uống',
-    name: 'Trà Đá',
-    price: 5000,
-    isAvailable: true,
-    defaultQuantity: 120,
-    currentQuantity: 120,
-    toppingIds: [4, 5, 6, 7],
-    imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60',
-  },
-  {
-    id: 3,
-    categoryId: 1,
-    categoryName: 'Món chính',
-    name: 'Hủ Tiếu Nam Vang Chay',
-    price: 55000,
-    isAvailable: true,
-    defaultQuantity: 35,
-    currentQuantity: 35,
-    toppingIds: [1, 3],
-    imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=60',
-  },
+  // {
+  //   id: 1,
+  //   categoryId: 1,
+  //   categoryName: 'Món chính',
+  //   name: 'Cơm Tấm Chay',
+  //   price: 45000,
+  //   isAvailable: true,
+  //   defaultQuantity: 40,
+  //   currentQuantity: 38,
+  //   toppingIds: [1, 2, 3],
+  //   imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60',
+  // },
+  // {
+  //   id: 2,
+  //   categoryId: 2,
+  //   categoryName: 'Nước uống',
+  //   name: 'Trà Đá',
+  //   price: 5000,
+  //   isAvailable: true,
+  //   defaultQuantity: 120,
+  //   currentQuantity: 120,
+  //   toppingIds: [4, 5, 6, 7],
+  //   imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60',
+  // },
+  // {
+  //   id: 3,
+  //   categoryId: 1,
+  //   categoryName: 'Món chính',
+  //   name: 'Hủ Tiếu Nam Vang Chay',
+  //   price: 55000,
+  //   isAvailable: true,
+  //   defaultQuantity: 35,
+  //   currentQuantity: 35,
+  //   toppingIds: [1, 3],
+  //   imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=60',
+  // },
 ];
 
 const FALLBACK_CATEGORIES: MenuCategoryItem[] = [
@@ -92,12 +91,16 @@ export const MerchantMenuPage: React.FC = () => {
   const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
   const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
-  const [activeMainTab, setActiveMainTab] = useState<'dishes' | 'toppings'>('dishes');
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [categories, setCategories] = useState<MenuCategoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+
+  // Server-side Pagination states
+  const [page, setPage] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(8);
+  const [totalElements, setTotalElements] = useState<number>(0);
 
   // Modal create/update state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -109,58 +112,77 @@ export const MerchantMenuPage: React.FC = () => {
   const [isAssignToppingOpen, setIsAssignToppingOpen] = useState<boolean>(false);
   const [selectedProductForTopping, setSelectedProductForTopping] = useState<ProductItem | null>(null);
 
-  // Load categories and products for Restaurant
-  const loadData = async () => {
-    setLoading(true);
+  // Load categories
+  const loadCategories = useCallback(async () => {
     try {
-      // 1. Fetch categories
-      let catList: MenuCategoryItem[] = [];
-      try {
-        const catRes = await restaurantApi.getCategories(currentRestaurantId);
-        if (catRes && catRes.data && catRes.data.length > 0) {
-          catList = catRes.data;
-        } else {
-          catList = FALLBACK_CATEGORIES;
-        }
-      } catch {
-        catList = FALLBACK_CATEGORIES;
+      const catRes = await restaurantApi.getCategories(currentRestaurantId);
+      if (catRes && catRes.data && catRes.data.length > 0) {
+        setCategories(catRes.data);
+      } else {
+        setCategories(FALLBACK_CATEGORIES);
       }
-      setCategories(catList);
+    } catch {
+      setCategories(FALLBACK_CATEGORIES);
+    }
+  }, [currentRestaurantId]);
 
-      // 2. Fetch products
+  // Load products with server-side pagination and search (Stable callback)
+  const fetchProducts = useCallback(
+    async (targetPage: number, targetPageSize: number, targetSearch: string, targetCat: number | null) => {
+      setLoading(true);
       try {
-        const prodRes = await restaurantApi.getProductsByRestaurant(currentRestaurantId);
-        if (prodRes && prodRes.data && prodRes.data.length > 0) {
-          setProducts(prodRes.data);
+        const prodRes = await restaurantApi.getProductsByRestaurant(currentRestaurantId, {
+          page: targetPage,
+          size: targetPageSize,
+          search: targetSearch.trim() || undefined,
+          categoryId: targetCat || undefined,
+        });
+
+        if (prodRes && prodRes.data) {
+          const paginated = prodRes.data;
+          if (Array.isArray(paginated)) {
+            setProducts(paginated);
+            setTotalElements(paginated.length);
+          } else if (paginated.content) {
+            setProducts(paginated.content);
+            setTotalElements(paginated.totalElements ?? paginated.content.length);
+          } else {
+            setProducts(FALLBACK_PRODUCTS);
+            setTotalElements(FALLBACK_PRODUCTS.length);
+          }
         } else {
           setProducts(FALLBACK_PRODUCTS);
+          setTotalElements(FALLBACK_PRODUCTS.length);
         }
       } catch {
         setProducts(FALLBACK_PRODUCTS);
+        setTotalElements(FALLBACK_PRODUCTS.length);
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setProducts(FALLBACK_PRODUCTS);
-      setCategories(FALLBACK_CATEGORIES);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    [currentRestaurantId]
+  );
 
   useEffect(() => {
-    loadData();
-  }, [currentRestaurantId]);
+    loadCategories();
+  }, [loadCategories]);
 
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      const matchSearch =
-        searchText.trim() === '' ||
-        p.name.toLowerCase().includes(searchText.toLowerCase());
-      const matchCategory =
-        selectedCategory === null || p.categoryId === selectedCategory;
-      return matchSearch && matchCategory;
-    });
-  }, [products, searchText, selectedCategory]);
+  // Debounced search / category filter effect (Chỉ kích hoạt khi từ khóa hoặc danh mục thay đổi)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0);
+      fetchProducts(0, pageSize, searchText, selectedCategory);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchText, selectedCategory, currentRestaurantId, pageSize, fetchProducts]);
+
+  const handlePageChange = (newPage: number, newPageSize: number) => {
+    const zeroBased = newPage - 1;
+    setPage(zeroBased);
+    setPageSize(newPageSize);
+    fetchProducts(zeroBased, newPageSize, searchText, selectedCategory);
+  };
 
   // Toggle isAvailable switch
   const handleToggleStatus = async (product: ProductItem, checked: boolean) => {
@@ -190,9 +212,10 @@ export const MerchantMenuPage: React.FC = () => {
     form.setFieldsValue({
       categoryId: categories[0]?.id || 1,
       price: 45000,
+      description: '',
       defaultQuantity: 50,
       isAvailable: true,
-      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
+      imageUrl: '',
     });
     setIsModalOpen(true);
   };
@@ -202,6 +225,7 @@ export const MerchantMenuPage: React.FC = () => {
     setEditingProduct(product);
     form.setFieldsValue({
       name: product.name,
+      description: product.description || '',
       categoryId: product.categoryId,
       price: product.price,
       defaultQuantity: product.defaultQuantity || 50,
@@ -231,6 +255,7 @@ export const MerchantMenuPage: React.FC = () => {
 
       const payload: ProductPayload = {
         name: values.name.trim(),
+        description: values.description?.trim() || undefined,
         categoryId: values.categoryId,
         price: values.price,
         imageUrl: values.imageUrl?.trim() || undefined,
@@ -278,6 +303,7 @@ export const MerchantMenuPage: React.FC = () => {
           categoryName:
             categories.find((c) => c.id === payload.categoryId)?.name || 'Món chính',
           name: payload.name,
+          description: payload.description,
           price: payload.price,
           isAvailable: payload.isAvailable ?? true,
           defaultQuantity: payload.defaultQuantity,
@@ -317,7 +343,7 @@ export const MerchantMenuPage: React.FC = () => {
       width: 80,
       render: (img: string, record) => (
         <Image
-          src={img}
+          src={getOptimizedCloudinaryUrl(img, 120, 120)}
           alt={record.name}
           width={52}
           height={52}
@@ -333,6 +359,9 @@ export const MerchantMenuPage: React.FC = () => {
       render: (name: string, record) => (
         <div>
           <div className="font-semibold text-slate-800 text-sm">{name}</div>
+          {record.description && (
+            <div className="text-xs text-slate-500 line-clamp-1 max-w-xs">{record.description}</div>
+          )}
           <span className="text-xs text-slate-400">ID món: #{record.id}</span>
         </div>
       ),
@@ -458,52 +487,20 @@ export const MerchantMenuPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Navigation Tabs between Dishes and Topping Management */}
-      <div className="bg-white rounded-2xl p-2 shadow-2xs border border-slate-200/80">
-        <Tabs
-          activeKey={activeMainTab}
-          onChange={(k) => setActiveMainTab(k as 'dishes' | 'toppings')}
-          size="large"
-          className="font-bold !mb-0"
-          items={[
-            {
-              key: 'dishes',
-              label: (
-                <span className="flex items-center gap-2 px-3 py-1">
-                  <AppstoreOutlined /> Thực Đơn Món Ăn ({products.length})
-                </span>
-              ),
-            },
-            {
-              key: 'toppings',
-              label: (
-                <span className="flex items-center gap-2 px-3 py-1">
-                  <TagsOutlined /> Nhóm &amp; Bảng Giá Topping (SP2-MERCH-05)
-                </span>
-              ),
-            },
-          ]}
-        />
-      </div>
-
-      {activeMainTab === 'toppings' ? (
-        <MerchantToppingPage />
-      ) : (
-        <>
-          {/* Header & Controls */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <Title level={3} className="!mb-1 text-slate-800">
-                Quản Lý Thực Đơn &amp; Món Ăn
-              </Title>
-              <Text className="text-slate-500 text-sm">
-                Thêm mới, gán topping đi kèm, cập nhật giá, điều chỉnh danh mục và bật/tắt trạng thái món ăn tức thì.
+      {/* Header & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Title level={3} className="!mb-1 text-slate-800">
+            Quản Lý Thực Đơn &amp; Món Ăn
+          </Title>
+          <Text className="text-slate-500 text-sm">
+            Thêm mới, gán topping đi kèm, cập nhật giá, điều chỉnh danh mục và bật/tắt trạng thái món ăn tức thì.
               </Text>
             </div>
             <div className="flex items-center gap-2.5">
               <Button
                 icon={<SyncOutlined spin={loading} />}
-                onClick={loadData}
+                onClick={() => fetchProducts(page, pageSize, searchText, selectedCategory)}
                 className="rounded-lg hover:border-orange-500 hover:text-orange-500"
               >
                 Làm mới
@@ -526,7 +523,7 @@ export const MerchantMenuPage: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
                 <Input
-                  placeholder="Tìm kiếm theo tên món ăn..."
+                  placeholder="Tìm kiếm món ăn (API search)..."
                   prefix={<SearchOutlined className="text-slate-400" />}
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
@@ -546,20 +543,24 @@ export const MerchantMenuPage: React.FC = () => {
                 />
               </div>
               <span className="text-xs text-slate-500 font-medium">
-                Hiển thị <strong>{filteredProducts.length}</strong> / {products.length} món
+                Trang {page + 1} &bull; Hiển thị <strong>{products.length}</strong> / Tổng {totalElements} món ăn
               </span>
             </div>
 
             {/* Ant Design Product Table */}
             <Table
               columns={columns}
-              dataSource={filteredProducts}
+              dataSource={products}
               rowKey="id"
               loading={loading}
               pagination={{
-                pageSize: 8,
-                showSizeChanger: false,
+                current: page + 1,
+                pageSize,
+                total: totalElements,
+                showSizeChanger: true,
+                pageSizeOptions: ['8', '16', '24'],
                 showTotal: (total) => `Tổng cộng ${total} món ăn`,
+                onChange: handlePageChange,
               }}
               className="rounded-xl overflow-hidden"
             />
@@ -590,8 +591,6 @@ export const MerchantMenuPage: React.FC = () => {
             }}
             onSuccess={handleAssignToppingSuccess}
           />
-        </>
-      )}
     </div>
   );
 };

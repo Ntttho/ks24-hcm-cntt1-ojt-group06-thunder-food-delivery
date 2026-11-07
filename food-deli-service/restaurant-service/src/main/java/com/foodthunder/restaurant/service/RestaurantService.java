@@ -15,6 +15,8 @@ public interface RestaurantService {
 
     List<RestaurantDto> getRestaurantsByOwner(Integer ownerId);
 
+    PageResponse<RestaurantDto> getRestaurantsByOwnerPaged(Integer ownerId, String search, int page, int size);
+
     RestaurantDto createRestaurant(CreateRestaurantRequest request, Integer ownerId);
 
     RestaurantDto updateRestaurantDetails(Integer id, CreateRestaurantRequest request, Integer ownerId);
