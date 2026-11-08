@@ -70,7 +70,10 @@ const DEMO_MY_ORDERS: CustomerOrder[] = [
     paymentMethod: 'VNPAY',
     statusCode: 'DELIVERED',
     statusLabel: 'Giao thành công',
-    createdAt: new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString(),
+    driverId: 2,
+    driverName: 'Nguyễn Văn Shipper - Giao Hàng Siêu Tốc',
+    driverPhone: '0912345678',
+    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     items: [
       {
         id: 4,
@@ -114,6 +117,9 @@ export const OrdersPage: React.FC = () => {
           customerPhone: item.customerPhone,
           restaurantId: item.restaurantId,
           restaurantName: item.restaurantName || (item.restaurantId === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : `Quán ăn #${item.restaurantId}`),
+          driverId: item.driverId ? Number(item.driverId) : undefined,
+          driverName: item.driverName || (item.driverId ? `Tài xế đối tác #${item.driverId}` : undefined),
+          driverPhone: item.driverPhone,
           receiverAddress: item.receiverAddress || 'Địa chỉ giao hàng mặc định',
           distanceKm: item.distanceKm,
           subtotalAmount: Number(item.subtotalAmount || 0),
@@ -168,7 +174,7 @@ export const OrdersPage: React.FC = () => {
         ['READY_FOR_PICKUP', 'PICKED_UP', 'DELIVERING'].includes(o.statusCode)
       );
     } else if (activeTab === 'COMPLETED') {
-      result = result.filter((o) => o.statusCode === 'DELIVERED');
+      result = result.filter((o) => ['DELIVERED', 'COMPLETED'].includes(o.statusCode));
     } else if (activeTab === 'CANCELLED') {
       result = result.filter((o) => o.statusCode === 'CANCELLED');
     }

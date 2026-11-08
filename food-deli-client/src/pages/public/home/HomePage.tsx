@@ -1,10 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { useAppSelector } from '@/hooks/useAppSelector';
 import { addToCartAsync } from '@/store/slices/cartSlice';
 import { restaurantApi } from '@/services/modules/restaurantApi';
-import { RestaurantConflictModal } from '@/pages/user/components/RestaurantConflictModal';
 import {
   HomeHeroBanner,
   HomeRestaurantDirectory,
@@ -36,15 +34,10 @@ const INITIAL_FOOD_CATEGORIES: FoodCategoryItem[] = [
 
 export const HomePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const cartState = useAppSelector((state) => state.cart);
 
   // Global search input in hero banner
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('Tất cả');
-
-  // Single-Shop Constraint Conflict Modal State
-  const [isConflictOpen, setIsConflictOpen] = useState(false);
-  const [pendingQuickItem, setPendingQuickItem] = useState<FeaturedFoodItem | null>(null);
 
   // =========================================================================
   // 1. Phân Hệ Món Ăn (Food Items) - Hiển thị lên trước, Phân trang & Lọc API
@@ -285,15 +278,6 @@ export const HomePage: React.FC = () => {
     message.success(`Đã thêm "${item.productName}" vào giỏ hàng!`);
   };
 
-  const handleConfirmReplaceCart = () => {
-    if (pendingQuickItem) {
-      applyAddToCart(pendingQuickItem, true);
-      message.success(`Đã tạo giỏ hàng mới tại "${pendingQuickItem.shopName}"!`);
-      setPendingQuickItem(null);
-    }
-    setIsConflictOpen(false);
-  };
-
   return (
     <div className="space-y-10 pb-12">
       {/* 1. Hero Banner with Global Search */}
@@ -328,23 +312,6 @@ export const HomePage: React.FC = () => {
         loading={restaurantLoading}
       />
 
-      {/* 4. Single-Shop Constraint Modal (Xung Đột Quán Ăn) */}
-      <RestaurantConflictModal
-        isOpen={isConflictOpen}
-        onClose={() => {
-          setIsConflictOpen(false);
-          setPendingQuickItem(null);
-        }}
-        onConfirmReplace={handleConfirmReplaceCart}
-        currentShopName={cartState.shopName || 'Quán hiện tại'}
-        currentItemsCount={cartState.totalQuantity}
-        currentTotal={cartState.totalAmount}
-        currentImageUrl={cartState.items[0]?.imageUrl}
-        newShopName={pendingQuickItem?.shopName}
-        newDishName={pendingQuickItem?.productName}
-        newDishPrice={pendingQuickItem?.price}
-        newImageUrl={pendingQuickItem?.imageUrl}
-      />
     </div>
   );
 };

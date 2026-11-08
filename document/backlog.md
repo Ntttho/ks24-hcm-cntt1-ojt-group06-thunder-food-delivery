@@ -8,39 +8,41 @@
 
 ## 📑 I. BẢNG TỔNG HỢP PRODUCT BACKLOG THEO MỨC ĐỘ ƯU TIÊN
 
-| Mã User Story | Tên Tính Năng (Ý Chính) | Vai Trò (Actor) | Độ Ưu Tiên | Sprint Dự Kiến | Story Points |
-| :---: | :--- | :---: | :---: | :---: | :---: |
-| **US-AUTH-01** | Đăng ký tài khoản tập trung (Unified Register) | Khách / Quán / Xế | 🟠 High | Sprint 1 | 5 SP |
-| **US-AUTH-02** | Đăng nhập JWT & Header Navigation theo Role | Toàn bộ User | 🟠 High | Sprint 1 & 2 | 4 SP |
-| **US-AUTH-03** | Quản lý Hồ sơ cá nhân & Sổ địa chỉ giao hàng | Customer | 🟡 Medium | Sprint 2 | 3 SP |
-| **US-CUST-01** | Khám phá ẩm thực, Tìm kiếm & Lọc theo Danh mục | Anonymous / Cust | 🟠 High | Sprint 2 | 4 SP |
-| **US-CUST-02** | Xem Chi tiết Quán & Thực đơn phân nhóm Category | Anonymous / Cust | 🟠 High | Sprint 2 | 2 SP |
-| **US-CUST-03** | Modal Tùy biến Món ăn & Topping tính tiền realtime | Customer | 🟠 High | Sprint 2 | 3 SP |
-| **US-CUST-04** | Giỏ hàng thông minh (Ràng buộc 1 quán, đồng bộ Redux) | Customer | 🟠 High | Sprint 2 | 2 SP |
-| **US-CUST-05** | Route Guard bảo vệ thanh toán (Yêu cầu login) | Customer | 🟠 High | Sprint 2 | 2 SP |
-| **US-CUST-06** | Đặt hàng linh hoạt đa phương thức (COD & VietQR) | Customer | 🟠 High | Sprint 2 | 6 SP |
-| **US-CUST-07** | Xem Lịch sử Đơn hàng & Chi tiết món đã đặt | Customer | 🟡 Medium | Sprint 2 | 3 SP |
-| **US-CUST-08** | Theo dõi Tiến trình Đơn hàng Realtime (Live Stepper) | Customer | 🟠 High | Sprint 3 | 3 SP |
-| **US-CUST-09** | Đánh giá 5★ & Nhận xét cho Quán và Tài xế | Customer | 🟡 Medium | Sprint 3 | 4 SP |
-| **US-MERCH-01**| Quản lý đa chi nhánh (1 Merchant sở hữu nhiều quán) | Merchant | 🟠 High | Sprint 2 | 2 SP |
-| **US-MERCH-02**| Merchant Dashboard tiếp nhận & xử lý đơn hàng Realtime | Merchant | 🟠 High | Sprint 2 | 3 SP |
-| **US-MERCH-03**| Chuông báo âm thanh đơn mới qua WebSocket STOMP | Merchant | 🟠 High | Sprint 2 | 4 SP |
-| **US-MERCH-04**| Quản lý Thực đơn & Món ăn (CRUD, toggle Còn/Hết hàng) | Merchant | 🟠 High | Sprint 2 | 3 SP |
-| **US-MERCH-05**| Quản lý Nhóm Topping & Gán Topping vào món cụ thể | Merchant | 🟠 High | Sprint 2 | 7 SP |
-| **US-MERCH-06**| Quản lý Danh mục món (Category) & Voucher quán ăn | Merchant | 🟡 Medium | Sprint 2 | 2 SP |
-| **US-MERCH-07**| Dashboard Báo cáo Doanh thu & Thống kê đa quán | Merchant | 🟡 Medium | Sprint 3 | 3 SP |
-| **US-DRV-01**  | Backend Delivery & Khóa bi quan chống Race Condition | Shipper / Core | 🟠 High | Sprint 3 | 8 SP |
-| **US-DRV-02**  | Shipper Web Hub (Radar quét đơn & 1-Click Nhận cuốc) | Shipper | 🟠 High | Sprint 3 | 5 SP |
-| **US-DRV-03**  | Giao diện Điều hướng Quy trình Giao hàng Ảo hóa | Shipper | 🟠 High | Sprint 3 | 4 SP |
-| **US-DRV-04**  | Bộ máy Tính toán Hiệu suất Tài xế Chuẩn PRD (AR / CR) | Shipper / Admin | 🟠 High | Sprint 3 | 5 SP |
-| **US-DRV-05**  | Thống kê Ví thu nhập & Lịch sử cuốc xe đã hoàn tất | Shipper | 🟡 Medium | Sprint 3 | 3 SP |
-| **US-CHAT-01** | Hộp thoại Chat 2 chiều Realtime giữa Khách & Quán/Xế | Cust / Merch / Drv | 🟡 Medium | Sprint 3 | 3 SP |
-| **US-ADM-01**  | Màn hình Quản trị Người dùng & Khóa/Mở tài khoản | Admin | 🟡 Medium | Sprint 3 | 3 SP |
-| **US-ADM-02**  | Phân hệ Phê duyệt Quán ăn mới & Tài xế mới gia nhập sàn| Admin | 🟠 High | Sprint 3 | 4 SP |
-| **US-ADM-03**  | Cấu hình Tham số Toàn sàn (Phí ship, % Hoa hồng sàn) | Admin | 🟡 Medium | Sprint 3 | 2 SP |
-| **US-OPS-01**  | Hạ tầng Cổng thanh toán VietQR Napas 247 (Dynamic QR + Webhook)| Core / Backend | 🟠 High | Sprint 2 | 5 SP |
-| **US-OPS-02**  | Kiến trúc Microservices Hub, Gateway JWT & Eureka | Architecture | 🟠 High | Sprint 1 | 13 SP |
-| **US-OPS-03**  | Đóng gói Docker Compose, Load Test HikariCP & Nghiệm thu| DevOps / Lead | 🟠 High | Sprint 3 | 7 SP |
+| Mã User Story | Tên Tính Năng (Ý Chính) | Vai Trò (Actor) | Độ Ưu Tiên | Sprint | Trạng Thái | Story Points |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: |
+| **US-AUTH-01** | Đăng ký tài khoản tập trung (Unified Register) | Khách / Quán / Xế | 🟠 High | Sprint 1 | ✅ Hoàn thành | 5 SP |
+| **US-AUTH-02** | Đăng nhập JWT & Header Navigation theo Role | Toàn bộ User | 🟠 High | Sprint 1 & 2 | ✅ Hoàn thành | 4 SP |
+| **US-AUTH-03** | Quản lý Hồ sơ cá nhân & Sổ địa chỉ giao hàng | Customer | 🟡 Medium | Sprint 2 | ✅ Hoàn thành | 3 SP |
+| **US-CUST-01** | Khám phá ẩm thực, Tìm kiếm & Lọc theo Danh mục | Anonymous / Cust | 🟠 High | Sprint 2 | ✅ Hoàn thành | 4 SP |
+| **US-CUST-02** | Xem Chi tiết Quán & Thực đơn phân nhóm Category | Anonymous / Cust | 🟠 High | Sprint 2 | ✅ Hoàn thành | 2 SP |
+| **US-CUST-03** | Modal Tùy biến Món ăn & Topping tính tiền realtime | Customer | 🟠 High | Sprint 2 | ✅ Hoàn thành | 3 SP |
+| **US-CUST-04** | Giỏ hàng thông minh (Ràng buộc 1 quán, đồng bộ Redux) | Customer | 🟠 High | Sprint 2 | ✅ Hoàn thành | 2 SP |
+| **US-CUST-05** | Route Guard bảo vệ thanh toán (Yêu cầu login) | Customer | 🟠 High | Sprint 2 | ✅ Hoàn thành | 2 SP |
+| **US-CUST-06** | Đặt hàng linh hoạt đa phương thức (COD & VietQR) | Customer | 🟠 High | Sprint 2 | ✅ Hoàn thành | 6 SP |
+| **US-CUST-07** | Xem Lịch sử Đơn hàng & Chi tiết món đã đặt | Customer | 🟡 Medium | Sprint 2 | ✅ Hoàn thành | 3 SP |
+| **US-CUST-09** | Phân hệ Đánh giá 5★ riêng Quán & Tài xế (`review-service`) | Customer / Merch | 🟠 High | Sprint 2 | ✅ Hoàn thành | 5 SP |
+| **US-MERCH-01**| Quản lý đa chi nhánh (1 Merchant sở hữu nhiều quán) | Merchant | 🟠 High | Sprint 2 | ✅ Hoàn thành | 2 SP |
+| **US-MERCH-02**| Merchant Dashboard tiếp nhận & xử lý đơn hàng Realtime | Merchant | 🟠 High | Sprint 2 | ✅ Hoàn thành | 3 SP |
+| **US-MERCH-03**| Chuông báo âm thanh đơn mới qua WebSocket STOMP | Merchant | 🟠 High | Sprint 2 | ✅ Hoàn thành | 4 SP |
+| **US-MERCH-04**| Quản lý Thực đơn & Món ăn (CRUD, toggle Còn/Hết hàng) | Merchant | 🟠 High | Sprint 2 | ✅ Hoàn thành | 3 SP |
+| **US-MERCH-05**| Quản lý Nhóm Topping & Gán Topping vào món cụ thể | Merchant | 🟠 High | Sprint 2 | ✅ Hoàn thành | 7 SP |
+| **US-MERCH-06**| Quản lý Danh mục món (Category) & Voucher quán ăn | Merchant | 🟡 Medium | Sprint 2 | ✅ Hoàn thành | 2 SP |
+| **US-OPS-01**  | Hạ tầng Cổng thanh toán VietQR Napas 247 (Dynamic QR + Webhook)| Core / Backend | 🟠 High | Sprint 2 | ✅ Hoàn thành | 5 SP |
+| **US-OPS-02**  | Kiến trúc Microservices Hub, Gateway JWT & Eureka | Architecture | 🟠 High | Sprint 1 | ✅ Hoàn thành | 13 SP |
+| **US-DRV-01**  | Backend Delivery & Khóa bi quan chống Race Condition | Shipper / Core | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 8 SP |
+| **US-DRV-02**  | Shipper Web Hub (Radar quét đơn & 1-Click Nhận cuốc) | Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
+| **US-DRV-03**  | Giao diện Điều hướng Quy trình Giao hàng Ảo hóa | Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-DRV-04**  | Bộ máy Tính toán Hiệu suất Tài xế Chuẩn PRD (AR / CR) | Shipper / Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
+| **US-DRV-05**  | Thống kê Ví thu nhập & Lịch sử cuốc xe đã hoàn tất | Shipper | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-ADM-01**  | Màn hình Quản trị Người dùng & Khóa/Mở tài khoản | Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-ADM-02**  | Phân hệ Phê duyệt Quán ăn mới & Tài xế mới gia nhập sàn| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-ADM-03**  | Cấu hình Tham số Toàn sàn (Phí ship, % Hoa hồng sàn) | Admin | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-ADM-04**  | Quản trị Toàn Bộ Đánh Giá Hệ Thống (Xem/Tìm/Lọc/Xóa) | Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-FIX-MERCH**| Khắc phục lỗi tồn đọng Merchant (Multi-shop, Toggle, STOMP)| Merchant | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-FIX-ADM**  | Khắc phục lỗi tồn đọng Admin (Duyệt hồ sơ, Tag Shipper)| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-CUST-08** | Theo dõi Tiến trình Đơn hàng Realtime (Live Stepper) | Customer | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-CHAT-01** | Hộp thoại Chat 2 chiều Realtime giữa Khách & Quán/Xế | Cust / Merch / Drv | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-OPS-03**  | Đóng gói Docker Compose, Load Test HikariCP & Nghiệm thu| DevOps / Lead | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 7 SP |
 
 ---
 
@@ -147,6 +149,12 @@
   * **Ý chính:** Màn hình kiểm duyệt hồ sơ mở quán mới (`restaurant_change_requests`) và duyệt hồ sơ xin làm tài xế mới (`driver_details` pending).
 * **US-ADM-03: Cấu hình Tham số Toàn sàn & Global Dashboard**
   * **Ý chính:** Bảng cấu hình phí vận chuyển mỗi km, % hoa hồng sàn (`system_settings`) và biểu đồ thống kê KPI tổng quan toàn sàn.
+* **US-ADM-04: Quản trị Toàn Bộ Đánh Giá Toàn Sàn (`/admin/reviews`)**
+  * **Ý chính:** Màn hình Admin quản trị toàn bộ đánh giá 5★ của hệ thống; tìm kiếm theo quán, tài xế, khách hàng; lọc theo số sao; quyền ẩn/xóa đánh giá vi phạm tiêu chuẩn.
+* **US-FIX-MERCH: Khắc phục Lỗi Tồn Đọng Phân hệ Merchant**
+  * **Ý chính:** Sửa triệt để các lỗi ở Cổng Quán: lỗi chọn chi nhánh (Branch Switcher đa quán), toggle trạng thái món ăn, đồng bộ chuông đơn STOMP, bổ sung báo cáo doanh thu đa quán.
+* **US-FIX-ADM: Khắc phục Lỗi Tồn Đọng Phân hệ Admin**
+  * **Ý chính:** Sửa các lỗi phê duyệt hồ sơ quán/tài xế, lưu cấu hình hệ thống, và đồng bộ hiển thị Tag "Không có tài xế" trên chi tiết đơn hàng khi đơn hoàn tất không có shipper.
 
 ---
 

@@ -40,7 +40,14 @@ Tài liệu này chuẩn hóa 3 trụ cột kỹ thuật then chốt cho toàn b
 | **`delivery-service`** | Nhận cuốc & Điều phối | `POST /api/v1/deliveries/orders/{id}/accept` | `POST /api/driver/orders/{id}/accept` | `ROLE_DRIVER` |
 | | Cập nhật tiến trình giao | `PATCH /api/v1/deliveries/orders/{id}/status` | `PATCH /api/driver/orders/{id}/status` | `ROLE_DRIVER` |
 | **`payment-service`** | VietQR SePay & COD | `POST /api/v1/payments/sepay/generate`<br>`POST /api/v1/payments/sepay/webhook` | `POST /api/payments/...` | Authenticated / Webhook |
-| **`review-service`** | Đánh giá sau đơn hàng | `POST /api/v1/reviews`<br>`GET /api/v1/reviews/shops/{shopId}` | `POST /api/reviews`<br>`GET /api/reviews/restaurant/{id}` | Authenticated / Public |
+| **`review-service`** | Đánh giá Quán & Món ăn riêng | `POST /api/v1/reviews/restaurant` | `POST /api/reviews/restaurant` | `ROLE_CUSTOMER` |
+| | Đánh giá Tài xế riêng (Quick tags) | `POST /api/v1/reviews/driver` | `POST /api/reviews/driver` | `ROLE_CUSTOMER` |
+| | Kiểm tra trạng thái đánh giá đơn (24h) | `GET /api/v1/reviews/orders/{id}/status` | Status Check | `ROLE_CUSTOMER` |
+| | Đánh giá tổng hợp (Legacy/Combined) | `POST /api/v1/reviews`<br>`GET /api/v1/reviews/orders/{id}/eligibility` | `POST /api/reviews` | `ROLE_CUSTOMER` |
+| | Xem review quán ăn & Thống kê | `GET /api/v1/reviews/restaurants/{id}`<br>`GET /api/v1/reviews/restaurants/{id}/summary` | `GET /api/reviews/restaurants/{id}` | Public GET |
+| | Quản lý đánh giá quán (Lọc món) | `GET /api/v1/reviews/merchant/mine` | Read-only | `ROLE_MERCHANT` |
+| | Xem đánh giá tài xế (Lọc ngày) | `GET /api/v1/reviews/driver/mine`<br>`GET /api/v1/reviews/driver/summary` | Read-only | `ROLE_DRIVER` |
+| | Quản trị đánh giá hệ thống (CRD) | `GET /api/v1/reviews/admin`<br>`GET /api/v1/reviews/admin/{id}`<br>`POST /api/v1/reviews/admin`<br>`DELETE /api/v1/reviews/admin/{id}` | Admin CRD | `ROLE_ADMIN` |
 
 ---
 

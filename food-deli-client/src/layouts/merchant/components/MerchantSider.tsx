@@ -10,6 +10,7 @@ import {
   ThunderboltFilled,
   FolderOutlined,
   GiftOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import type { Shop } from '@/services/modules/restaurantApi';
 
@@ -66,6 +67,12 @@ export const MerchantSider: React.FC<MerchantSiderProps> = ({
       icon: <GiftOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Khuyến mãi & Voucher</span>,
       onClick: () => onNavigate('/merchant/vouchers'),
+    },
+    {
+      key: '/merchant/reviews',
+      icon: <MessageOutlined className="text-lg" />,
+      label: <span className="font-semibold text-sm">Quản lý Đánh giá</span>,
+      onClick: () => onNavigate('/merchant/reviews'),
     },
   ];
 

@@ -5,6 +5,7 @@ import com.foodthunder.restaurant.dto.CategoryRequestDto;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Shop;
 import com.foodthunder.restaurant.repository.MenuCategoryRepository;
+import com.foodthunder.restaurant.repository.ProductRepository;
 import com.foodthunder.restaurant.repository.ShopRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ class CategoryControllerTest {
 
     @MockBean
     private ShopRepository shopRepository;
+
+    @MockBean
+    private ProductRepository productRepository;
 
     @Test
     @DisplayName("GET /api/v1/restaurants/{id}/categories thành công")

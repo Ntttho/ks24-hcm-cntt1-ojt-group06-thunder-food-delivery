@@ -2,6 +2,7 @@ package com.foodthunder.restaurant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.restaurant.dto.CreateToppingRequest;
+import com.foodthunder.restaurant.dto.PageResponse;
 import com.foodthunder.restaurant.dto.ToppingDto;
 import com.foodthunder.restaurant.dto.UpdateToppingRequest;
 import com.foodthunder.restaurant.service.ToppingService;
@@ -59,14 +60,24 @@ class ToppingControllerTest {
                 .isAvailable(true)
                 .build();
 
-        when(toppingService.getToppingsByRestaurant(eq(1), any())).thenReturn(List.of(dto1, dto2));
+        PageResponse<ToppingDto> pageResponse = PageResponse.<ToppingDto>builder()
+                .content(List.of(dto1, dto2))
+                .pageNumber(0)
+                .pageSize(10)
+                .totalElements(2)
+                .totalPages(1)
+                .last(true)
+                .build();
+
+        when(toppingService.getToppingsByRestaurantPaged(eq(1), any(), any(), any(), eq(0), eq(10)))
+                .thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/v1/toppings").param("restaurantId", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
-                .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].name").value("Trứng ốp la"))
-                .andExpect(jsonPath("$.data[1].price").value(10000));
+                .andExpect(jsonPath("$.data.content.length()").value(2))
+                .andExpect(jsonPath("$.data.content[0].name").value("Trứng ốp la"))
+                .andExpect(jsonPath("$.data.content[1].price").value(10000));
     }
 
     @Test

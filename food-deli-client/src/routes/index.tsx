@@ -9,13 +9,14 @@ import {
   NotFoundPage,
   CartPage,
   CheckoutPage,
-  StoreDetailPage,
-  StoreReviewPage,
+  RestaurantDetailPage,
+  RestaurantReviewPage,
   MerchantDashboardPage,
   MerchantMenuPage,
   MerchantCategoryPage,
   MerchantToppingPage,
   MerchantVoucherPage,
+  MerchantReviewPage,
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
@@ -26,7 +27,7 @@ import { APP_ROUTES } from '@/constants';
 export const router = createBrowserRouter([
   // Main Layout
   {
-    path: '/',
+    path: APP_ROUTES.HOME,
     element: <MainLayout />,
     children: [
       {
@@ -34,23 +35,23 @@ export const router = createBrowserRouter([
         element: <HomePage />,
       },
       {
-        path: 'restaurants',
+        path: APP_ROUTES.RESTAURANTS,
         element: <HomePage />,
       },
       {
-        path: 'restaurants/:id',
-        element: <StoreDetailPage />,
+        path: APP_ROUTES.RESTAURANT_DETAIL,
+        element: <RestaurantDetailPage />,
       },
       {
-        path: 'restaurants/:id/reviews',
-        element: <StoreReviewPage />,
+        path: APP_ROUTES.RESTAURANT_REVIEWS,
+        element: <RestaurantReviewPage />,
       },
       {
-        path: 'users',
+        path: APP_ROUTES.USERS,
         element: <AdminUserPage />,
       },
       {
-        path: 'admin/users',
+        path: APP_ROUTES.ADMIN_USERS,
         element: <AdminUserPage />,
       },
       // User Account Management Layout (Profile, Orders, Addresses)
@@ -62,29 +63,29 @@ export const router = createBrowserRouter([
         ),
         children: [
           {
-            path: 'profile',
+            path: APP_ROUTES.PROFILE,
             element: <ProfilePage />,
           },
           {
-            path: 'profile/addresses',
+            path: APP_ROUTES.ADDRESSES,
             element: <AddressManagementPage />,
           },
           {
-            path: 'addresses',
+            path: APP_ROUTES.ADDRESS_MANAGEMENT,
             element: <AddressManagementPage />,
           },
           {
-            path: 'orders',
+            path: APP_ROUTES.ORDERS,
             element: <OrdersPage />,
           },
           {
-            path: 'orders/:id',
+            path: APP_ROUTES.ORDER_DETAIL,
             element: <OrderDetailPage />,
           },
         ],
       },
       {
-        path: '*',
+        path: APP_ROUTES.NOT_FOUND,
         element: <NotFoundPage />,
       },
     ],
@@ -105,24 +106,24 @@ export const router = createBrowserRouter([
   },
   // Auth Layout: Strictly 1 Login & 1 Register page
   {
-    path: '/',
+    path: APP_ROUTES.HOME,
     element: <AuthLayout />,
     children: [
       {
-        path: 'login',
+        path: APP_ROUTES.LOGIN,
         element: <LoginPage />,
       },
       {
-        path: 'register',
+        path: APP_ROUTES.REGISTER,
         element: <RegisterPage />,
       },
     ],
   },
   // Merchant Layout: Merchant Dashboard, Menu & Toppings Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {
-    path: '/merchant',
+    path: APP_ROUTES.MERCHANT_DASHBOARD,
     element: (
-      <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+      <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
         <MerchantLayout />
       </ProtectedRoute>
     ),
@@ -130,40 +131,48 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: (
-          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantDashboardPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'menu',
+        path: APP_ROUTES.MERCHANT_MENU,
         element: (
-          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantMenuPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'categories',
+        path: APP_ROUTES.MERCHANT_CATEGORIES,
         element: (
-          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantCategoryPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'toppings',
+        path: APP_ROUTES.MERCHANT_TOPPINGS,
         element: (
-          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantToppingPage />
           </ProtectedRoute>
         ),
       },
       {
-        path: 'vouchers',
+        path: APP_ROUTES.MERCHANT_VOUCHERS,
         element: (
-          <ProtectedRoute allowedRoles={['ROLE_MERCHANT', 'ROLE_ADMIN']}>
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantVoucherPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.MERCHANT_REVIEWS,
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
+            <MerchantReviewPage />
           </ProtectedRoute>
         ),
       },

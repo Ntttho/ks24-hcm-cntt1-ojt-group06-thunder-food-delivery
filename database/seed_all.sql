@@ -440,21 +440,25 @@ CREATE TABLE `payment_transactions` (
 -- ⭐ MODULE 6: REVIEW-SERVICE (Ratings & Post-Order Feedback)
 -- =================================================================================
 
--- ĐÃ TÁCH LOGIC: order_id, customer_id, target_id là Logical Plain IDs
+-- ĐÃ TÁCH LOGIC: order_id, customer_id, target_id, food_item_id là Logical Plain IDs
 CREATE TABLE `reviews` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_id` BIGINT NOT NULL,             -- [Logical FK] trỏ sang order-service: orders.id
-  `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
+  `customer_id` BIGINT NOT NULL,          -- [Logical FK] trỏ sang auth-service: users.id
   `target_type` ENUM('RESTAURANT','DRIVER') NOT NULL,
-  `target_id` INT NOT NULL,               -- [Logical FK] trỏ sang restaurants.id hoặc users.id
-  `rating` TINYINT DEFAULT NULL,
+  `target_id` BIGINT NOT NULL,            -- [Logical FK] trỏ sang restaurants.id hoặc users.id
+  `food_item_id` BIGINT DEFAULT NULL,     -- [Logical FK] trỏ sang restaurant-service: food_items.id
+  `rating` TINYINT NOT NULL,
   `comment` TEXT,
+  `images_json` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_order_target` (`order_id`, `target_type`),
   KEY `idx_reviews_order_id` (`order_id`),
   KEY `idx_reviews_customer_id` (`customer_id`),
   KEY `idx_reviews_target` (`target_type`, `target_id`),
+  KEY `idx_reviews_food_item` (`food_item_id`),
+  KEY `idx_reviews_created_at` (`created_at`),
   CONSTRAINT `chk_reviews_rating` CHECK (`rating` BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -725,9 +729,9 @@ INSERT INTO `driver_penalties` (`id`, `driver_id`, `type`, `status`, `reason`, `
 (1, 4, 'LATE_PICKUP', 'RESOLVED', 'Trễ lấy hàng 15 phút do kẹt xe', '2026-06-01 10:00:00', '2026-06-01 12:00:00', '2026-06-01 10:00:00', '2026-06-01 12:00:00');
 
 -- 25. Reviews
-INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `target_type`, `target_id`, `rating`, `comment`, `created_at`) VALUES
-(1, 1, 1, 'RESTAURANT', 1, 5, 'Cơm tấm rất ngon, phục vụ nhanh!', '2026-06-10 08:08:00'),
-(2, 1, 1, 'DRIVER', 2, 5, 'Tài xế lịch sự, giao hàng nhanh chóng.', '2026-06-10 08:08:00');
+INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `target_type`, `target_id`, `food_item_id`, `rating`, `comment`, `images_json`, `created_at`) VALUES
+(1, 1, 1, 'RESTAURANT', 1, 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600"]', '2026-06-10 08:08:00'),
+(2, 1, 1, 'DRIVER', 2, NULL, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', NULL, '2026-06-10 08:08:00');
 
 -- 26. Chat Messages
 INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES

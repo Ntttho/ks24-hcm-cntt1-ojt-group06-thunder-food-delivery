@@ -74,8 +74,18 @@ export const API_ENDPOINTS = {
   },
   // Review Service
   REVIEWS: {
-    SHOP_REVIEWS: (shopId: number | string) => `/reviews/shops/${shopId}`,
-    CREATE: '/reviews',
+    SUBMIT: '/reviews',
+    SUBMIT_RESTAURANT: '/reviews/restaurant',
+    SUBMIT_DRIVER: '/reviews/driver',
+    ORDER_STATUS: (orderId: number | string) => `/reviews/orders/${orderId}/status`,
+    ORDER_ELIGIBILITY: (orderId: number | string) => `/reviews/orders/${orderId}/eligibility`,
+    RESTAURANT_REVIEWS: (restaurantId: number | string) => `/reviews/restaurants/${restaurantId}`,
+    RESTAURANT_SUMMARY: (restaurantId: number | string) => `/reviews/restaurants/${restaurantId}/summary`,
+    MERCHANT_MINE: '/reviews/merchant/mine',
+    DRIVER_MINE: '/reviews/driver/mine',
+    DRIVER_SUMMARY: '/reviews/driver/summary',
+    ADMIN_ALL: '/reviews/admin',
+    ADMIN_DETAIL: (id: number | string) => `/reviews/admin/${id}`,
   },
   // Payment Service (VietQR Napas 247 & SePay Gateway)
   PAYMENTS: {

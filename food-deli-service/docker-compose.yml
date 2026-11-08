@@ -253,6 +253,43 @@ services:
       retries: 6
       start_period: 30s
 
+  # 8. Review & Rating Microservice (Port 8086)
+  review-service:
+    build:
+      context: ./review-service
+      dockerfile: Dockerfile
+    container_name: ft-review-service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    environment:
+      - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=grabfood_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
 volumes:
   mysql_data:
     name: ft_mysql_data

@@ -10,8 +10,7 @@ import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
 import { clearPurchasedItems } from '@/store/slices/cartSlice';
 import { APP_ROUTES } from '@/constants';
-import { PaymentMethodModal } from '../components/PaymentMethodModal';
-import { AddressSelectorModal } from '../components/AddressSelectorModal';
+import { AddressSelectorModal } from '../../components/AddressSelectorModal';
 import type { DeliveryAddressItem } from '../types';
 import {
   CheckoutHeader,
@@ -25,6 +24,7 @@ import {
   CheckoutBottomBar,
   CheckoutSuccessModal,
   SepayQrPaymentModal,
+  PaymentMethodModal,
   VoucherSelectorModal,
 } from './components';
 

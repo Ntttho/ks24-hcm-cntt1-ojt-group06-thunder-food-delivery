@@ -22,7 +22,6 @@ import {
 } from '@/store/slices/cartSlice';
 import { orderApi } from '@/services/modules/orderApi';
 import { formatCurrency, formatDate } from '@/utils/formatters';
-import { PaymentMethodModal } from '../components/PaymentMethodModal';
 import {
   CartHeader,
   CartRestaurantCard,
@@ -31,9 +30,9 @@ import {
   EcoCutlerySection,
   CartPriceSummary,
   CartBottomBar,
-} from '../components/cart';
-import { AwaitingPaymentOrdersCard } from './components/AwaitingPaymentOrdersCard';
-import { CartEditToppingsModal } from './components/CartEditToppingsModal';
+  AwaitingPaymentOrdersCard,
+  CartEditToppingsModal,
+} from './components';
 import type { CartItemType } from '../types';
 
 export const CartPage: React.FC = () => {
@@ -50,8 +49,6 @@ export const CartPage: React.FC = () => {
   }, [isAuthenticated, user?.id, dispatch]);
 
   const [includeCutlery, setIncludeCutlery] = useState<boolean>(true);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('Chuyển khoản VietQR');
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<CartItemType | null>(null);
@@ -452,24 +449,10 @@ export const CartPage: React.FC = () => {
 
       {/* 7. Sticky Bottom Bar (Calculated on selected items) */}
       <CartBottomBar
-        selectedPaymentMethod={selectedPaymentMethod}
         totalAmount={selectedSubtotal + (selectedItemCount > 0 ? shippingFee : 0)}
         itemCount={selectedItemCount}
-        onOpenPaymentModal={() => setIsPaymentModalOpen(true)}
         onProceedToCheckout={handleProceedToCheckout}
         disabled={selectedItemCount === 0}
-      />
-
-      {/* 8. Payment Method Selector Drawer/Modal */}
-      <PaymentMethodModal
-        isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        selectedMethodId={selectedPaymentMethod.includes('VietQR') ? 'vietqr' : 'cod'}
-        onSelectMethod={(_, name) => {
-          setSelectedPaymentMethod(name);
-          message.success(`Đã chọn phương thức: ${name}`);
-        }}
-        totalAmount={selectedSubtotal + (selectedItemCount > 0 ? shippingFee : 0)}
       />
 
       {/* 9. Edit Toppings Modal */}

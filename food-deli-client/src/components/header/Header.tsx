@@ -386,7 +386,7 @@ export const Header: React.FC = () => {
                 }}
                 className="mt-2 w-full"
               >
-                Đăng xuất an toàn
+                Đăng xuất
               </Button>
             </>
           ) : (

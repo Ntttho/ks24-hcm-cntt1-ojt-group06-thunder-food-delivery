@@ -1,34 +1,85 @@
 import React from 'react';
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { ThunderboltFilled } from '@ant-design/icons';
 import { APP_ROUTES } from '@/constants';
+import { AuthHeroShowcase } from '@/pages/auth/components';
 
 export const AuthLayout: React.FC = () => {
-  return (
-    <div className="min-h-screen bg-linear-to-br from-orange-50 via-white to-amber-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
-        <Link to={APP_ROUTES.HOME} className="inline-flex items-center gap-2 group">
-          <div className="w-12 h-12 rounded-2xl bg-linear-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/25 group-hover:scale-105 transition-transform">
-            <ThunderboltFilled className="text-2xl" />
-          </div>
-          <div className="text-left">
-            <span className="font-extrabold text-2xl tracking-tight bg-linear-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent block">
-              Thunder Food
-            </span>
-            <span className="text-xs font-semibold text-gray-400 tracking-wider uppercase block">
-              Giao đồ ăn nhanh sấm sét
-            </span>
-          </div>
-        </Link>
-      </div>
+  const location = useLocation();
+  const navigate = useNavigate();
 
-      {/* Auth Card Outlet */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="bg-white py-8 px-6 shadow-xl shadow-orange-500/5 rounded-2xl border border-gray-100 sm:px-10">
-          <Outlet />
+  const isLoginPage = location.pathname === APP_ROUTES.LOGIN;
+  const isRegisterPage = location.pathname === APP_ROUTES.REGISTER;
+
+  return (
+    <div className="min-h-screen w-full bg-slate-900/5 flex items-center justify-center p-3 sm:p-6 lg:p-10 font-sans text-slate-800 antialiased selection:bg-orange-500 selection:text-white">
+      {/* Main Glassmorphic Split-Screen Container */}
+      <div className="w-full max-w-5xl bg-white rounded-3xl shadow-2xl shadow-slate-300/60 overflow-hidden border border-slate-100 grid grid-cols-1 lg:grid-cols-12 min-h-[640px]">
+        {/* Left Column: Interactive Story & Visual Hero (5 Cols) */}
+        <div className="hidden lg:block lg:col-span-5 h-full">
+          <AuthHeroShowcase />
+        </div>
+
+        {/* Right Column: Dynamic Form Engine (7 Cols) */}
+        <div className="lg:col-span-7 p-6 sm:p-10 lg:p-12 flex flex-col justify-between relative bg-white">
+          {/* Top Bar Switcher for Demo / Easy navigation */}
+          <div>
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+              <Link to={APP_ROUTES.HOME} className="flex items-center gap-2 lg:hidden">
+                <div className="w-8 h-8 rounded-xl bg-orange-500 flex items-center justify-center text-white font-bold">
+                  <ThunderboltFilled />
+                </div>
+                <span className="font-extrabold text-slate-900 tracking-tight">THUNDER FOOD</span>
+              </Link>
+
+              <div className="ml-auto flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.LOGIN, { state: location.state })}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    isLoginPage
+                      ? 'bg-white text-orange-600 shadow-xs font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Đăng nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(APP_ROUTES.REGISTER, { state: location.state })}
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    isRegisterPage
+                      ? 'bg-white text-orange-600 shadow-xs font-bold'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Đăng ký
+                </button>
+              </div>
+            </div>
+
+            {/* Dynamic Routed Page Content */}
+            <Outlet />
+          </div>
+
+          {/* Footer Support info */}
+          <div className="mt-8 pt-4 border-t border-slate-100 text-center text-[11px] text-slate-400 flex items-center justify-center gap-4">
+            <a href="#help" className="hover:text-slate-600 transition">
+              Trung tâm trợ giúp
+            </a>
+            <span>•</span>
+            <a href="#privacy" className="hover:text-slate-600 transition">
+              Bảo mật & Quyền riêng tư
+            </a>
+            <span>•</span>
+            <a href="tel:19006868" className="hover:text-slate-600 transition">
+              Hotline: 1900 6868
+            </a>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+export default AuthLayout;

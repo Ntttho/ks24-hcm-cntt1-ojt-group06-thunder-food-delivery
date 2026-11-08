@@ -1,41 +1,73 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Alert, Typography, message, Radio, Checkbox } from 'antd';
+import { Form, Input, Button, Alert, Checkbox, message } from 'antd';
 import {
   LockOutlined,
   UserOutlined,
   PhoneOutlined,
-  ThunderboltFilled,
   ShopOutlined,
   CarOutlined,
   MailOutlined,
+  CheckCircleFilled,
+  ArrowRightOutlined,
+  FireFilled,
 } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import type { RegisterRequest } from '@/types';
+import { PasswordStrengthMeter } from './components/PasswordStrengthMeter';
+import { SocialAuthButtons } from './components/SocialAuthButtons';
 
-const { Title, Text } = Typography;
+type UserRole = 'CUSTOMER' | 'MERCHANT' | 'DRIVER';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { register, isLoading, error, clearError } = useAuth();
   const [form] = Form.useForm();
-  const [selectedRole, setSelectedRole] = useState<'CUSTOMER' | 'MERCHANT' | 'DRIVER'>('CUSTOMER');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('CUSTOMER');
+  const [passwordValue, setPasswordValue] = useState<string>('');
 
-  // Phone validation for Vietnamese numbers (10 digits)
-  const validatePhoneNumber = (_: any, value: string) => {
-    if (!value || value.trim() === '') {
-      return Promise.reject(new Error('Vui lòng nhập số điện thoại!'));
+  const roleCards = [
+    {
+      id: 'CUSTOMER' as UserRole,
+      title: 'Khách hàng',
+      tagline: 'Đặt món giao siêu tốc 15 phút',
+      badge: 'Phổ biến',
+      icon: <UserOutlined className="text-xl" />,
+      perk: 'Voucher giảm 50k cho đơn đầu tiên',
+    },
+    {
+      id: 'MERCHANT' as UserRole,
+      title: 'Đối tác Quán',
+      tagline: 'Mở rộng doanh thu x3 cùng số hóa',
+      badge: '0% Phí tháng đầu',
+      icon: <ShopOutlined className="text-xl" />,
+      perk: 'Hỗ trợ máy POS & chụp ảnh menu',
+    },
+    {
+      id: 'DRIVER' as UserRole,
+      title: 'Tài xế giao hàng',
+      tagline: 'Thu nhập linh hoạt, nhận tiền theo ngày',
+      badge: 'Thưởng 2.5tr/tuần',
+      icon: <CarOutlined className="text-xl" />,
+      perk: 'Bảo hiểm chuyến đi độc quyền',
+    },
+  ];
+
+  // Vietnamese phone validation
+  const validatePhone = (_: any, value: string) => {
+    if (!value?.trim()) {
+      return Promise.reject(new Error('Vui lòng cung cấp số điện thoại!'));
     }
-    const cleanValue = value.trim();
+    const clean = value.trim();
     const phoneRegex = /^(0|\+84)[3|5|7|8|9][0-9]{8}$|^[0-9]{10}$/;
-    if (!phoneRegex.test(cleanValue)) {
-      return Promise.reject(new Error('Số điện thoại không hợp lệ (yêu cầu 10 chữ số)!'));
+    if (!phoneRegex.test(clean)) {
+      return Promise.reject(new Error('Số điện thoại 10 chữ số chưa hợp lệ'));
     }
     return Promise.resolve();
   };
 
-  const onFinish = async (values: any) => {
+  const handleRegister = async (values: any) => {
     try {
       const payload: RegisterRequest = {
         fullName: values.fullName.trim(),
@@ -58,99 +90,72 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Brand & Title */}
-      <div className="text-center space-y-1">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-linear-to-tr from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20 mb-2">
-          <ThunderboltFilled className="text-2xl" />
+    <div className="animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="mb-6 text-left">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-semibold mb-2">
+          <FireFilled className="text-orange-500" />
+          <span>Gia nhập hơn 250,000+ thành viên Thunder</span>
         </div>
-        <Title level={3} className="!mb-0 text-gray-900 font-extrabold tracking-tight">
-          Đăng ký tài khoản mới
-        </Title>
-        <Text type="secondary" className="text-sm block">
-          Chọn vai trò và gia nhập hệ thống Thunder Food Delivery
-        </Text>
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+          Đăng ký tài khoản
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">
+          Lựa chọn tư cách tham gia để nhận trải nghiệm tối ưu nhất cho bạn.
+        </p>
       </div>
 
-      {/* Role Selection Cards */}
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
-          Chọn vai trò tài khoản:
+      {/* Role Selector UX - Cards with visual state */}
+      <div className="mb-6 space-y-2">
+        <label className="text-xs font-bold uppercase tracking-wider text-slate-600 block">
+          Bạn muốn tham gia dưới vai trò gì?
         </label>
-        <Radio.Group
-          value={selectedRole}
-          onChange={(e) => {
-            setSelectedRole(e.target.value);
-            clearError();
-          }}
-          className="w-full grid grid-cols-1 sm:grid-cols-3 gap-2.5"
-        >
-          {/* Customer */}
-          <Radio.Button
-            value="CUSTOMER"
-            className={`!h-auto !py-3 !px-3 !rounded-xl !border transition-all flex flex-col items-center justify-center text-center ${
-              selectedRole === 'CUSTOMER'
-                ? '!border-orange-500 !bg-orange-50/60 shadow-xs ring-1 ring-orange-500/30'
-                : '!border-gray-200 hover:!border-orange-300'
-            }`}
-          >
-            <div className="flex flex-col items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {roleCards.map((role) => {
+            const isSelected = selectedRole === role.id;
+            return (
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm ${
-                  selectedRole === 'CUSTOMER' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
+                key={role.id}
+                onClick={() => {
+                  setSelectedRole(role.id);
+                  clearError();
+                }}
+                className={`relative p-3.5 rounded-2xl cursor-pointer border-2 transition-all duration-200 select-none flex flex-col justify-between ${
+                  isSelected
+                    ? 'border-orange-500 bg-linear-to-b from-orange-50/70 to-white shadow-md shadow-orange-500/10 ring-1 ring-orange-500'
+                    : 'border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/50'
                 }`}
               >
-                <UserOutlined />
-              </div>
-              <span className="font-bold text-sm text-gray-800">Khách hàng</span>
-              <span className="text-[11px] text-gray-500 mt-0.5">Đặt món ăn</span>
-            </div>
-          </Radio.Button>
+                {isSelected && (
+                  <div className="absolute top-2 right-2 text-orange-500">
+                    <CheckCircleFilled className="text-base" />
+                  </div>
+                )}
+                <div>
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 transition-colors ${
+                      isSelected
+                        ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/40'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {role.icon}
+                  </div>
+                  <h4 className="font-bold text-slate-800 text-sm">{role.title}</h4>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5 line-clamp-2">
+                    {role.tagline}
+                  </p>
+                </div>
 
-          {/* Merchant */}
-          <Radio.Button
-            value="MERCHANT"
-            className={`!h-auto !py-3 !px-3 !rounded-xl !border transition-all flex flex-col items-center justify-center text-center ${
-              selectedRole === 'MERCHANT'
-                ? '!border-orange-500 !bg-orange-50/60 shadow-xs ring-1 ring-orange-500/30'
-                : '!border-gray-200 hover:!border-orange-300'
-            }`}
-          >
-            <div className="flex flex-col items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm ${
-                  selectedRole === 'MERCHANT' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                <ShopOutlined />
+                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                  <span className="font-medium text-orange-700 bg-orange-100/70 px-1.5 py-0.5 rounded">
+                    {role.badge}
+                  </span>
+                </div>
               </div>
-              <span className="font-bold text-sm text-gray-800">Chủ quán</span>
-              <span className="text-[11px] text-gray-500 mt-0.5">Bán thực đơn</span>
-            </div>
-          </Radio.Button>
-
-          {/* Driver */}
-          <Radio.Button
-            value="DRIVER"
-            className={`!h-auto !py-3 !px-3 !rounded-xl !border transition-all flex flex-col items-center justify-center text-center ${
-              selectedRole === 'DRIVER'
-                ? '!border-orange-500 !bg-orange-50/60 shadow-xs ring-1 ring-orange-500/30'
-                : '!border-gray-200 hover:!border-orange-300'
-            }`}
-          >
-            <div className="flex flex-col items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 text-sm ${
-                  selectedRole === 'DRIVER' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600'
-                }`}
-              >
-                <CarOutlined />
-              </div>
-              <span className="font-bold text-sm text-gray-800">Tài xế</span>
-              <span className="text-[11px] text-gray-500 mt-0.5">Giao đồ ăn</span>
-            </div>
-          </Radio.Button>
-        </Radio.Group>
+            );
+          })}
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -162,97 +167,113 @@ export const RegisterPage: React.FC = () => {
           showIcon
           closable
           onClose={clearError}
-          className="rounded-xl border-red-200"
+          className="mb-4 rounded-xl border-red-200 text-xs"
         />
       )}
 
-      {/* Register Form */}
+      {/* Form Details */}
       <Form
         form={form}
         name="register"
         layout="vertical"
-        onFinish={onFinish}
+        onFinish={handleRegister}
         requiredMark={false}
         size="large"
         initialValues={{ terms: true }}
       >
-        <Form.Item
-          label={<span className="font-semibold text-gray-700">Họ và tên</span>}
-          name="fullName"
-          rules={[
-            { required: true, message: 'Vui lòng nhập họ và tên của bạn!' },
-            { min: 2, message: 'Họ tên phải có ít nhất 2 ký tự!' },
-          ]}
-        >
-          <Input
-            prefix={<UserOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="Ví dụ: Nguyễn Văn An"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
-          />
-        </Form.Item>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <Form.Item
+            label={<span className="text-xs font-semibold text-slate-700">Họ và tên đầy đủ</span>}
+            name="fullName"
+            rules={[
+              { required: true, message: 'Vui lòng nhập họ và tên!' },
+              { min: 2, message: 'Tối thiểu 2 ký tự!' },
+            ]}
+          >
+            <Input
+              prefix={<UserOutlined className="text-slate-400 mr-1" />}
+              placeholder="Nguyễn Văn An"
+              className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
+            />
+          </Form.Item>
+
+          <Form.Item
+            label={<span className="text-xs font-semibold text-slate-700">Số điện thoại đăng nhập</span>}
+            name="phone"
+            rules={[{ validator: validatePhone }]}
+          >
+            <Input
+              prefix={<PhoneOutlined className="text-slate-400 mr-1" />}
+              placeholder="0912 345 678"
+              className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
+            />
+          </Form.Item>
+        </div>
 
         <Form.Item
-          label={<span className="font-semibold text-gray-700">Số điện thoại</span>}
-          name="phone"
-          rules={[{ validator: validatePhoneNumber }]}
-          extra={<span className="text-xs text-gray-400">Dùng số điện thoại này để đăng nhập vào tài khoản</span>}
-        >
-          <Input
-            prefix={<PhoneOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="0912345678"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
-          />
-        </Form.Item>
-
-        <Form.Item
-          label={<span className="font-semibold text-gray-700">Email (Tùy chọn)</span>}
+          label={
+            <div className="flex items-center justify-between w-full">
+              <span className="text-xs font-semibold text-slate-700">Địa chỉ Email (Tùy chọn)</span>
+              <span className="text-[11px] text-slate-400 font-normal">Để nhận hóa đơn GTGT</span>
+            </div>
+          }
           name="email"
-          rules={[{ type: 'email', message: 'Định dạng email không hợp lệ!' }]}
+          rules={[{ type: 'email', message: 'Email không đúng định dạng!' }]}
         >
           <Input
-            prefix={<MailOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="user@example.com"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
+            prefix={<MailOutlined className="text-slate-400 mr-1" />}
+            placeholder="an.nguyen@company.com"
+            className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
           />
         </Form.Item>
 
-        <Form.Item
-          label={<span className="font-semibold text-gray-700">Mật khẩu</span>}
-          name="password"
-          rules={[
-            { required: true, message: 'Vui lòng nhập mật khẩu!' },
-            { min: 6, message: 'Mật khẩu phải từ 6 ký tự trở lên!' },
-          ]}
-        >
-          <Input.Password
-            prefix={<LockOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="Mật khẩu tối thiểu 6 ký tự"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
-          />
-        </Form.Item>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+          <Form.Item
+            label={<span className="text-xs font-semibold text-slate-700">Tạo mật khẩu</span>}
+            name="password"
+            rules={[
+              { required: true, message: 'Vui lòng nhập mật khẩu!' },
+              { min: 6, message: 'Tối thiểu 6 ký tự!' },
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined className="text-slate-400 mr-1" />}
+              placeholder="Mật khẩu bảo mật"
+              onChange={(e) => setPasswordValue(e.target.value)}
+              className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
+            />
+          </Form.Item>
 
-        <Form.Item
-          label={<span className="font-semibold text-gray-700">Xác nhận mật khẩu</span>}
-          name="confirmPassword"
-          dependencies={['password']}
-          rules={[
-            { required: true, message: 'Vui lòng nhập lại mật khẩu xác nhận!' },
-            ({ getFieldValue }) => ({
-              validator(_, value) {
-                if (!value || getFieldValue('password') === value) {
-                  return Promise.resolve();
-                }
-                return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
-              },
-            }),
-          ]}
-        >
-          <Input.Password
-            prefix={<LockOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="Nhập lại mật khẩu vừa tạo"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
-          />
-        </Form.Item>
+          <Form.Item
+            label={<span className="text-xs font-semibold text-slate-700">Xác nhận mật khẩu</span>}
+            name="confirmPassword"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: 'Vui lòng xác nhận mật khẩu!' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Mật khẩu nhập lại không khớp!'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined className="text-slate-400 mr-1" />}
+              placeholder="Nhập lại mật khẩu"
+              className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
+            />
+          </Form.Item>
+        </div>
+
+        {/* Dynamic Strength Indicator */}
+        {passwordValue && (
+          <div className="mb-4">
+            <PasswordStrengthMeter password={passwordValue} />
+          </div>
+        )}
 
         <Form.Item
           name="terms"
@@ -262,43 +283,52 @@ export const RegisterPage: React.FC = () => {
               validator: (_, value) =>
                 value
                   ? Promise.resolve()
-                  : Promise.reject(new Error('Vui lòng đồng ý với điều khoản dịch vụ!')),
+                  : Promise.reject(new Error('Cần xác nhận đồng ý điều khoản dịch vụ')),
             },
           ]}
         >
-          <Checkbox className="text-xs sm:text-sm text-gray-600">
-            Tôi đồng ý với{' '}
+          <Checkbox className="text-xs text-slate-600 leading-tight">
+            Tôi đã đọc kỹ và đồng ý với{' '}
             <a href="#terms" className="text-orange-600 font-semibold hover:underline">
-              Điều khoản dịch vụ
+              Quy chế hoạt động
             </a>{' '}
             và{' '}
             <a href="#privacy" className="text-orange-600 font-semibold hover:underline">
-              Chính sách bảo mật
+              Chính sách bảo mật dữ liệu
             </a>{' '}
-            của Thunder Food.
+            của hệ sinh thái Thunder Food.
           </Checkbox>
         </Form.Item>
 
-        <Form.Item className="mb-2">
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={isLoading}
-            block
-            className="h-12 bg-linear-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-md shadow-orange-500/25 border-none font-bold rounded-xl text-base"
-          >
-            Tạo tài khoản ngay
-          </Button>
-        </Form.Item>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={isLoading}
+          block
+          className="!h-12 !rounded-xl !bg-linear-to-r !from-orange-500 !via-amber-500 !to-orange-600 hover:!opacity-95 !border-none !text-white !font-bold !text-base shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2"
+        >
+          <span>Khởi tạo tài khoản ngay</span>
+          <ArrowRightOutlined className="text-sm" />
+        </Button>
       </Form>
 
-      {/* Switch to Login */}
-      <div className="text-center text-sm text-gray-500 pt-2 border-t border-gray-100">
-        Đã có tài khoản?{' '}
-        <Link to={APP_ROUTES.LOGIN} className="font-bold text-orange-600 hover:text-orange-700">
-          Đăng nhập ngay &rarr;
-        </Link>
+      {/* Social Register & Fast Switch */}
+      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+        <p className="text-xs text-slate-500 mb-3">Hoặc tiếp tục nhanh chóng với</p>
+        <SocialAuthButtons />
+
+        <p className="text-xs text-slate-500">
+          Đã có tài khoản trên hệ thống?{' '}
+          <Link
+            to={APP_ROUTES.LOGIN}
+            className="font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
+          >
+            Đăng nhập ngay
+          </Link>
+        </p>
       </div>
     </div>
   );
 };
+
+export default RegisterPage;

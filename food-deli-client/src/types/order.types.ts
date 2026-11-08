@@ -28,13 +28,18 @@ export interface OrderStatusLog {
 export type OrderStatusCode =
   | 'PENDING'
   | 'AWAITING_PAYMENT'
+  | 'DRIVER_ACCEPTED'
+  | 'DRIVER_REJECTED'
   | 'CONFIRMED'
+  | 'PICKING_UP'
   | 'PREPARING'
   | 'READY_FOR_PICKUP'
   | 'PICKED_UP'
   | 'DELIVERING'
+  | 'COMPLETED'
   | 'DELIVERED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'TIMEOUT';
 
 export interface CustomerOrder {
   id: number;
