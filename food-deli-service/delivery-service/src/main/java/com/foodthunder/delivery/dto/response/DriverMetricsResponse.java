@@ -20,3 +20,4 @@ public class DriverMetricsResponse {
     private Double totalEarnings;
     private Double ratingAvg;
 }
+
