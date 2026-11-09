@@ -1,16 +1,15 @@
 import React, { useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Button, Space, Tag, Typography } from 'antd';
-import { FolderAddOutlined, EditOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Modal, Form, Input, Button, Space, Tag } from 'antd';
+import { AppstoreAddOutlined, EditOutlined, FolderOutlined } from '@ant-design/icons';
 import type { MenuCategoryItem } from '@/services/modules/restaurantApi';
 
-const { Text } = Typography;
-
 interface CategoryFormModalProps {
-  open: boolean;
+  isOpen: boolean;
+  editingCategory: MenuCategoryItem | null;
+  restaurantId: number | string;
+  submitting: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; displayOrder?: number }) => Promise<void>;
-  initialData?: MenuCategoryItem | null;
-  loading?: boolean;
+  onSubmit: (values: { name: string; restaurantId: number }) => Promise<void>;
 }
 
 const PRESET_CATEGORIES = [
@@ -25,35 +24,31 @@ const PRESET_CATEGORIES = [
 ];
 
 export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
-  open,
+  isOpen,
+  editingCategory,
+  restaurantId,
+  submitting,
   onClose,
   onSubmit,
-  initialData,
-  loading = false,
 }) => {
   const [form] = Form.useForm();
-  const isEditing = !!initialData;
 
   useEffect(() => {
-    if (open) {
-      if (initialData) {
+    if (isOpen) {
+      if (editingCategory) {
         form.setFieldsValue({
-          name: initialData.name,
-          displayOrder: initialData.displayOrder ?? 0,
+          name: editingCategory.name,
         });
       } else {
         form.resetFields();
-        form.setFieldsValue({
-          displayOrder: 0,
-        });
       }
     }
-  }, [open, initialData, form]);
+  }, [isOpen, editingCategory, form]);
 
-  const handleFinish = async (values: any) => {
+  const handleFinish = async (values: { name: string }) => {
     await onSubmit({
       name: values.name.trim(),
-      displayOrder: values.displayOrder !== undefined ? Number(values.displayOrder) : undefined,
+      restaurantId: Number(restaurantId),
     });
   };
 
@@ -63,25 +58,20 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
   return (
     <Modal
+      open={isOpen}
+      onCancel={onClose}
       title={
-        <div className="flex items-center gap-2 text-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-            {isEditing ? <EditOutlined /> : <FolderAddOutlined />}
-          </div>
-          <div>
-            <div className="font-bold text-base">
-              {isEditing ? 'Đổi tên / Chỉnh sửa Danh mục' : 'Thêm mới Danh mục Thực đơn'}
-            </div>
-            <div className="text-xs text-slate-400 font-normal">
-              {isEditing
-                ? `Cập nhật thông tin danh mục #${initialData?.id}`
-                : 'Tạo nhóm món để khách hàng dễ dàng tìm kiếm trên thực đơn'}
-            </div>
-          </div>
+        <div className="flex items-center gap-2">
+          {editingCategory ? (
+            <EditOutlined className="text-orange-500 text-lg" />
+          ) : (
+            <AppstoreAddOutlined className="text-orange-500 text-lg" />
+          )}
+          <span className="font-bold text-slate-800">
+            {editingCategory ? 'Chỉnh Sửa Danh Mục' : 'Thêm Danh Mục Mới'}
+          </span>
         </div>
       }
-      open={open}
-      onCancel={onClose}
       footer={null}
       destroyOnClose
       centered
@@ -91,38 +81,27 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         form={form}
         layout="vertical"
         onFinish={handleFinish}
-        className="mt-4 space-y-4"
-        requiredMark={false}
+        className="pt-3"
       >
         <Form.Item
           name="name"
-          label={<span className="font-semibold text-slate-700">Tên danh mục món</span>}
+          label={<span className="font-semibold text-slate-700">Tên danh mục</span>}
           rules={[
             { required: true, message: 'Vui lòng nhập tên danh mục!' },
             { max: 100, message: 'Tên danh mục không được vượt quá 100 ký tự!' },
-            {
-              validator: (_, value) => {
-                if (value && value.trim().length === 0) {
-                  return Promise.reject(new Error('Tên danh mục không được chỉ chứa khoảng trắng!'));
-                }
-                return Promise.resolve();
-              },
-            },
           ]}
         >
           <Input
-            placeholder="Ví dụ: Món khai vị, Món chính, Trà hoa quả..."
+            prefix={<FolderOutlined className="text-slate-400" />}
+            placeholder="Ví dụ: Cơm tấm, Trà sữa, Món khai vị..."
+            allowClear
             size="large"
-            className="rounded-lg"
-            maxLength={100}
-            showCount
-            prefix={<AppstoreOutlined className="text-slate-400 mr-1" />}
           />
         </Form.Item>
 
         {/* Quick Suggestion Chips */}
-        {!isEditing && (
-          <div>
+        {!editingCategory && (
+          <div className="mb-4">
             <div className="text-xs text-slate-500 font-medium mb-1.5">
               Gợi ý danh mục phổ biến (Nhấp để chọn nhanh):
             </div>
@@ -140,32 +119,20 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           </div>
         )}
 
-        <Form.Item
-          name="displayOrder"
-          label={<span className="font-semibold text-slate-700">Thứ tự hiển thị trên Menu</span>}
-          extra="Số nhỏ hơn sẽ hiển thị trước trên thực đơn của khách hàng (0, 1, 2...)"
-        >
-          <InputNumber
-            min={0}
-            max={999}
-            className="w-full rounded-lg"
-            size="large"
-            placeholder="0"
-          />
-        </Form.Item>
-
-        <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-          <Button onClick={onClose} disabled={loading} className="rounded-lg">
-            Hủy bỏ
-          </Button>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={loading}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-lg shadow-sm"
-          >
-            {isEditing ? 'Lưu thay đổi' : 'Tạo danh mục ngay'}
-          </Button>
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+          <Space>
+            <Button onClick={onClose} disabled={submitting}>
+              Hủy
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={submitting}
+              className="bg-orange-500 hover:bg-orange-600 border-none font-semibold text-white"
+            >
+              {editingCategory ? 'Lưu thay đổi' : 'Tạo danh mục'}
+            </Button>
+          </Space>
         </div>
       </Form>
     </Modal>

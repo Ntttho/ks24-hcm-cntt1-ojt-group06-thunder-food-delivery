@@ -12,11 +12,16 @@ import com.foodthunder.auth.security.JwtProvider;
 import com.foodthunder.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -143,6 +148,37 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("Updated profile for user id: {}", userId);
         return toUserDto(updatedUser, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserDto> getUsers(String search, String role, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String roleParam = (role != null && !role.trim().isEmpty()) ? role.trim() : null;
+
+        Page<User> userPage = userRepository.searchUsers(searchParam, roleParam, pageable);
+        List<UserDto> content = userPage.getContent().stream()
+                .map(u -> toUserDto(u, null))
+                .collect(Collectors.toList());
+
+        return PageResponse.<UserDto>builder()
+                .content(content)
+                .pageNumber(userPage.getNumber())
+                .pageSize(userPage.getSize())
+                .totalElements(userPage.getTotalElements())
+                .totalPages(userPage.getTotalPages())
+                .last(userPage.isLast())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserDto> getAllUsers() {
+        return userRepository.findAll(Sort.by(Sort.Direction.DESC, "id")).stream()
+                .filter(u -> u.getDeletedAt() == null)
+                .map(u -> toUserDto(u, null))
+                .collect(Collectors.toList());
     }
 
     private UserDto toUserDto(User user, String activeRole) {

@@ -17,6 +17,8 @@ public class OrderResponse {
     private String orderCode;
     private String idempotencyKey;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private Integer restaurantId;
     private Integer driverId;
     private Integer voucherId;

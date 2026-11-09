@@ -1,6 +1,7 @@
 package com.foodthunder.restaurant.service;
 
 import com.foodthunder.restaurant.dto.CreateToppingRequest;
+import com.foodthunder.restaurant.dto.PageResponse;
 import com.foodthunder.restaurant.dto.ToppingDto;
 import com.foodthunder.restaurant.dto.ToppingGroupDto;
 import com.foodthunder.restaurant.dto.UpdateToppingRequest;
@@ -10,6 +11,15 @@ import java.util.List;
 public interface ToppingService {
 
     List<ToppingDto> getToppingsByRestaurant(Integer restaurantId, String groupName);
+
+    PageResponse<ToppingDto> getToppingsByRestaurantPaged(
+            Integer restaurantId,
+            String search,
+            String groupName,
+            Boolean isAvailable,
+            int page,
+            int size
+    );
 
     List<ToppingGroupDto> getToppingGroupsByRestaurant(Integer restaurantId);
 

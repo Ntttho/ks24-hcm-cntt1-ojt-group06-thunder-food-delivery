@@ -1,5 +1,6 @@
 package com.foodthunder.restaurant.service;
 
+import com.foodthunder.restaurant.dto.PageResponse;
 import com.foodthunder.restaurant.dto.ProductDetailDto;
 import com.foodthunder.restaurant.dto.ProductDto;
 import com.foodthunder.restaurant.dto.ProductRequestDto;
@@ -12,6 +13,16 @@ public interface ProductService {
     ProductDetailDto getProductDetail(Integer id);
 
     List<ProductDto> getProductsByRestaurant(Integer restaurantId);
+
+    PageResponse<ProductDto> getProductsByRestaurantPaged(
+            Integer restaurantId,
+            String search,
+            Integer categoryId,
+            String categoryName,
+            Boolean isAvailable,
+            int page,
+            int size
+    );
 
     ProductDto createProduct(ProductRequestDto request);
 

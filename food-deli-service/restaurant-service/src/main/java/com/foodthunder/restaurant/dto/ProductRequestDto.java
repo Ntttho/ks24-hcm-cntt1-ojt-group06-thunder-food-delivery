@@ -20,6 +20,8 @@ public class ProductRequestDto {
     @NotBlank(message = "Tên món ăn không được để trống")
     private String name;
 
+    private String description;
+
     @NotNull(message = "Danh mục không được để trống")
     private Integer categoryId;
 

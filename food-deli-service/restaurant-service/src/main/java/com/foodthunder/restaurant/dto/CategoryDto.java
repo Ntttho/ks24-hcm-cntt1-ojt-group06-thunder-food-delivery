@@ -13,5 +13,5 @@ public class CategoryDto {
     private String name;
     private Integer displayOrder;
     private Integer productCount;
+    private Long itemCount;
 }
-

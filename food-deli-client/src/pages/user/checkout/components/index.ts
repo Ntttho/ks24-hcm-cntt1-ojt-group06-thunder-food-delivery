@@ -9,4 +9,6 @@ export * from './CheckoutPriceSummary';
 export * from './CheckoutBottomBar';
 export * from './CheckoutSuccessModal';
 export * from './CheckoutVoucherModal';
-
+export * from './SepayQrPaymentModal';
+export * from './PaymentMethodModal';
+export * from './VoucherSelectorModal';

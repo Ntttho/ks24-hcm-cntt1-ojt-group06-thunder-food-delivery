@@ -1,25 +1,26 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Alert, Typography, Segmented, message, Checkbox } from 'antd';
+import { Form, Input, Button, Alert, Checkbox, message } from 'antd';
 import {
   LockOutlined,
-  ThunderboltFilled,
   UserOutlined,
   ShopOutlined,
   CarOutlined,
-  SafetyOutlined,
+  ArrowRightOutlined,
+  SafetyCertificateFilled,
 } from '@ant-design/icons';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
+import { SocialAuthButtons } from './components/SocialAuthButtons';
 
-const { Title, Text } = Typography;
+type UserRole = 'CUSTOMER' | 'MERCHANT' | 'DRIVER';
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isLoading, error, clearError } = useAuth();
   const [form] = Form.useForm();
-  const [selectedRole, setSelectedRole] = useState<string>('CUSTOMER');
+  const [activeRole, setActiveRole] = useState<UserRole>('CUSTOMER');
 
   // Check if redirected from another page (e.g. from /checkout)
   const queryParams = new URLSearchParams(location.search);
@@ -32,6 +33,30 @@ export const LoginPage: React.FC = () => {
       : fromState?.pathname
       ? `${fromState.pathname}${fromState.search || ''}`
       : fromQuery) || APP_ROUTES.HOME;
+
+  const roleDefinitions = [
+    {
+      key: 'CUSTOMER' as UserRole,
+      label: 'Khách hàng',
+      icon: <UserOutlined />,
+      helper: 'Dành cho thực khách săn ưu đãi & thưởng thức món',
+      demo: { phone: '0987654321', pass: 'Password@123' },
+    },
+    {
+      key: 'MERCHANT' as UserRole,
+      label: 'Đối tác Quán',
+      icon: <ShopOutlined />,
+      helper: 'Quản lý bàn, thực đơn & doanh thu nhà hàng',
+      demo: { phone: '0901234567', pass: 'Password@123' },
+    },
+    {
+      key: 'DRIVER' as UserRole,
+      label: 'Tài xế giao vận',
+      icon: <CarOutlined />,
+      helper: 'Nhận cuốc xe, tối ưu tuyến đường giao món',
+      demo: { phone: '0912345678', pass: 'Password@123' },
+    },
+  ];
 
   // Custom validation rule for Phone or Email
   const validatePhoneOrEmail = (_: any, value: string) => {
@@ -55,12 +80,12 @@ export const LoginPage: React.FC = () => {
       const payload = {
         phone: values.identifier.trim(),
         password: values.password,
-        role: selectedRole === 'ALL' ? undefined : selectedRole,
+        role: activeRole,
       };
 
       await login(payload);
       message.success('Đăng nhập thành công! Chào mừng bạn quay trở lại.');
-      if (fromLocation === APP_ROUTES.HOME && (selectedRole === 'MERCHANT')) {
+      if (fromLocation === APP_ROUTES.HOME && activeRole === 'MERCHANT') {
         navigate('/merchant', { replace: true });
       } else {
         navigate(fromLocation, { replace: true });
@@ -70,81 +95,71 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  // Quick fill demo account for testing ease
-  const handleQuickFill = (phone: string, pass: string, role: string) => {
+  const handleQuickFill = (role: UserRole) => {
+    const target = roleDefinitions.find((r) => r.key === role);
+    if (!target) return;
+    setActiveRole(role);
     form.setFieldsValue({
-      identifier: phone,
-      password: pass,
+      identifier: target.demo.phone,
+      password: target.demo.pass,
       remember: true,
     });
-    setSelectedRole(role);
     clearError();
   };
 
+  const currentRoleInfo = roleDefinitions.find((r) => r.key === activeRole);
+
   return (
-    <div className="space-y-6">
-      {/* Brand & Title */}
-      <div className="text-center space-y-1">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-linear-to-tr from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/20 mb-2">
-          <ThunderboltFilled className="text-2xl" />
+    <div className="animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="mb-6 text-left">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold mb-2">
+          <SafetyCertificateFilled className="text-emerald-500" />
+          <span>Hệ thống bảo mật TLS 1.3 mã hóa đầu cuối</span>
         </div>
-        <Title level={3} className="!mb-0 text-gray-900 font-extrabold tracking-tight">
-          Đăng nhập Thunder Food
-        </Title>
-        <Text type="secondary" className="text-sm block">
-          Kết nối trực tiếp API Gateway và trải nghiệm ẩm thực tiện lợi
-        </Text>
+        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+          Chào mừng trở lại!
+        </h2>
+        <p className="text-slate-500 text-sm mt-1">
+          Đăng nhập để theo dõi đơn hàng và tận hưởng dịch vụ ưu đãi độc quyền.
+        </p>
       </div>
 
-      {/* Role Segment Selector */}
-      <div className="bg-gray-100/80 p-1.5 rounded-xl">
-        <div className="text-xs font-semibold text-gray-500 mb-1.5 px-1 flex items-center justify-between">
-          <span>Chọn cổng vai trò đăng nhập:</span>
-          <span className="text-orange-600 font-bold">
-            {selectedRole === 'CUSTOMER' && 'Khách hàng'}
-            {selectedRole === 'MERCHANT' && 'Chủ quán'}
-            {selectedRole === 'DRIVER' && 'Tài xế'}
-            {selectedRole === 'ALL' && 'Tất cả'}
+      {/* Role Picker - Modern Pill Tabs */}
+      <div className="mb-5">
+        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <span>Cổng truy cập vai trò:</span>
+          <span className="text-orange-600 font-bold capitalize">
+            {currentRoleInfo?.label}
           </span>
+        </label>
+
+        <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100/90 rounded-2xl">
+          {roleDefinitions.map((role) => {
+            const isCurrent = activeRole === role.key;
+            return (
+              <button
+                key={role.key}
+                type="button"
+                onClick={() => {
+                  setActiveRole(role.key);
+                  clearError();
+                }}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer ${
+                  isCurrent
+                    ? 'bg-white text-orange-600 shadow-sm shadow-slate-300/40'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+                }`}
+              >
+                <span className="text-sm">{role.icon}</span>
+                <span className="truncate">{role.label}</span>
+              </button>
+            );
+          })}
         </div>
-        <Segmented
-          block
-          size="middle"
-          value={selectedRole}
-          onChange={(val) => {
-            setSelectedRole(val as string);
-            clearError();
-          }}
-          options={[
-            {
-              label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
-                  <UserOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Khách hàng</span>
-                </div>
-              ),
-              value: 'CUSTOMER',
-            },
-            {
-              label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
-                  <ShopOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Chủ quán</span>
-                </div>
-              ),
-              value: 'MERCHANT',
-            },
-            {
-              label: (
-                <div className="py-1 flex items-center justify-center gap-1.5">
-                  <CarOutlined />
-                  <span className="font-semibold text-xs sm:text-sm">Tài xế</span>
-                </div>
-              ),
-              value: 'DRIVER',
-            },
-          ]}
-        />
+        <p className="text-[11px] text-slate-400 mt-1.5 ml-1 italic">
+          💡 {currentRoleInfo?.helper}
+        </p>
       </div>
 
       {/* Error Alert */}
@@ -156,11 +171,11 @@ export const LoginPage: React.FC = () => {
           showIcon
           closable
           onClose={clearError}
-          className="rounded-xl border-red-200"
+          className="mb-4 rounded-xl border-red-200 text-xs"
         />
       )}
 
-      {/* Form */}
+      {/* Login Form */}
       <Form
         form={form}
         name="login"
@@ -171,101 +186,101 @@ export const LoginPage: React.FC = () => {
         initialValues={{ remember: true }}
       >
         <Form.Item
-          label={<span className="font-semibold text-gray-700">Số điện thoại hoặc Email</span>}
+          label={<span className="text-xs font-semibold text-slate-700">Số điện thoại hoặc Email</span>}
           name="identifier"
           rules={[{ validator: validatePhoneOrEmail }]}
-          extra={<span className="text-xs text-gray-400">Ví dụ: 0987654321 hoặc customer@foodthunder.com</span>}
+          extra={<span className="text-xs text-slate-400">Ví dụ: 0987654321 hoặc customer@foodthunder.com</span>}
         >
           <Input
-            prefix={<UserOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="0987654321 hoặc email@example.com"
+            prefix={<UserOutlined className="text-slate-400 mr-1" />}
+            placeholder="0987 654 321 hoặc an@email.com"
             autoComplete="username"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
+            className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
           />
         </Form.Item>
 
         <Form.Item
-          label={<span className="font-semibold text-gray-700">Mật khẩu</span>}
+          label={<span className="text-xs font-semibold text-slate-700">Mật khẩu bảo vệ</span>}
           name="password"
           rules={[
-            { required: true, message: 'Vui lòng nhập mật khẩu!' },
+            { required: true, message: 'Vui lòng nhập mật khẩu đăng nhập!' },
             { min: 6, message: 'Mật khẩu phải từ 6 ký tự trở lên!' },
           ]}
         >
           <Input.Password
-            prefix={<LockOutlined className="text-gray-400 mr-1.5" />}
-            placeholder="••••••••"
+            prefix={<LockOutlined className="text-slate-400 mr-1" />}
+            placeholder="Nhập mật khẩu"
             autoComplete="current-password"
-            className="rounded-xl hover:border-orange-400 focus:border-orange-500"
+            className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
           />
         </Form.Item>
 
-        <div className="flex items-center justify-between mb-4 text-xs sm:text-sm">
+        <div className="flex items-center justify-between mb-5 text-xs">
           <Form.Item name="remember" valuePropName="checked" noStyle>
-            <Checkbox className="text-gray-600">Ghi nhớ đăng nhập</Checkbox>
+            <Checkbox className="text-slate-600">Ghi nhớ đăng nhập 30 ngày</Checkbox>
           </Form.Item>
           <a
-            href="#forgot"
+            href="#forgot-pass"
             onClick={(e) => {
               e.preventDefault();
-              message.info('Vui lòng liên hệ quản trị viên hoặc sử dụng tính năng quên mật khẩu.');
+              message.info('Vui lòng liên hệ hotline 1900 6868 hoặc bộ phận hỗ trợ kỹ thuật để khôi phục mật khẩu.');
             }}
-            className="font-semibold text-orange-600 hover:text-orange-700"
+            className="font-bold text-orange-600 hover:text-orange-700 hover:underline"
           >
             Quên mật khẩu?
           </a>
         </div>
 
-        <Form.Item className="mb-2">
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={isLoading}
-            block
-            className="h-12 bg-linear-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 shadow-md shadow-orange-500/25 border-none font-bold rounded-xl text-base"
-          >
-            Đăng nhập ngay
-          </Button>
-        </Form.Item>
+        <Button
+          type="primary"
+          htmlType="submit"
+          loading={isLoading}
+          block
+          className="!h-12 !rounded-xl !bg-linear-to-r !from-orange-500 !via-amber-500 !to-orange-600 hover:!opacity-95 !border-none !text-white !font-bold !text-base shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2"
+        >
+          <span>Đăng nhập hệ thống</span>
+          <ArrowRightOutlined className="text-sm" />
+        </Button>
       </Form>
 
-      {/* Demo Credentials Quick Fill Pills */}
-      <div className="bg-orange-50/60 border border-orange-100 rounded-xl p-3.5 space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-orange-800">
-          <SafetyOutlined />
-          <span>Tài khoản kiểm thử nhanh (Demo Seed Data):</span>
+      {/* Demo Quick Fill Card */}
+      <div className="mt-5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wide flex items-center gap-1.5">
+            <SafetyCertificateFilled className="text-amber-500" />
+            <span>Tài khoản Demo thử nghiệm nhanh:</span>
+          </span>
+          <span className="text-[10px] text-slate-400">Click để tự động điền</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickFill('0987654321', 'Password@123', 'CUSTOMER')}
-            className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
-          >
-            👤 Khách hàng
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill('0901234567', 'Password@123', 'MERCHANT')}
-            className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
-          >
-            🏪 Chủ quán
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill('0912345678', 'Password@123', 'DRIVER')}
-            className="px-2 py-1.5 text-xs bg-white rounded-lg border border-orange-200 text-gray-700 hover:border-orange-500 hover:text-orange-600 font-medium transition-all shadow-2xs text-center"
-          >
-            🛵 Tài xế
-          </button>
+          {roleDefinitions.map((role) => (
+            <button
+              key={role.key}
+              type="button"
+              onClick={() => handleQuickFill(role.key)}
+              className="py-1.5 px-2 bg-white rounded-lg border border-slate-200 text-slate-700 hover:border-orange-400 hover:text-orange-600 text-xs font-semibold shadow-2xs hover:shadow transition flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <span>{role.icon}</span>
+              <span className="truncate">{role.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Switch to Register */}
-      <div className="text-center text-sm text-gray-500 pt-2 border-t border-gray-100">
-        Chưa có tài khoản?{' '}
-        <Link to={APP_ROUTES.REGISTER} className="font-bold text-orange-600 hover:text-orange-700">
-          Đăng ký tài khoản mới &rarr;
-        </Link>
+      {/* Social Register & Fast Switch */}
+      <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+        <p className="text-xs text-slate-500 mb-3">Hoặc tiếp tục nhanh chóng với</p>
+        <SocialAuthButtons />
+
+        <p className="text-xs text-slate-500">
+          Chưa có tài khoản Thunder Food?{' '}
+          <Link
+            to={APP_ROUTES.REGISTER}
+            className="font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
+          >
+            Đăng ký tài khoản ngay &rarr;
+          </Link>
+        </p>
       </div>
     </div>
   );

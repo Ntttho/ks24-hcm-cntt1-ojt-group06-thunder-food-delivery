@@ -2,9 +2,11 @@ package com.foodthunder.restaurant.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.restaurant.dto.CreateRestaurantRequest;
+import com.foodthunder.restaurant.dto.PageResponse;
 import com.foodthunder.restaurant.dto.RestaurantDto;
 import com.foodthunder.restaurant.service.ProductService;
 import com.foodthunder.restaurant.service.RestaurantService;
+import com.foodthunder.restaurant.service.ToppingService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +43,9 @@ class RestaurantControllerTest {
     @MockBean
     private ProductService productService;
 
+    @MockBean
+    private ToppingService toppingService;
+
     @Test
     @DisplayName("GET /api/v1/restaurants/mine trả về danh sách quán của chủ quán")
     void getMyRestaurants_success() throws Exception {
@@ -52,14 +57,24 @@ class RestaurantControllerTest {
                 .isOpen(true)
                 .build();
 
-        when(restaurantService.getRestaurantsByOwner(5)).thenReturn(List.of(dto));
+        PageResponse<RestaurantDto> pageResponse = PageResponse.<RestaurantDto>builder()
+                .content(List.of(dto))
+                .pageNumber(0)
+                .pageSize(10)
+                .totalElements(1)
+                .totalPages(1)
+                .last(true)
+                .build();
+
+        when(restaurantService.getRestaurantsByOwnerPaged(eq(5), any(), eq(0), eq(10)))
+                .thenReturn(pageResponse);
 
         mockMvc.perform(get("/api/v1/restaurants/mine")
                         .header("X-User-Id", "5"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
-                .andExpect(jsonPath("$.data[0].id").value(10))
-                .andExpect(jsonPath("$.data[0].name").value("Quán Phở Thìn 1955"));
+                .andExpect(jsonPath("$.data.content[0].id").value(10))
+                .andExpect(jsonPath("$.data.content[0].name").value("Quán Phở Thìn 1955"));
     }
 
     @Test

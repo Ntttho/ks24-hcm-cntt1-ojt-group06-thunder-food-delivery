@@ -1,5 +1,14 @@
 import { apiClient, API_ENDPOINTS } from '@/services/api';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse, PaginatedData } from '@/types';
+
+export interface GetMerchantOrdersParams {
+  restaurantId?: number | string;
+  status?: string;
+  keyword?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+}
 
 export interface CreateOrderItemPayload {
   foodId: number;
@@ -12,6 +21,8 @@ export interface CreateOrderItemPayload {
 
 export interface CreateOrderPayload {
   restaurantId: number;
+  customerName?: string;
+  customerPhone?: string;
   receiverAddress: string;
   receiverLat?: number;
   receiverLng?: number;
@@ -49,69 +60,123 @@ export const orderApi = {
     return apiClient.put(API_ENDPOINTS.ORDERS.STATUS(id), data);
   },
 
-  // Merchant Portal: Order Reception, Confirmation & Cancellation APIs
+  confirmPaymentSuccess: async (orderId: number | string, transactionNo?: string): Promise<ApiResponse<any>> => {
+    return apiClient.put(`/orders/${orderId}/payment-success`, null, {
+      params: { transactionNo },
+    });
+  },
+
+  cancelOrder: async (orderId: number | string, reason?: string): Promise<ApiResponse<any>> => {
+    return apiClient.put(`/orders/${orderId}/cancel`, null, {
+      params: { reason },
+    });
+  },
+
+  // Merchant Portal: Order Reception, Confirmation & Cancellation APIs (Hỗ trợ Server-side Page & Search)
   getMerchantOrders: async (
-    restaurantId?: number | string,
-    status?: string
-  ): Promise<ApiResponse<MerchantOrder[]>> => {
+    paramOrRestaurantId?: number | string | GetMerchantOrdersParams,
+    statusParam?: string
+  ): Promise<ApiResponse<PaginatedData<MerchantOrder>>> => {
+    let requestParams: Record<string, any> = {};
+
+    if (paramOrRestaurantId && typeof paramOrRestaurantId === 'object') {
+      const p = paramOrRestaurantId as GetMerchantOrdersParams;
+      requestParams = {
+        restaurantId: p.restaurantId,
+        status: p.status && p.status !== 'ALL' ? p.status : undefined,
+        keyword: p.keyword || p.search || undefined,
+        page: p.page ?? 0,
+        size: p.size ?? 10,
+      };
+    } else {
+      requestParams = {
+        restaurantId: paramOrRestaurantId,
+        status: statusParam && statusParam !== 'ALL' ? statusParam : undefined,
+        page: 0,
+        size: 50,
+      };
+    }
+
     try {
       const res = await apiClient.get<any>('/orders', {
-        params: {
-          restaurantId,
-          status: status && status !== 'ALL' ? status : undefined,
-        },
+        params: requestParams,
       });
 
-      const list = Array.isArray(res?.data)
-        ? res.data
-        : Array.isArray(res?.data?.content)
-        ? res.data.content
-        : null;
+      const rawData = res?.data;
+      const list = Array.isArray(rawData?.content)
+        ? rawData.content
+        : Array.isArray(rawData)
+        ? rawData
+        : [];
 
-      if (list && list.length > 0) {
-        const mapped: MerchantOrder[] = list.map((item: any) => ({
-          id: item.id,
-          orderCode: item.orderCode || `ORD-${item.id}`,
-          customerId: item.customerId,
-          customerName: item.customerName || `Khách hàng #${item.customerId || ''}`,
-          customerPhone: item.customerPhone || '0987654321',
-          restaurantId: item.restaurantId,
-          receiverAddress: item.receiverAddress || 'Chưa cập nhật địa chỉ',
-          subtotalAmount: Number(item.subtotalAmount || 0),
-          shippingFee: Number(item.shippingFee || 0),
-          discountAmount: Number(item.discountAmount || 0),
-          totalAmount: Number(item.totalAmount || 0),
-          paymentMethod: item.paymentMethod || 'COD',
-          statusCode: item.statusCode || 'PENDING',
-          statusLabel: item.statusLabel || item.statusCode,
-          customerNote: item.customerNote || item.note || '',
-          cancelReason: item.cancelReason || '',
-          createdAt: item.createdAt || new Date().toISOString(),
-          items: (item.items || []).map((it: any) => ({
-            id: it.id,
-            foodId: it.foodId,
-            foodName: it.foodName || 'Món ăn',
-            quantity: it.quantity || 1,
-            priceAtOrder: Number(it.priceAtOrder || 0),
-            toppings: (it.toppings || []).map((tp: any) => ({
-              id: tp.id,
-              toppingId: tp.toppingId,
-              name: tp.name || `Topping #${tp.toppingId}`,
-              price: Number(tp.price || 0),
-              quantity: tp.quantity || 1,
-            })),
+      const totalElements = rawData?.totalElements ?? list.length;
+      const totalPages = rawData?.totalPages ?? Math.max(1, Math.ceil(totalElements / (requestParams.size || 10)));
+      const pageNumber = rawData?.pageNumber ?? requestParams.page ?? 0;
+      const pageSize = rawData?.pageSize ?? requestParams.size ?? 10;
+      const last = rawData?.last ?? (pageNumber + 1 >= totalPages);
+
+      const mapped: MerchantOrder[] = list.map((item: any) => ({
+        id: item.id,
+        orderCode: item.orderCode || `ORD-${item.id}`,
+        customerId: item.customerId,
+        customerName: item.customerName || `Khách hàng #${item.customerId || ''}`,
+        customerPhone: item.customerPhone || '0987654321',
+        restaurantId: item.restaurantId,
+        receiverAddress: item.receiverAddress || 'Chưa cập nhật địa chỉ',
+        subtotalAmount: Number(item.subtotalAmount || 0),
+        shippingFee: Number(item.shippingFee || 0),
+        discountAmount: Number(item.discountAmount || 0),
+        totalAmount: Number(item.totalAmount || 0),
+        paymentMethod: item.paymentMethod || 'COD',
+        statusCode: item.statusCode || 'PENDING',
+        statusLabel: item.statusLabel || item.statusCode,
+        customerNote: item.customerNote || item.note || '',
+        cancelReason: item.cancelReason || '',
+        createdAt: item.createdAt || new Date().toISOString(),
+        items: (item.items || []).map((it: any) => ({
+          id: it.id,
+          foodId: it.foodId,
+          foodName: it.foodName || 'Món ăn',
+          quantity: it.quantity || 1,
+          priceAtOrder: Number(it.priceAtOrder || 0),
+          toppings: (it.toppings || []).map((tp: any) => ({
+            id: tp.id,
+            toppingId: tp.toppingId,
+            name: tp.name || `Topping #${tp.toppingId}`,
+            price: Number(tp.price || 0),
+            quantity: tp.quantity || 1,
           })),
-        }));
-        return {
-          status: 200,
-          message: 'Success',
-          data: mapped,
-          timestamp: new Date().toISOString(),
-        };
-      }
-      return getFallbackOrders(status);
+        })),
+      }));
+
+      return {
+        status: 200,
+        message: 'Success',
+        data: {
+          content: mapped,
+          totalElements,
+          totalPages,
+          pageNumber,
+          pageSize,
+          last,
+        },
+        timestamp: new Date().toISOString(),
+      };
     } catch {
-      return getFallbackOrders(status);
+      const fallbackList = getFallbackOrders(requestParams.status).data || [];
+      return {
+        status: 200,
+        message: 'Fallback Data',
+        data: {
+          content: fallbackList,
+          totalElements: fallbackList.length,
+          totalPages: 1,
+          pageNumber: 0,
+          pageSize: 10,
+          last: true,
+        },
+        timestamp: new Date().toISOString(),
+      };
     }
   },
 

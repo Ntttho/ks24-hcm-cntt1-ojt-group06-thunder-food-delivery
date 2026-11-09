@@ -1,7 +1,10 @@
 import React from 'react';
+import { formatCurrency } from '@/utils/formatters';
+import type { VoucherItem } from '@/services/modules/restaurantApi';
 
 interface CheckoutVoucherCardProps {
   totalDiscount: number;
+  appliedVoucher?: VoucherItem | null;
   onOpenVoucherPicker?: () => void;
   appliedVoucherCode?: string;
   appliedVoucherDiscount?: number;
@@ -10,16 +13,23 @@ interface CheckoutVoucherCardProps {
 
 export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
   totalDiscount,
+  appliedVoucher,
   onOpenVoucherPicker,
   appliedVoucherCode,
   appliedVoucherDiscount = 25000,
   onRemoveVoucher,
 }) => {
+  const hasApplied = appliedVoucher || appliedVoucherCode;
+  const displayCode = appliedVoucher ? appliedVoucher.code : appliedVoucherCode;
+  const displayDiscount = appliedVoucher
+    ? totalDiscount
+    : appliedVoucherDiscount;
+
   return (
-    <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-3">
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-secondary-container/20 flex items-center justify-center text-secondary">
+          <div className="w-7 h-7 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
             <span
               className="material-symbols-outlined text-[18px]"
               style={{ fontVariationSettings: "'FILL' 1" }}
@@ -27,88 +37,83 @@ export const CheckoutVoucherCard: React.FC<CheckoutVoucherCardProps> = ({
               confirmation_number
             </span>
           </div>
-          <span className="font-headline-sm text-headline-sm text-on-surface font-semibold">
-            Khuyến mãi &amp; Mã giảm giá
+          <span className="font-bold text-sm text-slate-800">
+            Khuyến mãi &amp; Mã giảm giá (Tối đa 1 mã)
           </span>
         </div>
         <button
           type="button"
           aria-label="Chọn hoặc nhập mã khác"
-          className="font-label-md text-label-md text-primary font-bold flex items-center gap-0.5 active:scale-95 transition-transform cursor-pointer"
+          className="text-xs text-orange-600 font-bold flex items-center gap-0.5 hover:text-orange-700 active:scale-95 transition-all cursor-pointer"
           onClick={onOpenVoucherPicker}
         >
-          Nhập mã khác
+          {hasApplied ? 'Đổi mã khác' : 'Chọn mã'}
           <span className="material-symbols-outlined text-[16px]">chevron_right</span>
         </button>
       </div>
 
-      {/* Applied Vouchers Badges */}
-      <div className="flex flex-col gap-2">
-        {/* Restaurant/Food Voucher */}
-        <div className="flex items-center justify-between bg-secondary-fixed/30 rounded-xl p-2.5">
+      {/* Applied Voucher Badge or Placeholder */}
+      {hasApplied ? (
+        <div className="flex items-center justify-between bg-orange-50 border border-orange-200 rounded-xl p-3">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-secondary-container text-on-primary flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
               <span className="material-symbols-outlined text-[18px]">sell</span>
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="font-label-md text-label-md text-on-surface truncate font-bold uppercase">
-                {appliedVoucherCode || 'THUNDERNEW'}
-              </span>
-              <span className="font-body-sm text-body-sm text-secondary truncate">
-                {appliedVoucherCode
-                  ? `Mã ưu đãi của quán (${appliedVoucherCode})`
-                  : 'Giảm giá ưu đãi cho đơn hàng'}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-900 font-extrabold truncate">
+                  {displayCode}
+                </span>
+                {appliedVoucher && (
+                  <span className="text-[10px] font-bold bg-orange-200/80 text-orange-800 px-1.5 py-0.2 rounded">
+                    {appliedVoucher.discountType === 'PERCENTAGE'
+                      ? `Giảm ${appliedVoucher.discountValue}%`
+                      : `Giảm ${formatCurrency(appliedVoucher.discountValue)}`}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] text-slate-500 truncate">
+                {appliedVoucher?.minOrderValue
+                  ? `Đơn tối thiểu ${formatCurrency(appliedVoucher.minOrderValue)}`
+                  : 'Mã ưu đãi áp dụng cho đơn hàng'}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-label-md text-label-md text-secondary font-bold">
-              -{appliedVoucherDiscount.toLocaleString('vi-VN')}đ
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-emerald-600 font-extrabold">
+              -{formatCurrency(displayDiscount)}
             </span>
-            <span
-              className="material-symbols-outlined text-primary text-[18px]"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              check_circle
-            </span>
+            {onRemoveVoucher && (
+              <button
+                type="button"
+                onClick={onRemoveVoucher}
+                className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                title="Bỏ áp dụng mã này"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            )}
           </div>
         </div>
-
-        {/* Shipping Voucher */}
-        <div className="flex items-center justify-between bg-primary-fixed/20 rounded-xl p-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-primary-container text-on-primary flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[18px]">moped</span>
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="font-label-md text-label-md text-on-surface truncate font-bold">
-                FREESHIP15K
-              </span>
-              <span className="font-body-sm text-body-sm text-primary truncate">
-                Hỗ trợ 15.000đ phí giao hàng
-              </span>
-            </div>
+      ) : (
+        <div
+          onClick={onOpenVoucherPicker}
+          className="flex items-center justify-between bg-slate-50 border border-dashed border-slate-300 rounded-xl p-3 cursor-pointer hover:border-orange-400 hover:bg-orange-50/30 transition-all"
+        >
+          <div className="flex items-center gap-2 text-slate-500 text-xs">
+            <span className="material-symbols-outlined text-orange-500 text-lg">local_offer</span>
+            <span>Chưa chọn mã giảm giá nào cho đơn này</span>
           </div>
-          <div className="flex items-center gap-1">
-            <span className="font-label-md text-label-md text-primary font-bold">
-              -15.000đ
-            </span>
-            <span
-              className="material-symbols-outlined text-primary text-[18px]"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              check_circle
-            </span>
-          </div>
+          <span className="text-xs font-semibold text-orange-600">Chọn mã ưu đãi &gt;</span>
         </div>
-      </div>
+      )}
 
-      <div className="flex items-center gap-1 text-primary font-semibold">
-        <span className="material-symbols-outlined text-[16px]">celebration</span>
-        <span className="font-label-sm text-label-sm">
-          Đã tiết kiệm được {totalDiscount.toLocaleString('vi-VN')}đ cho đơn hàng này!
-        </span>
-      </div>
+      {totalDiscount > 0 && (
+        <div className="flex items-center gap-1 text-emerald-600 font-semibold text-xs">
+          <span className="material-symbols-outlined text-[16px]">celebration</span>
+          <span>Bạn đã tiết kiệm được {formatCurrency(totalDiscount)} với mã giảm giá này!</span>
+        </div>
+      )}
     </div>
   );
 };

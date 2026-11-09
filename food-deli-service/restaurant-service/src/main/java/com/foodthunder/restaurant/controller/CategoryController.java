@@ -78,6 +78,18 @@ public class CategoryController {
     }
 
     /**
+     * Lấy chi tiết một danh mục
+     * GET /api/v1/categories/{id}
+     */
+    @GetMapping("/api/v1/categories/{id}")
+    public ResponseEntity<ApiResponse<CategoryDto>> getCategoryById(@PathVariable("id") Integer id) {
+        MenuCategory category = menuCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục với ID: " + id));
+
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin danh mục thành công", mapCategoryToDto(category)));
+    }
+
+    /**
      * Tạo mới danh mục thực đơn (CRUD Merchant)
      * POST /api/v1/categories
      */
@@ -123,12 +135,13 @@ public class CategoryController {
     }
 
     /**
+    /**
      * Cập nhật danh mục thực đơn (Đổi tên, cập nhật thứ tự hiển thị)
      * PUT /api/v1/categories/{id}
      */
     @PutMapping("/api/v1/categories/{id}")
     public ResponseEntity<ApiResponse<CategoryDto>> updateCategory(
-            @PathVariable Integer id,
+            @PathVariable("id") Integer id,
             @Valid @RequestBody CategoryRequestDto request,
             @RequestHeader(value = "X-User-Id", required = false) Integer userId,
             @RequestHeader(value = "X-User-Role", required = false) String userRole
@@ -140,8 +153,9 @@ public class CategoryController {
         checkShopOwnership(shop, userId, userRole);
 
         String newName = request.getName().trim();
-        // Check duplicate name excluding current category
-        if (menuCategoryRepository.existsByRestaurantIdAndNameIgnoreCaseAndIdNot(shop.getId(), newName, id)) {
+        Integer restaurantId = shop != null ? shop.getId() : (request.getRestaurantId() != null ? request.getRestaurantId() : 1);
+
+        if (menuCategoryRepository.existsByRestaurantIdAndNameIgnoreCaseAndIdNot(restaurantId, newName, id)) {
             throw new ConflictException("Tên danh mục '" + newName + "' đã tồn tại trong quán ăn này");
         }
 
@@ -160,7 +174,7 @@ public class CategoryController {
      */
     @DeleteMapping("/api/v1/categories/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
-            @PathVariable Integer id,
+            @PathVariable("id") Integer id,
             @RequestHeader(value = "X-User-Id", required = false) Integer userId,
             @RequestHeader(value = "X-User-Role", required = false) String userRole
     ) {
@@ -173,8 +187,7 @@ public class CategoryController {
         // Check if there are active products inside this category
         long productCount = productRepository.countByCategoryIdAndDeletedAtIsNull(id);
         if (productCount > 0) {
-            throw new BadRequestException("Không thể xoá! Danh mục đang chứa " + productCount
-                    + " món ăn. Vui lòng chuyển hoặc xoá các món này trước khi xoá danh mục.");
+            throw new ConflictException("Không thể xóa danh mục này vì đang có " + productCount + " món ăn trực thuộc. Vui lòng chuyển hoặc xóa các món ăn trước!");
         }
 
         menuCategoryRepository.delete(category);
@@ -215,7 +228,7 @@ public class CategoryController {
     }
 
     private void checkShopOwnership(Shop shop, Integer userId, String userRole) {
-        if (userRole != null && userRole.contains("MERCHANT") && userId != null) {
+        if (shop != null && userRole != null && userRole.contains("MERCHANT") && userId != null) {
             if (!shop.getOwnerId().equals(userId)) {
                 throw new ForbiddenException("Bạn không có quyền thao tác trên quán của chủ sở hữu khác (Chủ quán: " + shop.getOwnerId() + ")");
             }
@@ -230,6 +243,7 @@ public class CategoryController {
                 .name(c.getName())
                 .displayOrder(c.getDisplayOrder() != null ? c.getDisplayOrder() : 0)
                 .productCount((int) count)
+                .itemCount(count)
                 .build();
     }
 }

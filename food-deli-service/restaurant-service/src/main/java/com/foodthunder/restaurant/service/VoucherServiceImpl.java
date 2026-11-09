@@ -1,6 +1,7 @@
 package com.foodthunder.restaurant.service;
 
 import com.foodthunder.restaurant.dto.CreateVoucherRequest;
+import com.foodthunder.restaurant.dto.UpdateVoucherRequest;
 import com.foodthunder.restaurant.dto.ValidateVoucherRequest;
 import com.foodthunder.restaurant.dto.VoucherDto;
 import com.foodthunder.restaurant.dto.VoucherValidationResponse;
@@ -204,20 +205,58 @@ public class VoucherServiceImpl implements VoucherService {
 
     @Override
     @Transactional
+    public VoucherDto updateVoucher(Integer id, UpdateVoucherRequest request, Integer requesterUserId, String role) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
+
+        validateOwnership(voucher, requesterUserId, role);
+
+        String discountType = request.getDiscountType() != null ? request.getDiscountType().trim().toUpperCase() : voucher.getDiscountType();
+        if ("PERCENTAGE".equals(discountType)) {
+            if (request.getDiscountValue().compareTo(BigDecimal.ONE) < 0
+                    || request.getDiscountValue().compareTo(BigDecimal.valueOf(100)) > 0) {
+                throw new BadRequestException("Tỷ lệ giảm giá (%) phải nằm trong khoảng từ 1 đến 100");
+            }
+        }
+
+        if (request.getStartDate() != null && request.getExpiryDate() != null
+                && request.getExpiryDate().isBefore(request.getStartDate())) {
+            throw new BadRequestException("Ngày hết hạn phải sau ngày bắt đầu có hiệu lực");
+        }
+
+        voucher.setDiscountType(discountType);
+        voucher.setDiscountValue(request.getDiscountValue());
+        if ("FIXED".equals(discountType)) {
+            voucher.setDiscountAmount(request.getDiscountValue());
+        }
+        voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
+        if (request.getMinOrderValue() != null) {
+            voucher.setMinOrderValue(request.getMinOrderValue());
+        }
+        if (request.getUsageLimit() != null) {
+            voucher.setUsageLimit(request.getUsageLimit());
+        }
+        if (request.getStartDate() != null) {
+            voucher.setStartDate(request.getStartDate());
+        }
+        if (request.getExpiryDate() != null) {
+            voucher.setExpiryDate(request.getExpiryDate());
+        }
+        if (request.getIsActive() != null) {
+            voucher.setIsActive(request.getIsActive());
+        }
+
+        Voucher updated = voucherRepository.save(voucher);
+        return mapToDto(updated);
+    }
+
+    @Override
+    @Transactional
     public VoucherDto updateVoucherStatus(Integer id, Boolean isActive, Integer requesterUserId, String role) {
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
 
-        if (voucher.getRestaurantId() != null) {
-            Shop shop = shopRepository.findByIdAndDeletedAtIsNull(voucher.getRestaurantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán với ID: " + voucher.getRestaurantId()));
-            if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
-                if (!shop.getOwnerId().equals(requesterUserId)) {
-                    throw new ForbiddenException("Bạn không có quyền thay đổi trạng thái voucher của quán khác");
-                }
-            }
-        }
-
+        validateOwnership(voucher, requesterUserId, role);
         voucher.setIsActive(Boolean.TRUE.equals(isActive));
         Voucher saved = voucherRepository.save(voucher);
         return mapToDto(saved);
@@ -229,19 +268,34 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
 
-        if (voucher.getRestaurantId() != null) {
-            Shop shop = shopRepository.findByIdAndDeletedAtIsNull(voucher.getRestaurantId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán với ID: " + voucher.getRestaurantId()));
-            if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
-                if (!shop.getOwnerId().equals(requesterUserId)) {
-                    throw new ForbiddenException("Bạn không có quyền xoá voucher của quán khác");
-                }
-            }
-        }
-
+        validateOwnership(voucher, requesterUserId, role);
         voucherRepository.delete(voucher);
     }
 
+    @Override
+    @Transactional
+    public VoucherDto toggleVoucherStatus(Integer id, Integer requesterUserId, String role) {
+        Voucher voucher = voucherRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy voucher với ID: " + id));
+
+        validateOwnership(voucher, requesterUserId, role);
+        voucher.setIsActive(voucher.getIsActive() == null || !voucher.getIsActive());
+        Voucher saved = voucherRepository.save(voucher);
+        return mapToDto(saved);
+    }
+
+    private void validateOwnership(Voucher voucher, Integer requesterUserId, String role) {
+        if (role != null && role.contains("ADMIN")) {
+            return;
+        }
+        if (voucher.getRestaurantId() != null && role != null && role.contains("MERCHANT") && requesterUserId != null) {
+            Shop shop = shopRepository.findByIdAndDeletedAtIsNull(voucher.getRestaurantId())
+                    .orElse(null);
+            if (shop != null && !shop.getOwnerId().equals(requesterUserId)) {
+                throw new ForbiddenException("Bạn không có quyền quản lý voucher của quán này");
+            }
+        }
+    }
     private VoucherDto mapToDto(Voucher v) {
         return VoucherDto.builder()
                 .id(v.getId())

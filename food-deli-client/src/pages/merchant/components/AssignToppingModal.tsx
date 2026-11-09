@@ -36,8 +36,8 @@ export const AssignToppingModal: React.FC<AssignToppingModalProps> = ({
       setLoading(true);
       try {
         // 1. Fetch all toppings belonging to the restaurant
-        const allRes = await restaurantApi.getToppingsByRestaurant(restaurantId);
-        const allList = allRes.data || [];
+        const allRes = await restaurantApi.getAllToppings(restaurantId);
+        const allList = Array.isArray(allRes.data) ? allRes.data : ((allRes.data as any)?.content || []);
         setToppings(allList);
 
         // 2. Fetch assigned toppings for this product

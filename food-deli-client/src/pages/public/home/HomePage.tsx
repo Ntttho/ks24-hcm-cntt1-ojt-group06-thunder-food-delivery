@@ -1,13 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { message } from 'antd';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { addToCart } from '@/store/slices/cartSlice';
+import { addToCartAsync } from '@/store/slices/cartSlice';
+import { restaurantApi } from '@/services/modules/restaurantApi';
 import {
   HomeHeroBanner,
   HomeRestaurantDirectory,
   HomeFeaturedItems,
   type RestaurantItem,
   type FeaturedFoodItem,
+  type FoodCategoryItem,
 } from './components';
 
 const CUISINES = [
@@ -19,146 +21,297 @@ const CUISINES = [
   'Nhật Bản',
 ];
 
-const RESTAURANTS: RestaurantItem[] = [
-  {
-    id: 1,
-    name: 'Tiệm Cơm Gà Hoàng Gia',
-    cuisine: 'Việt Nam',
-    address: 'Quận 1, TP.HCM',
-    imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600',
-    rating: 4.8,
-    deliveryTime: '15-20 phút',
-  },
-  {
-    id: 2,
-    name: 'The Alley Tea House',
-    cuisine: 'Trà sữa',
-    address: 'Quận 3, TP.HCM',
-    imageUrl: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=600',
-    rating: 4.9,
-    deliveryTime: '10-15 phút',
-  },
-  {
-    id: 3,
-    name: 'Bún Bò Huế O Mai',
-    cuisine: 'Việt Nam',
-    address: 'Quận 5, TP.HCM',
-    imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600',
-    rating: 4.7,
-    deliveryTime: '20-25 phút',
-  },
-  {
-    id: 4,
-    name: 'Thunder Burger & Fries',
-    cuisine: 'Đồ ăn nhanh',
-    address: 'Quận 7, TP.HCM',
-    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600',
-    rating: 4.9,
-    deliveryTime: '15-20 phút',
-  },
-];
-
-const FEATURED_ITEMS: FeaturedFoodItem[] = [
-  {
-    id: 'item-1',
-    productId: 101,
-    productName: 'Cơm Gà Xối Mỡ Giòn Cay',
-    price: 45000,
-    shopId: 1,
-    shopName: 'Tiệm Cơm Gà Hoàng Gia',
-    imageUrl: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format&fit=crop&q=80',
-    rating: 4.8,
-    reviewsCount: 142,
-    prepTime: '15-20 phút',
-  },
-  {
-    id: 'item-2',
-    productId: 102,
-    productName: 'Trà Sữa Trân Châu Đường Đen',
-    price: 35000,
-    shopId: 2,
-    shopName: 'The Alley Tea House',
-    imageUrl: 'https://images.unsplash.com/photo-1558857563-b371033873b8?w=600&auto=format&fit=crop&q=80',
-    rating: 4.9,
-    reviewsCount: 310,
-    prepTime: '10-15 phút',
-  },
-  {
-    id: 'item-3',
-    productId: 103,
-    productName: 'Bún Bò Huế Đặc Biệt',
-    price: 55000,
-    shopId: 3,
-    shopName: 'Bún Bò Huế O Mai',
-    imageUrl: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=600&auto=format&fit=crop&q=80',
-    rating: 4.7,
-    reviewsCount: 88,
-    prepTime: '20-25 phút',
-  },
-  {
-    id: 'item-4',
-    productId: 104,
-    productName: 'Burger Bò Phô Mai Chảy',
-    price: 69000,
-    shopId: 4,
-    shopName: 'Thunder Burger & Fries',
-    imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
-    rating: 4.9,
-    reviewsCount: 220,
-    prepTime: '15-20 phút',
-  },
+const INITIAL_FOOD_CATEGORIES: FoodCategoryItem[] = [
+  { id: null, name: 'Tất cả' },
+  { id: 1, name: 'Mon chinh' },
+  { id: 2, name: 'Nuoc uong' },
+  { id: 4, name: 'Com tam' },
+  { id: 10, name: 'Bun bo' },
+  { id: 12, name: 'Tra sua' },
+  { id: 18, name: 'Ga ran' },
+  { id: 19, name: 'Burger' },
 ];
 
 export const HomePage: React.FC = () => {
   const dispatch = useAppDispatch();
+
+  // Global search input in hero banner
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState('Tất cả');
 
-  const filteredRestaurants = useMemo(() => {
-    const keyword = searchTerm.trim().toLowerCase();
-    return RESTAURANTS.filter((restaurant) => {
-      const matchesCuisine = selectedCuisine === 'Tất cả' || restaurant.cuisine === selectedCuisine;
-      const matchesKeyword =
-        !keyword ||
-        restaurant.name.toLowerCase().includes(keyword) ||
-        restaurant.cuisine.toLowerCase().includes(keyword) ||
-        restaurant.address.toLowerCase().includes(keyword);
-      return matchesCuisine && matchesKeyword;
-    });
-  }, [searchTerm, selectedCuisine]);
+  // =========================================================================
+  // 1. Phân Hệ Món Ăn (Food Items) - Hiển thị lên trước, Phân trang & Lọc API
+  // =========================================================================
+  const [foods, setFoods] = useState<FeaturedFoodItem[]>([]);
+  const [foodPage, setFoodPage] = useState<number>(0);
+  const [foodPageSize, setFoodPageSize] = useState<number>(8);
+  const [foodTotalElements, setFoodTotalElements] = useState<number>(0);
+  const [foodLoading, setFoodLoading] = useState<boolean>(true);
+  const [foodSearch, setFoodSearch] = useState<string>('');
+  const [foodCategories, setFoodCategories] = useState<FoodCategoryItem[]>(INITIAL_FOOD_CATEGORIES);
+  const [selectedFoodCategory, setSelectedFoodCategory] = useState<number | null>(null);
 
+  /**
+   * Tải danh sách danh mục món ăn từ backend API và lọc sạch trùng lặp
+   */
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await restaurantApi.getCategories();
+        if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const seen = new Set<string>();
+          const apiCats: FoodCategoryItem[] = [];
+          res.data.forEach((c) => {
+            const cleanName = c.name?.trim();
+            if (cleanName && !seen.has(cleanName.toLowerCase()) && !cleanName.includes('Ã')) {
+              seen.add(cleanName.toLowerCase());
+              apiCats.push({
+                id: c.id,
+                name: cleanName,
+              });
+            }
+          });
+          if (apiCats.length > 0) {
+            setFoodCategories([{ id: null, name: 'Tất cả' }, ...apiCats]);
+          }
+        }
+      } catch (err) {
+        console.warn('[HomePage] Categories fetch skipped:', err);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  /**
+   * Gọi API backend lấy danh sách món ăn theo phân trang, tìm kiếm và lọc danh mục
+   */
+  const fetchLiveFoods = useCallback(
+    async (
+      targetPage: number,
+      targetPageSize: number,
+      targetSearch: string,
+      targetCategoryId: number | null,
+      targetCategoryName?: string
+    ) => {
+      setFoodLoading(true);
+      try {
+        const res = await restaurantApi.getProducts({
+          page: targetPage,
+          size: targetPageSize,
+          search: targetSearch.trim() || undefined,
+          categoryId: targetCategoryId !== null ? targetCategoryId : undefined,
+          categoryName: targetCategoryName?.trim() || undefined,
+          isAvailable: true,
+        });
+
+        if (res && res.data) {
+          const raw = res.data;
+          const items = Array.isArray(raw) ? raw : (raw.content || []);
+          const mapped: FeaturedFoodItem[] = items.map((p: any) => ({
+            id: `food-${p.id}`,
+            productId: p.id,
+            productName: p.name,
+            description: p.description,
+            price: Number(p.price),
+            shopId: p.restaurantId || 1,
+            shopName: p.restaurantName || 'Quán ăn đối tác',
+            imageUrl:
+              p.imageUrl ||
+              'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80',
+            rating: Number((4.6 + ((p.id * 7) % 5) / 10).toFixed(1)),
+            reviewsCount: 40 + ((p.id * 19) % 200),
+            prepTime: '15-20 phút',
+            categoryName: p.categoryName || 'Món ngon',
+          }));
+
+          setFoods(mapped);
+          setFoodTotalElements((raw as any).totalElements ?? mapped.length);
+        } else {
+          setFoods([]);
+          setFoodTotalElements(0);
+        }
+      } catch (err) {
+        console.warn('[HomePage] Fetch live foods error:', err);
+        setFoods([]);
+        setFoodTotalElements(0);
+      } finally {
+        setFoodLoading(false);
+      }
+    },
+    []
+  );
+
+  // Debounce API search & category filter cho Món Ăn
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFoodPage(0);
+      const effectiveSearch = foodSearch.trim() || searchTerm.trim();
+      const selectedCat = foodCategories.find((c) => c.id === selectedFoodCategory);
+      fetchLiveFoods(
+        0,
+        foodPageSize,
+        effectiveSearch,
+        selectedFoodCategory,
+        selectedCat && selectedCat.name !== 'Tất cả' ? selectedCat.name : undefined
+      );
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [foodSearch, searchTerm, selectedFoodCategory, foodPageSize, foodCategories, fetchLiveFoods]);
+
+  // Xử lý chuyển trang món ăn
+  const handleFoodPageChange = (newPage: number, newPageSize: number) => {
+    setFoodPage(newPage);
+    setFoodPageSize(newPageSize);
+    const effectiveSearch = foodSearch.trim() || searchTerm.trim();
+    const selectedCat = foodCategories.find((c) => c.id === selectedFoodCategory);
+    fetchLiveFoods(
+      newPage,
+      newPageSize,
+      effectiveSearch,
+      selectedFoodCategory,
+      selectedCat && selectedCat.name !== 'Tất cả' ? selectedCat.name : undefined
+    );
+  };
+
+  // Xử lý lọc danh mục món ăn
+  const handleSelectFoodCategory = (categoryId: number | null) => {
+    setSelectedFoodCategory(categoryId);
+  };
+
+  // =========================================================================
+  // 2. Phân Hệ Nhà Hàng (Restaurants) - Phân trang & Tìm kiếm API
+  // =========================================================================
+  const [restaurants, setRestaurants] = useState<RestaurantItem[]>([]);
+  const [restaurantPage, setRestaurantPage] = useState<number>(0);
+  const [restaurantPageSize, setRestaurantPageSize] = useState<number>(8);
+  const [restaurantTotalElements, setRestaurantTotalElements] = useState<number>(0);
+  const [restaurantLoading, setRestaurantLoading] = useState<boolean>(false);
+
+  const fetchLiveRestaurants = useCallback(
+    async (targetPage: number, targetPageSize: number, targetSearch: string) => {
+      setRestaurantLoading(true);
+      try {
+        const res = await restaurantApi.getAll({
+          page: targetPage,
+          size: targetPageSize,
+          search: targetSearch.trim() || undefined,
+        });
+
+        if (res && res.data) {
+          const raw = res.data;
+          const items = Array.isArray(raw) ? raw : (raw.content || []);
+          const mapped: RestaurantItem[] = items.map((shop: any) => ({
+            id: shop.id,
+            name: shop.name,
+            cuisine: 'Việt Nam',
+            address: shop.address || 'TP. Hồ Chí Minh',
+            imageUrl:
+              shop.imageUrl ||
+              'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600',
+            rating: Number(shop.ratingAvg || 4.8),
+            deliveryTime: '20-25 phút',
+          }));
+          setRestaurants(mapped);
+          setRestaurantTotalElements((raw as any).totalElements ?? mapped.length);
+        } else {
+          setRestaurants([]);
+          setRestaurantTotalElements(0);
+        }
+      } catch {
+        setRestaurants([]);
+        setRestaurantTotalElements(0);
+      } finally {
+        setRestaurantLoading(false);
+      }
+    },
+    []
+  );
+
+  // Debounce API search cho nhà hàng (dùng searchTerm từ banner)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setRestaurantPage(0);
+      fetchLiveRestaurants(0, restaurantPageSize, searchTerm);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm, restaurantPageSize, fetchLiveRestaurants]);
+
+  const handleRestaurantPageChange = (newPage: number, newPageSize: number) => {
+    setRestaurantPage(newPage);
+    setRestaurantPageSize(newPageSize);
+    fetchLiveRestaurants(newPage, newPageSize, searchTerm);
+  };
+
+  const filteredRestaurants = useMemo(() => {
+    if (selectedCuisine === 'Tất cả') return restaurants;
+    return restaurants.filter((r) => r.cuisine === selectedCuisine);
+  }, [restaurants, selectedCuisine]);
+
+  // =========================================================================
+  // 3. Xử Lý Thêm Nhanh Vào Giỏ Hàng & Single-Shop Constraint Modal
+  // =========================================================================
   const handleQuickAdd = (item: FeaturedFoodItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    // Multi-Shop Cart: Thêm trực tiếp vào giỏ hàng, giữ nguyên các món của quán khác
+    applyAddToCart(item, false);
+  };
+
+  const applyAddToCart = (item: FeaturedFoodItem, replaceCart: boolean) => {
+    const cartItemId = `${item.productId}-base`;
+
     dispatch(
-      addToCart({
-        id: item.id,
-        productId: item.productId,
-        productName: item.productName,
-        price: item.price,
-        quantity: 1,
-        imageUrl: item.imageUrl,
-        shopId: item.shopId,
-        shopName: item.shopName,
+      addToCartAsync({
+        item: {
+          id: cartItemId,
+          productId: item.productId,
+          productName: item.productName,
+          price: item.price,
+          quantity: 1,
+          imageUrl: item.imageUrl,
+          shopId: item.shopId,
+          shopName: item.shopName,
+        },
+        replaceCart,
       })
     );
+
     message.success(`Đã thêm "${item.productName}" vào giỏ hàng!`);
   };
 
   return (
-    <div className="space-y-10">
-      {/* 1. Hero Banner with Search & Badges */}
+    <div className="space-y-10 pb-12">
+      {/* 1. Hero Banner with Global Search */}
       <HomeHeroBanner searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
-      {/* 2. Restaurant Directory with Cuisine Chips */}
+      {/* 2. MÓN ĂN CỦA CÁC NHÀ HÀNG - HIỂN THỊ LÊN TRƯỚC, PHÂN TRANG & LỌC GỌI API */}
+      <HomeFeaturedItems
+        items={foods}
+        loading={foodLoading}
+        page={foodPage}
+        pageSize={foodPageSize}
+        totalElements={foodTotalElements}
+        onPageChange={handleFoodPageChange}
+        categories={foodCategories}
+        selectedCategoryId={selectedFoodCategory}
+        onSelectCategory={handleSelectFoodCategory}
+        searchTerm={foodSearch}
+        onSearchChange={setFoodSearch}
+        onQuickAdd={handleQuickAdd}
+      />
+
+      {/* 3. DANH MỤC NHÀ HÀNG - PHÂN TRANG & TÌM KIẾM GỌI API */}
       <HomeRestaurantDirectory
         cuisines={CUISINES}
         selectedCuisine={selectedCuisine}
         onSelectCuisine={setSelectedCuisine}
         restaurants={filteredRestaurants}
+        page={restaurantPage}
+        pageSize={restaurantPageSize}
+        totalElements={restaurantTotalElements}
+        onPageChange={handleRestaurantPageChange}
+        loading={restaurantLoading}
       />
 
-      {/* 3. Featured Bestseller Foods Grid */}
-      <HomeFeaturedItems items={FEATURED_ITEMS} onQuickAdd={handleQuickAdd} />
     </div>
   );
 };

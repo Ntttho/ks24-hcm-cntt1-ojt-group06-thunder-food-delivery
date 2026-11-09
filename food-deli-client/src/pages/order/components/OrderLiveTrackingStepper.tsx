@@ -5,16 +5,18 @@ import { ClockCircleOutlined } from '@ant-design/icons';
 interface OrderLiveTrackingStepperProps {
   current: number;
   statusText: string;
-  isCancelled: boolean;
+  isError: boolean;
   statusCode?: string;
 }
 
 export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> = ({
   current,
   statusText,
-  isCancelled,
+  isError,
   statusCode,
 }) => {
+  const isCompleted = statusCode === 'DELIVERED' || statusCode === 'COMPLETED';
+
   return (
     <div className="py-2">
       <div className="bg-orange-50/70 border border-orange-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
@@ -29,7 +31,7 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
             <div className="font-bold text-gray-900 text-base">{statusText}</div>
           </div>
         </div>
-        {!isCancelled && statusCode !== 'DELIVERED' && (
+        {!isError && !isCompleted && statusCode !== 'AWAITING_PAYMENT' && (
           <div className="text-right hidden sm:block">
             <span className="text-xs text-gray-500 block">Dự kiến nhận món</span>
             <span className="text-base font-extrabold text-orange-600">~ 15 - 20 phút</span>
@@ -39,7 +41,7 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
 
       <Steps
         current={current}
-        status={isCancelled ? 'error' : undefined}
+        status={isError ? 'error' : undefined}
         responsive
         items={[
           {
@@ -65,4 +67,3 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
 };
 
 export default OrderLiveTrackingStepper;
-

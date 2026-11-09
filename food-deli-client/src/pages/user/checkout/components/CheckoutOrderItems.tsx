@@ -1,5 +1,14 @@
 import React from 'react';
 
+export interface CheckoutOrderItemData {
+  id: string | number;
+  name: string;
+  quantity: number;
+  price: number;
+  toppings?: string[];
+  note?: string;
+}
+
 interface CheckoutOrderItemsProps {
   isOrderSummaryOpen: boolean;
   onToggleSummary: () => void;
@@ -8,7 +17,18 @@ interface CheckoutOrderItemsProps {
   selectedKitchenChips: string[];
   onToggleKitchenChip: (chip: string) => void;
   subtotal: number;
+  items?: CheckoutOrderItemData[];
+  shopName?: string;
 }
+
+const DEFAULT_KITCHEN_CHIPS = [
+  'Ít cay',
+  'Không cay',
+  'Để riêng nước sốt',
+  'Nhiều đá',
+  'Ít ngọt',
+  'Nóng hổi',
+];
 
 export const CheckoutOrderItems: React.FC<CheckoutOrderItemsProps> = ({
   isOrderSummaryOpen,
@@ -18,29 +38,41 @@ export const CheckoutOrderItems: React.FC<CheckoutOrderItemsProps> = ({
   selectedKitchenChips,
   onToggleKitchenChip,
   subtotal,
+  items = [],
+  shopName = 'Thunder Food Delivery',
 }) => {
+  const displayItems = items.length > 0 ? items : [
+    {
+      id: 1,
+      name: 'Món ăn trong giỏ hàng',
+      quantity: 1,
+      price: subtotal,
+      toppings: [],
+    },
+  ];
+
   return (
-    <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-2xs overflow-hidden flex flex-col">
       {/* Merchant Header */}
-      <div className="p-space-lg flex items-center justify-between bg-surface-container-low/60 border-b border-surface-container-high/40">
+      <div className="p-4 flex items-center justify-between bg-orange-50/50 border-b border-gray-100">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-surface-container-highest flex items-center justify-center flex-shrink-0 text-primary">
-            <span className="material-symbols-outlined text-[20px]">restaurant</span>
+          <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600 font-bold">
+            <span className="material-symbols-outlined text-[18px]">storefront</span>
           </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-headline-sm text-headline-sm text-on-surface truncate font-bold">
-                Cơm Tấm Sà Bì Chưởng
+              <span className="text-sm text-gray-900 truncate font-extrabold">
+                {shopName}
               </span>
               <span
-                className="material-symbols-outlined text-primary text-[16px]"
+                className="material-symbols-outlined text-orange-500 text-[15px]"
                 style={{ fontVariationSettings: "'FILL' 1" }}
               >
                 check_circle
               </span>
             </div>
-            <span className="font-body-sm text-body-sm text-on-surface-variant truncate">
-              Chi nhánh Nguyễn Trãi, Quận 1
+            <span className="text-xs text-gray-400 truncate">
+              Đơn hàng được chế biến tươi nóng theo yêu cầu
             </span>
           </div>
         </div>
@@ -48,12 +80,12 @@ export const CheckoutOrderItems: React.FC<CheckoutOrderItemsProps> = ({
         <button
           type="button"
           aria-label="Thu gọn hoặc mở rộng danh sách"
-          className="flex items-center gap-1 text-on-surface-variant font-label-md text-label-md px-2 py-1 rounded bg-surface-container-lowest active:scale-95 transition-transform cursor-pointer hover:bg-surface-container font-semibold"
+          className="flex items-center gap-1 text-gray-600 text-xs px-2.5 py-1 rounded-lg bg-white border border-gray-200 active:scale-95 transition-all cursor-pointer hover:bg-gray-50 font-semibold"
           onClick={onToggleSummary}
         >
-          <span>Chi tiết (3 món)</span>
+          <span>{displayItems.length} món</span>
           <span
-            className={`material-symbols-outlined text-[18px] transition-transform duration-200 ${
+            className={`material-symbols-outlined text-[16px] transition-transform duration-200 ${
               isOrderSummaryOpen ? 'rotate-0' : 'rotate-180'
             }`}
           >
@@ -64,130 +96,77 @@ export const CheckoutOrderItems: React.FC<CheckoutOrderItemsProps> = ({
 
       {/* Items List */}
       {isOrderSummaryOpen && (
-        <div className="p-space-lg flex flex-col gap-3.5 transition-all">
-          {/* Item 1 */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <span className="bg-surface-container-high text-on-surface font-label-sm text-label-sm w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
-                1x
-              </span>
-              <div className="flex flex-col min-w-0">
-                <p className="font-body-lg text-body-lg text-on-surface font-semibold leading-tight">
-                  Cơm Tấm Sườn Bì Chả Đặc Biệt
-                </p>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Sườn nướng mật ong, nước mắm kẹo, mỡ hành nhiều
-                </p>
-                <span className="text-tertiary text-xs mt-0.5 italic">
-                  Ghi chú: Ít cơm, nhiều dưa chua
-                </span>
+        <div className="p-4 flex flex-col gap-3 transition-all">
+          <div className="divide-y divide-gray-100">
+            {displayItems.map((item) => (
+              <div key={item.id} className="py-2.5 first:pt-0 last:pb-0 flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="bg-orange-100 text-orange-700 text-xs font-bold w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {item.quantity}x
+                  </span>
+                  <div className="flex flex-col min-w-0">
+                    <p className="text-sm text-gray-900 font-bold leading-snug">
+                      {item.name}
+                    </p>
+                    {item.toppings && item.toppings.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {item.toppings.join(', ')}
+                      </p>
+                    )}
+                    {item.note && (
+                      <span className="text-orange-600 text-xs mt-0.5 italic">
+                        Ghi chú: {item.note}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-right flex-shrink-0">
+                  <span className="font-bold text-gray-900 text-sm">
+                    {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
               </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="font-bold text-on-surface">89.000đ</span>
-            </div>
+            ))}
           </div>
 
-          {/* Item 2 */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <span className="bg-surface-container-high text-on-surface font-label-sm text-label-sm w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
-                1x
+          {/* Kitchen Note & Quick Chips */}
+          <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
+            <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-orange-500 text-[16px]">
+                soup_kitchen
               </span>
-              <div className="flex flex-col min-w-0">
-                <p className="font-body-lg text-body-lg text-on-surface font-semibold leading-tight">
-                  Canh Khổ Qua Nhồi Thịt
-                </p>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  Nóng hổi, chuẩn vị truyền thống
-                </p>
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="font-bold text-on-surface">35.000đ</span>
-            </div>
-          </div>
+              Ghi chú cho quán ăn
+            </span>
 
-          {/* Item 3 */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
-              <span className="bg-surface-container-high text-on-surface font-label-sm text-label-sm w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 font-bold">
-                2x
-              </span>
-              <div className="flex flex-col min-w-0">
-                <p className="font-body-lg text-body-lg text-on-surface font-semibold leading-tight">
-                  Trà Tắc Xí Muội Khổng Lồ
-                </p>
-                <p className="text-xs text-on-surface-variant mt-0.5">
-                  70% đường, 100% đá
-                </p>
-              </div>
-            </div>
-            <div className="text-right flex-shrink-0">
-              <span className="font-bold text-on-surface">48.000đ</span>
-              <p className="text-[11px] text-on-surface-variant">24.000đ/ly</p>
-            </div>
-          </div>
-
-          {/* Kitchen Note Box */}
-          <div className="p-3 rounded-xl bg-surface-container-low/70 flex flex-col gap-2 border border-surface-container-high/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-secondary text-[18px]">
-                  soup_kitchen
-                </span>
-                <span className="font-label-sm text-label-sm font-bold text-on-surface">
-                  Dặn dò Quán ăn &amp; Bếp
-                </span>
-              </div>
-              <span className="text-[11px] font-label-sm text-on-surface-variant">Tùy chọn</span>
+            {/* Quick Chips */}
+            <div className="flex flex-wrap gap-1.5">
+              {DEFAULT_KITCHEN_CHIPS.map((chip) => {
+                const isSelected = selectedKitchenChips.includes(chip);
+                return (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => onToggleKitchenChip(chip)}
+                    className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-orange-500 text-white font-bold shadow-xs'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {chip}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center justify-between bg-surface-container-lowest px-3 py-2 rounded-lg border border-surface-container-high">
-              <input
-                type="text"
-                placeholder="Ghi chú cho quán (dị ứng, gia vị...)..."
-                className="w-full bg-transparent text-body-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none"
-                value={kitchenNote}
-                onChange={(e) => onChangeKitchenNote(e.target.value)}
-              />
-              <span className="material-symbols-outlined text-on-surface-variant text-[16px]">
-                edit_note
-              </span>
-            </div>
-
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-              {['+ Ít cay', '+ Không hành lá', '+ Để riêng nước sốt', '+ Lấy thêm muỗng đũa'].map(
-                (chip) => {
-                  const isSelected = selectedKitchenChips.includes(chip);
-                  return (
-                    <button
-                      key={chip}
-                      type="button"
-                      className={`flex-shrink-0 px-2.5 py-0.5 rounded-full font-label-sm text-label-sm transition-all active:scale-95 cursor-pointer ${
-                        isSelected
-                          ? 'bg-secondary text-white font-bold'
-                          : 'bg-surface-container-high/60 text-on-surface hover:bg-secondary-fixed hover:text-secondary'
-                      }`}
-                      onClick={() => onToggleKitchenChip(chip)}
-                    >
-                      {chip}
-                    </button>
-                  );
-                }
-              )}
-            </div>
-          </div>
-
-          {/* Cutlery footnote */}
-          <div className="pt-2 flex items-center justify-between text-on-surface-variant">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-[16px] text-primary">eco</span>
-              <span className="text-xs">Kèm muỗng nĩa &amp; khăn giấy</span>
-            </div>
-            <div className="text-xs text-on-surface">
-              Tạm tính: <span className="font-bold">{subtotal.toLocaleString('vi-VN')}đ</span>
-            </div>
+            <input
+              type="text"
+              value={kitchenNote}
+              onChange={(e) => onChangeKitchenNote(e.target.value)}
+              placeholder="VD: Không hành lá, xin thêm muỗng nĩa..."
+              className="mt-1 w-full text-xs px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 bg-gray-50/50"
+            />
           </div>
         </div>
       )}
@@ -196,4 +175,3 @@ export const CheckoutOrderItems: React.FC<CheckoutOrderItemsProps> = ({
 };
 
 export default CheckoutOrderItems;
-

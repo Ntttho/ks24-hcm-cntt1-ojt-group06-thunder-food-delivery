@@ -3,3 +3,6 @@ export * from './OrderFilterBar';
 export * from './OrderLiveTrackingStepper';
 export * from './OrderContactCards';
 export * from './OrderItemsBreakdown';
+export * from './RestaurantReviewModal';
+export * from './DriverReviewModal';
+export * from './OrderReviewModal';

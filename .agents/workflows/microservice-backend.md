@@ -6,19 +6,22 @@ description: Comprehensive Spring Boot Microservices Backend development workflo
 
 You are an expert Senior Spring Boot Microservices Software Engineer and Mentor. All backend source code and microservices reside inside the primary backend folder: **`food-deli-service/`** (located at `d:\ojt-food-deli-start\food-deli-service/`). When developing, migrating, or reviewing any backend feature or service in the **Food Thunder Deli** microservices architecture, follow this systematic workflow:
 
-## Step 1: Service Boundary & Architecture Placement
-1. Identify which microservice owns the feature based on the Bounded Context (10 Microservices):
+## Step 1: Service Boundary, Architecture Placement & Monolith Reference
+1. **Mandatory Monolith Reference:** Always inspect the legacy monolith implementation in **`older/grab-food-springboot/`** (`d:\ojt-food-deli-start\older\grab-food-springboot/`) before coding:
+   - Identify the existing controller, service, repository, and entity classes (e.g. `com.grabfood.controller.ToppingController`, `RestaurantController`, `OrderController`).
+   - Extract business rules, calculation algorithms, and existing endpoint contracts.
+2. Identify which microservice owns the feature based on the Bounded Context (10 Microservices):
    - **`auth-service` (Port 8081):** User credentials, roles, profile, delivery addresses. Unified Auth (`/login`, `/register`).
    - **`restaurant-service` (Port 8082):** Multi-shop management (`/mine`), menu categories, dishes/products, toppings, restaurant vouchers.
    - **`order-service` (Port 8083):** Cart operations, order checkout (ACID transaction), order state machine, price calculation.
    - **`delivery-service` (Port 8084):** Shipper pool, dispatching, virtual delivery state machine (Accept $\rightarrow$ Picked Up $\rightarrow$ Delivering $\rightarrow$ Delivered), Pessimistic Lock (`SELECT FOR UPDATE`), Driver AR/CR Engine PRD.
-   - **`payment-service` (Port 8085):** COD and VNPay Sandbox Gateway integration (URL creation, HMAC-SHA512 checksum, IPN and Return URL callback).
+   - **`payment-service` (Port 8085):** COD and VietQR / SePay Gateway integration (dynamic QR, Webhook balance tracking, transaction settlement).
    - **`review-service` (Port 8086):** Customer 5★ reviews for shops and shippers post-delivery.
    - **`chat-notification-service` (Port 8087):** WebSocket STOMP (`/ws-food-deli`) order status push, real-time customer-merchant chat, Merchant Dashboard "ding-dong" chime.
    - **`api-gateway` (Port 8080):** Routing, rate limiting, and centralized JWT validation.
    - **`discovery-service` (Port 8761):** Eureka Service Registry.
    - **`config-server` (Port 8888):** Centralized configuration server.
-2. Determine inter-service dependencies:
+3. Determine inter-service dependencies:
    - Does this feature need data from another service? (e.g., `order-service` calls `restaurant-service` to validate product price & voucher).
    - Should the communication be **Synchronous (OpenFeign REST)** or **Asynchronous (Event/Message Broker)**?
 
@@ -60,29 +63,45 @@ You are an expert Senior Spring Boot Microservices Software Engineer and Mentor.
 
 ## Step 7: Controller Layer & API Gateway Exposure
 1. Create `@RestController` mapped to `/api/v1/...`.
-2. Use constructor injection (`@RequiredArgsConstructor`).
-3. Add `@Valid` on request bodies and return appropriate HTTP status (`200 OK`, `201 Created`, `204 No Content`).
-4. Update **`api-gateway`** routing configuration:
-   - Route path predicates (e.g., `/api/v1/orders/**` $\rightarrow$ `lb://order-service`).
-   - Role authorization filters (e.g., Merchant, Shipper, Customer routes).
+2. **Dual Endpoint Compatibility:** Support both monolith RESTful paths (e.g. `/api/v1/restaurants/{id}/toppings`) and query parameters (e.g. `/api/v1/toppings?restaurantId={id}`).
+3. Use constructor injection (`@RequiredArgsConstructor`).
+4. Add `@Valid` on request bodies and return appropriate HTTP status (`200 OK`, `201 Created`, `204 No Content`).
+5. Update **`api-gateway`** routing configuration:
+   - Route path predicates without spaces after commas: `Path=/api/v1/restaurants/**,/api/v1/toppings/**,...`.
+   - Whitelist public GET endpoints in `JwtAuthenticationFilter.java` (`PUBLIC_GET_PATTERNS`).
+6. Synchronize endpoints in `food-deli-client/src/services/api/endpoints.ts`.
 
-## Step 8: Security & Context Extraction
+## Step 8: Order Lifecycle & State Machine Enforcement
+1. Follow the strict progression defined in [`document/order-status-flow.md`](file:///d:/ojt-food-deli-start/document/order-status-flow.md):
+   $$\text{PENDING} \longrightarrow \text{CONFIRMED} \longrightarrow \text{DRIVER\_ACCEPTED} \longrightarrow \text{PICKING\_UP} \longrightarrow \text{DELIVERING} \longrightarrow \mathbf{COMPLETED}$$
+2. Implement **Transition Guards** to block status skipping (e.g. `PENDING` directly to `COMPLETED`).
+3. Enforce **Role Boundaries**:
+   - Merchant only confirms preparation: `CONFIRMED`.
+   - Shipper exclusively transitions to `DELIVERING` and finalizes `COMPLETED`.
+4. Implement **Pessimistic Locking (`SELECT ... FOR UPDATE`)** on `driver_offers` / `orders` when accepting delivery offers.
+
+## Step 9: Security & Context Extraction
 1. Extract authenticated user info from JWT claims or Gateway forwarded headers (`X-User-Id`, `X-User-Role`).
 2. Enforce endpoint authorization via `@PreAuthorize("hasAuthority('ROLE_...')")`.
 3. Centralized `@RestControllerAdvice` handles validation errors, domain exceptions, and `FeignException`.
 
-## Step 9: Unit & Integration Testing
+## Step 10: Unit & Integration Testing
 1. **Service Unit Tests:** Use JUnit 5 and Mockito. Mock both local repositories and remote `@Mock FeignClient`.
 2. **Controller Tests:** Use `@WebMvcTest` with `@MockBean` for services.
 3. **Circuit Breaker Tests:** Verify fallback methods when external Feign calls fail or time out.
 4. Aim for 80%+ test coverage across core business scenarios.
 
-## Step 10: Microservice Quality & Review Checklist
+## Step 11: Microservice Quality & Review Checklist
+- [ ] Has the implementation been cross-checked against `older/grab-food-springboot`?
+- [ ] Are both RESTful and Query Param endpoint styles supported for backward compatibility?
+- [ ] Is the endpoint whitelisted in API Gateway `PUBLIC_GET_PATTERNS` if public access is needed?
+- [ ] Is the endpoint declared in `food-deli-client/src/services/api/endpoints.ts`?
+- [ ] Are Order State Machine transitions strictly validated against role permissions?
 - [ ] Are table schemas and existing database data fully preserved according to the decoupled schema?
 - [ ] Are cross-service foreign keys represented as plain IDs (no cross-service `@ManyToOne` or `@JoinColumn`)?
 - [ ] Are Feign clients protected with Circuit Breakers, timeouts, and fallbacks?
 - [ ] Is the JWT token propagated across inter-service calls via `FeignClientInterceptor`?
 - [ ] Are asynchronous events used where synchronous blocking is unnecessary?
-- [ ] Are API Gateway routes and role filters properly configured?
+- [ ] Are API Gateway routes and role filters properly configured without spaces?
 - [ ] Is constructor injection used exclusively?
 - [ ] Are all exceptions handled gracefully without leaking sensitive stack traces?

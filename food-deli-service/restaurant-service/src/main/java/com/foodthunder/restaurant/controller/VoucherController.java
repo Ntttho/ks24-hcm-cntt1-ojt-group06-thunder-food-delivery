@@ -2,6 +2,7 @@ package com.foodthunder.restaurant.controller;
 
 import com.foodthunder.restaurant.dto.ApiResponse;
 import com.foodthunder.restaurant.dto.CreateVoucherRequest;
+import com.foodthunder.restaurant.dto.UpdateVoucherRequest;
 import com.foodthunder.restaurant.dto.ValidateVoucherRequest;
 import com.foodthunder.restaurant.dto.VoucherDto;
 import com.foodthunder.restaurant.dto.VoucherValidationResponse;
@@ -74,6 +75,22 @@ public class VoucherController {
     }
 
     /**
+    /**
+     * Chỉnh sửa voucher (CRUD Merchant/Admin)
+     * PUT /api/v1/vouchers/{id}
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<VoucherDto>> updateVoucher(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateVoucherRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) Integer userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    ) {
+        VoucherDto updated = voucherService.updateVoucher(id, request, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật mã voucher thành công", updated));
+    }
+
+    /**
      * Cập nhật trạng thái kích hoạt của voucher
      * PATCH /api/v1/vouchers/{id}/status
      */
@@ -90,7 +107,21 @@ public class VoucherController {
     }
 
     /**
-     * Xóa voucher
+     * Bật / Tắt trạng thái hoạt động của voucher
+     * PATCH /api/v1/vouchers/{id}/toggle
+     */
+    @PatchMapping("/{id}/toggle")
+    public ResponseEntity<ApiResponse<VoucherDto>> toggleVoucher(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole
+    ) {
+        VoucherDto updated = voucherService.toggleVoucherStatus(id, userId, userRole);
+        return ResponseEntity.ok(ApiResponse.success("Đã thay đổi trạng thái voucher", updated));
+    }
+
+    /**
+     * Xóa voucher (CRUD Merchant/Admin)
      * DELETE /api/v1/vouchers/{id}
      */
     @DeleteMapping("/{id}")
@@ -100,6 +131,6 @@ public class VoucherController {
             @RequestHeader(value = "X-User-Role", required = false) String userRole
     ) {
         voucherService.deleteVoucher(id, userId, userRole);
-        return ResponseEntity.ok(ApiResponse.success("Xoá voucher thành công", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa mã voucher thành công", null));
     }
 }

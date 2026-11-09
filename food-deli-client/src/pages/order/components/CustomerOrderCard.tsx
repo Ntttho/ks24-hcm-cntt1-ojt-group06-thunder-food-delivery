@@ -1,13 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Tag } from 'antd';
 import {
   ShopOutlined,
   ClockCircleOutlined,
   CreditCardOutlined,
   CompassOutlined,
+  StarFilled,
+  CarOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { CustomerOrder } from '@/types';
+import { reviewApi } from '@/services/api/reviewApi';
+import { RestaurantReviewModal } from './RestaurantReviewModal';
+import { DriverReviewModal } from './DriverReviewModal';
 
 interface CustomerOrderCardProps {
   order: CustomerOrder;
@@ -19,6 +24,36 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
   onViewDetail,
 }) => {
   const navigate = useNavigate();
+  const [isRestaurantReviewOpen, setIsRestaurantReviewOpen] = useState<boolean>(false);
+  const [isDriverReviewOpen, setIsDriverReviewOpen] = useState<boolean>(false);
+  const [restaurantReviewed, setRestaurantReviewed] = useState<boolean>(false);
+  const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
+
+  const isCompleted = order.statusCode === 'DELIVERED' || order.statusCode === 'COMPLETED';
+  const orderTime = new Date(order.createdAt).getTime();
+  const isWithin24Hours = Date.now() - orderTime <= 24 * 60 * 60 * 1000;
+
+  // Tự động kiểm tra trạng thái đánh giá Quán và Tài xế từ backend
+  useEffect(() => {
+    if (!order?.id || !isCompleted || !isWithin24Hours) return;
+
+    let isMounted = true;
+    reviewApi
+      .getOrderReviewStatus(order.id)
+      .then((res) => {
+        if (isMounted && res?.data) {
+          if (res.data.isRestaurantReviewed) setRestaurantReviewed(true);
+          if (res.data.isDriverReviewed) setDriverReviewed(true);
+        }
+      })
+      .catch(() => {
+        // Giữ trạng thái hiện tại nếu chưa gọi được backend
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [order?.id, isCompleted, isWithin24Hours]);
 
   const handleGoToDetail = () => {
     if (onViewDetail) {
@@ -33,7 +68,7 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
       case 'PENDING':
         return <Tag color="gold" className="font-semibold">Chờ xác nhận</Tag>;
       case 'AWAITING_PAYMENT':
-        return <Tag color="blue" className="font-semibold">Chờ thanh toán VNPay</Tag>;
+        return <Tag color="orange" className="font-semibold">Chờ thanh toán VietQR</Tag>;
       case 'CONFIRMED':
         return <Tag color="cyan" className="font-semibold">Quán đã nhận</Tag>;
       case 'PREPARING':
@@ -136,7 +171,51 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
           </Tag>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto" onClick={(e) => e.stopPropagation()}>
+          {isCompleted && (
+            isWithin24Hours ? (
+              <>
+                {/* 1. Nút / Tag Đánh giá quán */}
+                {restaurantReviewed ? (
+                  <Tag color="orange" className="rounded-xl px-2.5 py-1 font-bold text-xs">
+                    <StarFilled className="mr-1 text-amber-500" />
+                    Quán: Đã đánh giá
+                  </Tag>
+                ) : (
+                  <Button
+                    icon={<ShopOutlined className="text-orange-500" />}
+                    onClick={() => setIsRestaurantReviewOpen(true)}
+                    className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 rounded-xl font-bold text-xs"
+                  >
+                    Đánh giá quán
+                  </Button>
+                )}
+
+                {/* 2. Nút / Tag Đánh giá tài xế (nếu có tài xế) */}
+                {order.driverId && (
+                  driverReviewed ? (
+                    <Tag color="green" className="rounded-xl px-2.5 py-1 font-bold text-xs">
+                      <StarFilled className="mr-1 text-emerald-500" />
+                      Tài xế: Đã đánh giá
+                    </Tag>
+                  ) : (
+                    <Button
+                      icon={<CarOutlined className="text-emerald-500" />}
+                      onClick={() => setIsDriverReviewOpen(true)}
+                      className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 rounded-xl font-bold text-xs"
+                    >
+                      Đánh giá tài xế
+                    </Button>
+                  )
+                )}
+              </>
+            ) : (
+              <Tag color="default" className="rounded-xl px-2 py-1 text-xs text-gray-400">
+                Hết hạn đánh giá (24h)
+              </Tag>
+            )
+          )}
+
           <Button
             type="primary"
             icon={<CompassOutlined />}
@@ -147,6 +226,26 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Modal đánh giá Quán riêng */}
+      {isRestaurantReviewOpen && (
+        <RestaurantReviewModal
+          isOpen={isRestaurantReviewOpen}
+          onClose={() => setIsRestaurantReviewOpen(false)}
+          order={order}
+          onSuccess={() => setRestaurantReviewed(true)}
+        />
+      )}
+
+      {/* Modal đánh giá Tài xế riêng */}
+      {isDriverReviewOpen && (
+        <DriverReviewModal
+          isOpen={isDriverReviewOpen}
+          onClose={() => setIsDriverReviewOpen(false)}
+          order={order}
+          onSuccess={() => setDriverReviewed(true)}
+        />
+      )}
     </div>
   );
 };

@@ -95,11 +95,46 @@ public class OrderController {
             @RequestParam(required = false) Integer restaurantId,
             @RequestParam(required = false) Integer driverId,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size
     ) {
-        PageResponse<OrderResponse> response = orderService.getOrders(restaurantId, driverId, status, page, size);
+        String searchTerm = keyword != null && !keyword.isBlank() ? keyword : search;
+        PageResponse<OrderResponse> response = orderService.getOrders(restaurantId, driverId, status, searchTerm, page, size);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách đơn hàng thành công", response));
+    }
+
+    /**
+     * PUT /api/v1/orders/{id}/payment-success
+     * Kích hoạt khi SePay Webhook / Polling xác nhận biến động số dư thành công:
+     * Chuyển trạng thái từ AWAITING_PAYMENT -> PENDING và bắn WebSocket chuông cho quán.
+     */
+    @PutMapping("/{id}/payment-success")
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmPaymentSuccess(
+            @PathVariable Long id,
+            @RequestParam(required = false) String transactionNo
+    ) {
+        log.info("Received confirm payment success for order ID: {}, transactionNo: {}", id, transactionNo);
+        OrderResponse response = orderService.confirmPaymentSuccess(id, transactionNo);
+        return ResponseEntity.ok(ApiResponse.success("Xác nhận thanh toán đơn hàng thành công", response));
+    }
+
+    /**
+     * PUT /api/v1/orders/{id}/cancel & POST /api/v1/orders/{id}/cancel
+     * Hủy đơn hàng (khi khách hủy trong 8 phút hoặc quá thời hạn thanh toán).
+     */
+    @RequestMapping(value = "/{id}/cancel", method = {RequestMethod.PUT, RequestMethod.POST})
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
+            @PathVariable Long id,
+            @RequestParam(required = false) String reason,
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader
+    ) {
+        Integer userId = parseUserId(userIdHeader, null);
+        log.info("Received cancel order request for order ID: {}, reason: {}, userId: {}", id, reason, userId);
+        OrderResponse response = orderService.cancelOrder(id, reason, userId, userRoleHeader);
+        return ResponseEntity.ok(ApiResponse.success("Hủy đơn hàng thành công", response));
     }
 
     private Integer requireUserId(String userIdHeader) {

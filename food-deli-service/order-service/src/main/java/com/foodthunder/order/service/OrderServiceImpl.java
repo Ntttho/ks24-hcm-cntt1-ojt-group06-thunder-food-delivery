@@ -15,6 +15,8 @@ import com.foodthunder.order.exception.UnauthorizedException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +26,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,17 +47,20 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusRepository orderStatusRepository;
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final RestaurantClient restaurantClient;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
             OrderStatusRepository orderStatusRepository,
             OrderStatusLogRepository orderStatusLogRepository,
-            RestaurantClient restaurantClient
+            RestaurantClient restaurantClient,
+            SimpMessagingTemplate messagingTemplate
     ) {
         this.orderRepository = orderRepository;
         this.orderStatusRepository = orderStatusRepository;
         this.orderStatusLogRepository = orderStatusLogRepository;
         this.restaurantClient = restaurantClient;
+        this.messagingTemplate = messagingTemplate;
     }
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
@@ -245,30 +251,38 @@ public class OrderServiceImpl implements OrderService {
             totalAmount = BigDecimal.ZERO;
         }
 
-        // 5. Retrieve initial status based on payment method (COD vs VNPAY)
+        // 5. Retrieve initial status based on payment method (COD vs SEPAY/VIETQR/VNPAY)
         String paymentMethod = (request.getPaymentMethod() != null && !request.getPaymentMethod().isBlank())
                 ? request.getPaymentMethod().trim().toUpperCase() : "COD";
 
         OrderStatus initialStatus;
         String initialReason;
-        if ("VNPAY".equalsIgnoreCase(paymentMethod)) {
-            paymentMethod = "VNPAY";
-            initialStatus = getOrCreateStatus(OrderStatus.AWAITING_PAYMENT, "Chờ thanh toán VNPay", "Đơn hàng đang chờ thanh toán qua cổng VNPay Sandbox", 1);
-            initialReason = "Khách hàng tạo đơn hàng qua VNPay (Chờ thanh toán)";
+        if ("VNPAY".equalsIgnoreCase(paymentMethod) || "SEPAY".equalsIgnoreCase(paymentMethod)
+                || "VIETQR".equalsIgnoreCase(paymentMethod) || "WALLET".equalsIgnoreCase(paymentMethod)) {
+            paymentMethod = ("WALLET".equalsIgnoreCase(paymentMethod) || "VIETQR".equalsIgnoreCase(paymentMethod)) ? "SEPAY" : paymentMethod;
+            initialStatus = getOrCreateStatus(OrderStatus.AWAITING_PAYMENT, "Chờ thanh toán", "Đơn hàng đang chờ thanh toán qua cổng SePay/VietQR (8 phút)", 10);
+            initialReason = "Khách hàng tạo đơn hàng qua " + paymentMethod + " (Chờ thanh toán 8 phút)";
         } else {
             paymentMethod = "COD";
-            initialStatus = getOrCreateStatus(OrderStatus.PENDING, "Chờ xác nhận", "Đơn hàng vừa được tạo, đang chờ xử lý", 2);
+            initialStatus = getOrCreateStatus(OrderStatus.PENDING, "Chờ xác nhận", "Đơn hàng vừa được tạo, đang chờ xử lý", 1);
             initialReason = "Khách hàng tạo đơn hàng COD (Chờ xác nhận)";
         }
 
         // 6. Generate unique order code
         String orderCode = generateOrderCode();
 
+        String finalCustomerName = (request.getCustomerName() != null && !request.getCustomerName().isBlank())
+                ? request.getCustomerName().trim() : ("Khách hàng #" + customerId);
+        String finalCustomerPhone = (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank())
+                ? request.getCustomerPhone().trim() : "0900000000";
+
         // 7. Build Order entity
         Order order = Order.builder()
                 .orderCode(orderCode)
                 .idempotencyKey(idempotencyKey)
                 .customerId(customerId)
+                .customerName(finalCustomerName)
+                .customerPhone(finalCustomerPhone)
                 .restaurantId(targetRestaurantId)
                 .voucherId(appliedVoucherId)
                 .receiverAddress(request.getReceiverAddress())
@@ -302,6 +316,11 @@ public class OrderServiceImpl implements OrderService {
         Order savedOrder = orderRepository.save(order);
         log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, discount: {}, status: {}",
                 savedOrder.getId(), savedOrder.getOrderCode(), paymentMethod, discountAmount, initialStatus.getCode());
+
+        // Broadcast realtime notification to Merchant if order is already PENDING (e.g. COD)
+        if (OrderStatus.PENDING.equalsIgnoreCase(initialStatus.getCode())) {
+            broadcastOrderToMerchant(savedOrder);
+        }
 
         return mapToOrderResponse(savedOrder);
     }
@@ -343,7 +362,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, int page, int size) {
+    public PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Specification<Order> spec = (root, query, cb) -> {
@@ -357,6 +376,28 @@ public class OrderServiceImpl implements OrderService {
             if (statusCode != null && !statusCode.isBlank()) {
                 predicates.add(cb.equal(root.get("status").get("code"), statusCode.toUpperCase()));
             }
+
+            if (keyword != null && !keyword.isBlank()) {
+                String kw = "%" + keyword.trim().toLowerCase() + "%";
+                if (query != null) {
+                    query.distinct(true);
+                }
+                Join<Order, OrderItem> itemsJoin = root.join("items", JoinType.LEFT);
+                List<Predicate> searchOrList = new ArrayList<>();
+                searchOrList.add(cb.like(cb.lower(root.get("orderCode")), kw));
+                searchOrList.add(cb.like(cb.lower(root.get("customerName")), kw));
+                searchOrList.add(cb.like(cb.lower(root.get("customerPhone")), kw));
+                searchOrList.add(cb.like(cb.lower(itemsJoin.get("foodName")), kw));
+
+                try {
+                    Long numericId = Long.parseLong(keyword.trim());
+                    searchOrList.add(cb.equal(root.get("id"), numericId));
+                } catch (NumberFormatException ignored) {
+                }
+
+                predicates.add(cb.or(searchOrList.toArray(new Predicate[0])));
+            }
+
             predicates.add(cb.isNull(root.get("deletedAt")));
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -522,6 +563,8 @@ public class OrderServiceImpl implements OrderService {
                 .orderCode(order.getOrderCode())
                 .idempotencyKey(order.getIdempotencyKey())
                 .customerId(order.getCustomerId())
+                .customerName(order.getCustomerName())
+                .customerPhone(order.getCustomerPhone())
                 .restaurantId(order.getRestaurantId())
                 .driverId(order.getDriverId())
                 .voucherId(order.getVoucherId())
@@ -543,5 +586,79 @@ public class OrderServiceImpl implements OrderService {
                 .items(itemResponses)
                 .statusLogs(logResponses)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse confirmPaymentSuccess(Long orderId, String transactionNo) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng ID=" + orderId));
+
+        if (!OrderStatus.AWAITING_PAYMENT.equalsIgnoreCase(order.getStatus().getCode())) {
+            log.info("Order ID={} is already at status={}, skipping payment success update",
+                    orderId, order.getStatus().getCode());
+            return mapToOrderResponse(order);
+        }
+
+        OrderStatus pendingStatus = getOrCreateStatus(OrderStatus.PENDING, "Chờ xác nhận", "Đơn hàng vừa được tạo, đang chờ xử lý", 1);
+        order.setStatus(pendingStatus);
+
+        OrderStatusLog logEntry = OrderStatusLog.builder()
+                .previousStatus(OrderStatus.AWAITING_PAYMENT)
+                .newStatus(OrderStatus.PENDING)
+                .changedBy(order.getCustomerId())
+                .reason("Thanh toán thành công qua SePay VietQR (Mã GD: " + (transactionNo != null ? transactionNo : "SEPAY-AUTO") + ")")
+                .createdAt(LocalDateTime.now())
+                .build();
+        order.addStatusLog(logEntry);
+
+        Order saved = orderRepository.save(order);
+        log.info("Order ID={} successfully transitioned from AWAITING_PAYMENT to PENDING via SePay payment", orderId);
+
+        broadcastOrderToMerchant(saved);
+        return mapToOrderResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public OrderResponse cancelOrder(Long orderId, String reason, Integer requestingUserId, String requestingUserRole) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn hàng ID=" + orderId));
+
+        String currentStatus = order.getStatus().getCode();
+        if (OrderStatus.COMPLETED.equalsIgnoreCase(currentStatus) || OrderStatus.CANCELLED.equalsIgnoreCase(currentStatus)) {
+            throw new BadRequestException("Không thể hủy đơn hàng đã ở trạng thái: " + currentStatus);
+        }
+
+        OrderStatus cancelledStatus = getOrCreateStatus(OrderStatus.CANCELLED, "Đã huỷ", "Đơn hàng đã bị huỷ", 8);
+        order.setStatus(cancelledStatus);
+        order.setCancelReason(reason != null ? reason : "Hủy đơn hàng");
+        order.setCancelledAt(LocalDateTime.now());
+        order.setCancelledByRole(requestingUserRole != null ? requestingUserRole : "CUSTOMER");
+        order.setCancelledByUserId(requestingUserId);
+
+        OrderStatusLog logEntry = OrderStatusLog.builder()
+                .previousStatus(currentStatus)
+                .newStatus(OrderStatus.CANCELLED)
+                .changedBy(requestingUserId)
+                .reason(reason != null ? reason : "Hủy đơn hàng")
+                .createdAt(LocalDateTime.now())
+                .build();
+        order.addStatusLog(logEntry);
+
+        Order saved = orderRepository.save(order);
+        log.info("Order ID={} cancelled with reason: {}", orderId, reason);
+        return mapToOrderResponse(saved);
+    }
+
+    private void broadcastOrderToMerchant(Order order) {
+        try {
+            OrderResponse response = mapToOrderResponse(order);
+            String destination = "/topic/merchant/" + order.getRestaurantId() + "/orders";
+            messagingTemplate.convertAndSend(destination, response);
+            log.info("Broadcasted realtime order {} to {}", order.getOrderCode(), destination);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast WebSocket order message: {}", e.getMessage());
+        }
     }
 }

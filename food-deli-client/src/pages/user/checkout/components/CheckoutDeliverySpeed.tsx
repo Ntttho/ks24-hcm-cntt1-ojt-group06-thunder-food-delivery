@@ -12,24 +12,24 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
   distance = '1.8 km',
 }) => {
   return (
-    <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-3">
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[20px]">local_shipping</span>
-          <h2 className="font-headline-sm text-headline-sm text-on-surface font-semibold">
+          <span className="material-symbols-outlined text-orange-500 text-[20px]">local_shipping</span>
+          <h2 className="text-sm text-gray-900 font-extrabold !mb-0">
             Tùy chọn giao hàng
           </h2>
         </div>
-        <span className="font-label-sm text-label-sm text-on-surface-variant">Khoảng cách: {distance}</span>
+        <span className="text-xs text-gray-400">Khoảng cách: {distance}</span>
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5">
+      <div className="grid grid-cols-1 gap-2">
         {/* Option 1: Priority */}
         <label
-          className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border ${
+          className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
             deliverySpeed === 'priority'
-              ? 'bg-surface-container-low border-primary ring-1 ring-primary'
-              : 'bg-surface-container-lowest border-transparent'
+              ? 'bg-orange-50/60 border-orange-500 ring-1 ring-orange-500'
+              : 'bg-gray-50/60 border-gray-100 hover:bg-gray-50'
           }`}
           onClick={() => onSelectDeliverySpeed('priority')}
         >
@@ -37,35 +37,35 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
             <div
               className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                 deliverySpeed === 'priority'
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-high text-transparent'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-200 text-transparent'
               }`}
             >
-              <span className="material-symbols-outlined text-[14px]">check</span>
+              <span className="material-symbols-outlined text-[13px]">check</span>
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <span className="font-label-lg text-label-lg text-on-surface font-bold">
-                  Giao ngay (Ưu tiên)
+                <span className="text-xs text-gray-900 font-bold">
+                  Giao nhanh hỏa tốc
                 </span>
-                <span className="bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm px-1.5 py-0.5 rounded font-semibold">
-                  Nhanh nhất
+                <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded">
+                  Khuyên chọn
                 </span>
               </div>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                20 - 25 phút • Giao trực tiếp
+              <span className="text-[11px] text-gray-500 mt-0.5">
+                15 - 25 phút • Giao trực tiếp không ghép đơn
               </span>
             </div>
           </div>
-          <span className="font-label-lg text-label-lg text-secondary font-bold">+5.000đ</span>
+          <span className="text-xs text-orange-600 font-bold">+5.000đ</span>
         </label>
 
         {/* Option 2: Standard */}
         <label
-          className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border ${
+          className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all border ${
             deliverySpeed === 'standard'
-              ? 'bg-surface-container-low border-primary ring-1 ring-primary'
-              : 'bg-surface-container-lowest border-transparent'
+              ? 'bg-orange-50/60 border-orange-500 ring-1 ring-orange-500'
+              : 'bg-gray-50/60 border-gray-100 hover:bg-gray-50'
           }`}
           onClick={() => onSelectDeliverySpeed('standard')}
         >
@@ -73,55 +73,27 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
             <div
               className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
                 deliverySpeed === 'standard'
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-high text-transparent'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-gray-200 text-transparent'
               }`}
             >
-              <span className="material-symbols-outlined text-[14px]">check</span>
+              <span className="material-symbols-outlined text-[13px]">check</span>
             </div>
             <div className="flex flex-col">
-              <span className="font-label-lg text-label-lg text-on-surface font-bold">
-                Giao tiêu chuẩn
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                30 - 35 phút • Tiết kiệm
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-900 font-bold">
+                  Giao tiêu chuẩn
+                </span>
+                <span className="bg-gray-100 text-gray-600 text-[10px] font-semibold px-1.5 py-0.2 rounded">
+                  Tiết kiệm
+                </span>
+              </div>
+              <span className="text-[11px] text-gray-500 mt-0.5">
+                30 - 40 phút • Phí ship tiêu chuẩn
               </span>
             </div>
           </div>
-          <span className="font-label-lg text-label-lg text-on-surface-variant font-medium">
-            Miễn phụ phí
-          </span>
-        </label>
-
-        {/* Option 3: Scheduled */}
-        <label
-          className={`relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border ${
-            deliverySpeed === 'schedule'
-              ? 'bg-surface-container-low border-primary ring-1 ring-primary'
-              : 'bg-surface-container-lowest border-transparent'
-          }`}
-          onClick={() => onSelectDeliverySpeed('schedule')}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-5 h-5 rounded-full flex items-center justify-center transition-colors ${
-                deliverySpeed === 'schedule'
-                  ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-high text-transparent'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[14px]">check</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-label-lg text-label-lg text-on-surface font-bold">
-                Đặt lịch trước
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Giao đúng giờ hẹn
-              </span>
-            </div>
-          </div>
-          <span className="font-label-sm text-label-sm text-primary font-bold">Chọn giờ</span>
+          <span className="text-xs text-gray-500 font-semibold">Miễn phụ phí</span>
         </label>
       </div>
     </div>
@@ -129,4 +101,3 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
 };
 
 export default CheckoutDeliverySpeed;
-

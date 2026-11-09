@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Form,
@@ -6,58 +6,88 @@ import {
   InputNumber,
   Radio,
   DatePicker,
+  Switch,
   Button,
   Space,
-  Switch,
-  Typography,
+  Row,
+  Col,
   Tag,
-  Divider,
 } from 'antd';
 import {
   GiftOutlined,
   ThunderboltOutlined,
-  CalendarOutlined,
   DollarOutlined,
   PercentageOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type { CreateVoucherPayload } from '@/services/modules/restaurantApi';
+import type {
+  VoucherItem,
+  CreateVoucherPayload,
+  UpdateVoucherPayload,
+} from '@/services/modules/restaurantApi';
 
-const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
-interface VoucherFormModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSubmit: (data: CreateVoucherPayload) => Promise<void>;
-  restaurantId: number;
+export interface VoucherFormModalProps {
+  isOpen?: boolean;
+  open?: boolean;
+  editingVoucher?: VoucherItem | null;
+  restaurantId: number | string;
+  submitting?: boolean;
   loading?: boolean;
+  onClose: () => void;
+  onSubmit: (values: CreateVoucherPayload | UpdateVoucherPayload) => Promise<void>;
 }
 
 export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
+  isOpen,
   open,
+  editingVoucher,
+  restaurantId,
+  submitting = false,
+  loading = false,
   onClose,
   onSubmit,
-  restaurantId,
-  loading = false,
 }) => {
   const [form] = Form.useForm();
   const [discountType, setDiscountType] = useState<'PERCENTAGE' | 'FIXED'>('PERCENTAGE');
 
+  const visible = open ?? isOpen ?? false;
+  const isBusy = loading || submitting;
+
   useEffect(() => {
-    if (open) {
-      form.resetFields();
-      form.setFieldsValue({
-        discountType: 'PERCENTAGE',
-        discountValue: 15,
-        maxDiscountAmount: 30000,
-        minOrderValue: 50000,
-        usageLimit: 100,
-        expiryDate: dayjs().add(30, 'day'),
-        isActive: true,
-      });
-      setDiscountType('PERCENTAGE');
+    if (visible) {
+      if (editingVoucher) {
+        const type = editingVoucher.discountType || 'FIXED';
+        setDiscountType(type);
+        form.setFieldsValue({
+          code: editingVoucher.code,
+          discountType: type,
+          discountValue: editingVoucher.discountValue,
+          maxDiscountAmount: editingVoucher.maxDiscountAmount,
+          minOrderValue: editingVoucher.minOrderValue ?? 0,
+          usageLimit: editingVoucher.usageLimit,
+          dateRange: [
+            editingVoucher.startDate ? dayjs(editingVoucher.startDate) : dayjs(),
+            editingVoucher.expiryDate ? dayjs(editingVoucher.expiryDate) : dayjs().add(30, 'day'),
+          ],
+          isActive: editingVoucher.isActive ?? true,
+        });
+      } else {
+        form.resetFields();
+        setDiscountType('PERCENTAGE');
+        form.setFieldsValue({
+          discountType: 'PERCENTAGE',
+          discountValue: 15,
+          maxDiscountAmount: 30000,
+          minOrderValue: 50000,
+          usageLimit: 100,
+          dateRange: [dayjs(), dayjs().add(30, 'day')],
+          isActive: true,
+        });
+      }
     }
-  }, [open, form]);
+  }, [visible, editingVoucher, form]);
 
   const handleGenerateCode = () => {
     const prefixes = ['THUNDER', 'GIAM', 'SALE', 'PROMO', 'VIP'];
@@ -66,49 +96,83 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
     form.setFieldsValue({ code: `${randomPrefix}${randomNum}` });
   };
 
+  const handleApplyPreset = (code: string, type: 'PERCENTAGE' | 'FIXED', val: number, max?: number, min?: number) => {
+    setDiscountType(type);
+    form.setFieldsValue({
+      code,
+      discountType: type,
+      discountValue: val,
+      maxDiscountAmount: max,
+      minOrderValue: min ?? 0,
+    });
+  };
+
   const handleFinish = async (values: any) => {
-    const expiry = values.expiryDate ? dayjs(values.expiryDate).toISOString() : dayjs().add(30, 'day').toISOString();
-    const start = values.startDate ? dayjs(values.startDate).toISOString() : new Date().toISOString();
+    const [startDateRaw, expiryDateRaw] = values.dateRange || [];
+    const startDate = startDateRaw ? dayjs(startDateRaw).toISOString() : new Date().toISOString();
+    const expiryDate = expiryDateRaw
+      ? dayjs(expiryDateRaw).toISOString()
+      : dayjs().add(30, 'day').toISOString();
 
-    const payload: CreateVoucherPayload = {
-      restaurantId,
-      code: values.code.trim().toUpperCase(),
-      discountType: values.discountType,
-      discountValue: Number(values.discountValue),
-      maxDiscountAmount:
-        values.discountType === 'PERCENTAGE' && values.maxDiscountAmount
-          ? Number(values.maxDiscountAmount)
-          : undefined,
-      minOrderValue: values.minOrderValue ? Number(values.minOrderValue) : 0,
-      usageLimit: values.usageLimit ? Number(values.usageLimit) : 100,
-      startDate: start,
-      expiryDate: expiry,
-    };
-
-    await onSubmit(payload);
+    if (editingVoucher) {
+      const payload: UpdateVoucherPayload = {
+        discountType: values.discountType,
+        discountValue: Number(values.discountValue),
+        maxDiscountAmount:
+          values.discountType === 'PERCENTAGE' && values.maxDiscountAmount
+            ? Number(values.maxDiscountAmount)
+            : undefined,
+        minOrderValue: values.minOrderValue ? Number(values.minOrderValue) : 0,
+        usageLimit: values.usageLimit ? Number(values.usageLimit) : undefined,
+        startDate,
+        expiryDate,
+        isActive: values.isActive,
+      };
+      await onSubmit(payload);
+    } else {
+      const payload: CreateVoucherPayload = {
+        restaurantId: Number(restaurantId),
+        code: values.code.trim().toUpperCase(),
+        discountType: values.discountType,
+        discountValue: Number(values.discountValue),
+        maxDiscountAmount:
+          values.discountType === 'PERCENTAGE' && values.maxDiscountAmount
+            ? Number(values.maxDiscountAmount)
+            : undefined,
+        minOrderValue: values.minOrderValue ? Number(values.minOrderValue) : 0,
+        usageLimit: values.usageLimit ? Number(values.usageLimit) : undefined,
+        startDate,
+        expiryDate,
+      };
+      await onSubmit(payload);
+    }
   };
 
   return (
     <Modal
       title={
         <div className="flex items-center gap-2 text-slate-800">
-          <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
             <GiftOutlined />
           </div>
           <div>
-            <div className="font-bold text-base">Tạo Voucher Khuyến Mãi Mới</div>
+            <div className="font-bold text-base">
+              {editingVoucher ? `Chỉnh sửa Voucher: ${editingVoucher.code}` : 'Tạo Voucher Khuyến Mãi Mới'}
+            </div>
             <div className="text-xs text-slate-400 font-normal">
-              Phát hành mã giảm giá cho quán — Khách hàng có thể nhập mã ngay tại trang Checkout
+              {editingVoucher
+                ? 'Cập nhật điều kiện hoặc thời hạn áp dụng của mã giảm giá'
+                : 'Phát hành mã giảm giá cho quán — Khách hàng có thể nhập mã ngay tại trang Checkout'}
             </div>
           </div>
         </div>
       }
-      open={open}
+      open={visible}
       onCancel={onClose}
       footer={null}
       destroyOnClose
       centered
-      width={560}
+      width={600}
     >
       <Form
         form={form}
@@ -125,13 +189,14 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             { required: true, message: 'Vui lòng nhập mã voucher!' },
             {
               pattern: /^[A-Za-z0-9_]{3,20}$/,
-              message: 'Mã voucher chỉ từ 3-20 ký tự (chữ, số hoặc gạch dưới)!',
+              message: 'Mã voucher từ 3-20 ký tự (chữ, số hoặc gạch dưới)!',
             },
           ]}
           extra="Mã tự động chuyển thành chữ hoa. Khách hàng sẽ nhập mã này tại bước thanh toán."
         >
           <div className="flex gap-2">
             <Input
+              disabled={!!editingVoucher}
               placeholder="VD: GIAM20K, SALE50, THUNDER30"
               size="large"
               className="rounded-lg uppercase font-bold tracking-wider text-slate-800"
@@ -140,16 +205,46 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
                 form.setFieldsValue({ code: e.target.value.toUpperCase() });
               }}
             />
-            <Button
-              icon={<ThunderboltOutlined />}
-              onClick={handleGenerateCode}
-              size="large"
-              className="rounded-lg text-orange-600 border-orange-200 hover:border-orange-500 font-medium"
-            >
-              Tạo ngẫu nhiên
-            </Button>
+            {!editingVoucher && (
+              <Button
+                icon={<ThunderboltOutlined />}
+                onClick={handleGenerateCode}
+                size="large"
+                className="rounded-lg text-orange-600 border-orange-200 hover:border-orange-500 font-medium"
+              >
+                Tạo mã nhanh
+              </Button>
+            )}
           </div>
         </Form.Item>
+
+        {/* Quick Presets for New Voucher */}
+        {!editingVoucher && (
+          <div className="flex flex-wrap items-center gap-1.5 pb-2">
+            <span className="text-xs text-slate-400">Gợi ý mẫu:</span>
+            <Tag
+              className="cursor-pointer hover:border-orange-500"
+              color="orange"
+              onClick={() => handleApplyPreset('THUNDER20', 'PERCENTAGE', 20, 30000, 60000)}
+            >
+              THUNDER20 (Giảm 20% max 30k)
+            </Tag>
+            <Tag
+              className="cursor-pointer hover:border-orange-500"
+              color="volcano"
+              onClick={() => handleApplyPreset('GIAM15K', 'FIXED', 15000, undefined, 50000)}
+            >
+              GIAM15K (Giảm thẳng 15k)
+            </Tag>
+            <Tag
+              className="cursor-pointer hover:border-orange-500"
+              color="purple"
+              onClick={() => handleApplyPreset('CHAOQUANMOI', 'PERCENTAGE', 50, 50000, 100000)}
+            >
+              CHAOQUANMOI (Giảm 50% max 50k)
+            </Tag>
+          </div>
+        )}
 
         {/* Discount Type Radio */}
         <Form.Item
@@ -176,133 +271,152 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
           </Radio.Group>
         </Form.Item>
 
-        {/* Discount Value */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Form.Item
-            name="discountValue"
-            label={
-              <span className="font-semibold text-slate-700">
-                {discountType === 'PERCENTAGE' ? 'Tỷ lệ giảm (%)' : 'Số tiền giảm (VNĐ)'}
-              </span>
-            }
-            rules={[
-              { required: true, message: 'Vui lòng nhập giá trị giảm!' },
-              {
-                validator: (_, value) => {
-                  if (discountType === 'PERCENTAGE' && (value < 1 || value > 100)) {
-                    return Promise.reject(new Error('Tỷ lệ giảm phải từ 1% đến 100%!'));
-                  }
-                  if (discountType === 'FIXED' && value < 1000) {
-                    return Promise.reject(new Error('Số tiền giảm tối thiểu là 1.000đ!'));
-                  }
-                  return Promise.resolve();
-                },
-              },
-            ]}
-          >
-            <InputNumber
-              className="w-full rounded-lg"
-              size="large"
-              min={discountType === 'PERCENTAGE' ? 1 : 1000}
-              max={discountType === 'PERCENTAGE' ? 100 : 10000000}
-              step={discountType === 'PERCENTAGE' ? 5 : 5000}
-              formatter={(value) =>
-                discountType === 'PERCENTAGE'
-                  ? `${value}%`
-                  : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-              }
-              parser={(value) => (value ? value.replace(/\D/g, '') : '') as any}
-            />
-          </Form.Item>
-
-          {discountType === 'PERCENTAGE' && (
+        {/* Discount Value & Max Discount */}
+        <Row gutter={16}>
+          <Col span={12}>
             <Form.Item
-              name="maxDiscountAmount"
-              label={<span className="font-semibold text-slate-700">Mức giảm tối đa (VNĐ)</span>}
-              extra="Để trống nếu không giới hạn trần giảm"
+              name="discountValue"
+              label={
+                <span className="font-semibold text-slate-700">
+                  {discountType === 'PERCENTAGE' ? 'Tỷ lệ giảm (%)' : 'Số tiền giảm (VNĐ)'}
+                </span>
+              }
+              rules={[
+                { required: true, message: 'Vui lòng nhập giá trị giảm!' },
+                {
+                  validator: (_, value) => {
+                    if (discountType === 'PERCENTAGE' && (value < 1 || value > 100)) {
+                      return Promise.reject(new Error('Tỷ lệ giảm phải từ 1% đến 100%!'));
+                    }
+                    if (discountType === 'FIXED' && value < 1000) {
+                      return Promise.reject(new Error('Số tiền giảm tối thiểu là 1.000đ!'));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
             >
               <InputNumber
                 className="w-full rounded-lg"
                 size="large"
+                min={discountType === 'PERCENTAGE' ? 1 : 1000}
+                max={discountType === 'PERCENTAGE' ? 100 : 10000000}
+                step={discountType === 'PERCENTAGE' ? 5 : 5000}
+                formatter={(value) =>
+                  discountType === 'PERCENTAGE'
+                    ? `${value}%`
+                    : `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                }
+                parser={(value) => (value ? value.replace(/\D/g, '') : '') as any}
+              />
+            </Form.Item>
+          </Col>
+
+          <Col span={12}>
+            <Form.Item
+              name="maxDiscountAmount"
+              label={
+                <span className="font-semibold text-slate-700">
+                  Giảm tối đa (VNĐ){' '}
+                  {discountType !== 'PERCENTAGE' && (
+                    <span className="text-slate-400 font-normal text-xs">(Không áp dụng)</span>
+                  )}
+                </span>
+              }
+            >
+              <InputNumber
+                className="w-full rounded-lg"
+                size="large"
+                disabled={discountType !== 'PERCENTAGE'}
                 min={1000}
                 step={5000}
-                placeholder="VD: 30,000đ"
+                placeholder="VD: 50,000"
                 formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                 parser={(value) => (value ? value.replace(/\D/g, '') : '') as any}
               />
             </Form.Item>
-          )}
-        </div>
+          </Col>
+        </Row>
 
-        {/* Min Order Value & Usage Limit */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Form.Item
-            name="minOrderValue"
-            label={<span className="font-semibold text-slate-700">Đơn hàng tối thiểu (VNĐ)</span>}
-            extra="Áp dụng khi đơn đạt từ mức này trở lên"
-          >
-            <InputNumber
-              className="w-full rounded-lg"
-              size="large"
-              min={0}
-              step={10000}
-              placeholder="0đ (Không yêu cầu)"
-              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-              parser={(value) => (value ? value.replace(/\D/g, '') : '') as any}
-            />
-          </Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="minOrderValue"
+              label={<span className="font-semibold text-slate-700">Đơn tối thiểu (VNĐ)</span>}
+            >
+              <InputNumber
+                className="w-full rounded-lg"
+                size="large"
+                min={0}
+                step={10000}
+                placeholder="VD: 50,000"
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={(value) => (value ? value.replace(/\D/g, '') : '') as any}
+              />
+            </Form.Item>
+          </Col>
 
-          <Form.Item
-            name="usageLimit"
-            label={<span className="font-semibold text-slate-700">Số lượt sử dụng tối đa</span>}
-            extra="Tổng số lần mã có thể được áp dụng"
-          >
-            <InputNumber
-              className="w-full rounded-lg"
-              size="large"
-              min={1}
-              max={10000}
-              placeholder="100 lượt"
-            />
-          </Form.Item>
-        </div>
+          <Col span={12}>
+            <Form.Item
+              name="usageLimit"
+              label={
+                <span className="font-semibold text-slate-700">
+                  Giới hạn lượt dùng{' '}
+                  <span className="text-slate-400 font-normal text-xs">(Trống = Vô hạn)</span>
+                </span>
+              }
+            >
+              <InputNumber
+                className="w-full rounded-lg"
+                size="large"
+                min={1}
+                placeholder="VD: 100"
+              />
+            </Form.Item>
+          </Col>
+        </Row>
 
-        {/* Expiry Date */}
         <Form.Item
-          name="expiryDate"
-          label={<span className="font-semibold text-slate-700">Ngày hết hạn sử dụng</span>}
-          rules={[{ required: true, message: 'Vui lòng chọn ngày hết hạn!' }]}
+          name="dateRange"
+          label={<span className="font-semibold text-slate-700">Thời hạn áp dụng</span>}
+          rules={[{ required: true, message: 'Vui lòng chọn thời gian áp dụng voucher!' }]}
         >
-          <DatePicker
-            showTime={{ format: 'HH:mm' }}
-            format="YYYY-MM-DD HH:mm"
-            className="w-full rounded-lg"
-            size="large"
-            disabledDate={(current) => current && current < dayjs().startOf('day')}
+          <RangePicker
+            showTime
+            format="DD/MM/YYYY HH:mm"
+            className="w-full rounded-lg h-10"
+            placeholder={['Ngày bắt đầu', 'Ngày hết hạn']}
           />
         </Form.Item>
 
-        <Divider className="my-2" />
+        {editingVoucher && (
+          <Form.Item
+            name="isActive"
+            label={<span className="font-semibold text-slate-700">Trạng thái phát hành</span>}
+            valuePropName="checked"
+          >
+            <Switch
+              checkedChildren="Đang hoạt động"
+              unCheckedChildren="Tạm dừng"
+              className="bg-slate-300"
+            />
+          </Form.Item>
+        )}
 
-        {/* Footer actions */}
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Kích hoạt ngay khi tạo xong
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={onClose} disabled={loading} className="rounded-lg">
+        <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+          <Space>
+            <Button onClick={onClose} disabled={isBusy}>
               Hủy
             </Button>
             <Button
               type="primary"
               htmlType="submit"
-              loading={loading}
+              loading={isBusy}
               className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-lg shadow-sm"
             >
-              Phát hành Voucher ngay
+              {editingVoucher ? 'Lưu thay đổi' : 'Phát hành Voucher ngay'}
             </Button>
-          </div>
+          </Space>
         </div>
       </Form>
     </Modal>

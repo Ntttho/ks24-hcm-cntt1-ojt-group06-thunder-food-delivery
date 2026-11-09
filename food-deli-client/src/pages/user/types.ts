@@ -1,13 +1,16 @@
 export interface CartItemType {
   id: string;
+  productId?: number;
   name: string;
   price: number;
   quantity: number;
   imageUrl: string;
   options?: string;
+  toppings?: Array<{ id: number; name: string; price: number }>;
   note?: string;
   shopId?: number;
   shopName?: string;
+  selected?: boolean;
 }
 
 export interface UpsellItemType {

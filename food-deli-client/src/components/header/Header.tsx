@@ -195,7 +195,7 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Center Navigation Links (Desktop): Trang chủ, Quán ăn, Giỏ hàng */}
+        {/* Center Navigation Links (Desktop): Trang chủ, Giỏ hàng */}
         <nav className="hidden md:flex items-center gap-1 lg:gap-2">
           <Link
             to={APP_ROUTES.HOME}
@@ -207,18 +207,6 @@ export const Header: React.FC = () => {
           >
             <HomeOutlined />
             <span>Trang chủ</span>
-          </Link>
-
-          <Link
-            to={APP_ROUTES.RESTAURANTS}
-            className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-              location.pathname.startsWith('/restaurants')
-                ? 'text-orange-600 bg-orange-50 font-bold'
-                : 'text-gray-600 hover:text-orange-600 hover:bg-gray-50'
-            }`}
-          >
-            <ShopOutlined />
-            <span>Quán ăn</span>
           </Link>
 
           <Link
@@ -323,13 +311,6 @@ export const Header: React.FC = () => {
             <HomeOutlined /> Trang chủ
           </Link>
           <Link
-            to={APP_ROUTES.RESTAURANTS}
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
-          >
-            <ShopOutlined /> Quán ăn
-          </Link>
-          <Link
             to={APP_ROUTES.CART}
             onClick={() => setMobileMenuOpen(false)}
             className="flex items-center justify-between text-gray-800 font-semibold py-2 hover:text-orange-600"
@@ -405,7 +386,7 @@ export const Header: React.FC = () => {
                 }}
                 className="mt-2 w-full"
               >
-                Đăng xuất an toàn
+                Đăng xuất
               </Button>
             </>
           ) : (

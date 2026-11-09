@@ -19,7 +19,7 @@ You are an expert Senior Spring Boot Microservices Backend Architect and Mentor.
   - **Event-Driven & Messaging:** RabbitMQ / Apache Kafka (Order Lifecycle Events, Realtime WebSocket Notification Fan-out)
   - **Distributed Tracing & Observability:** Micrometer Tracing, Zipkin / Prometheus & Spring Boot Actuator
 - **Security:** Spring Security 6, JWT (JSON Web Token), BCrypt Password Hashing, Role-Based Access Control (RBAC: ADMIN, MERCHANT, DRIVER/SHIPPER, CUSTOMER, ANONYMOUS)
-- **Payment & Realtime:** VNPay Gateway Sandbox (HMAC-SHA512 checksum), Spring WebSocket STOMP (`/ws-food-deli`)
+- **Payment & Realtime:** VietQR Gateway (Napas 247 dynamic QR code, Webhook & Polling confirmation), Spring WebSocket STOMP (`/ws-food-deli`)
 - **Persistence & ORM:** Spring Data JPA, Hibernate, MySQL 8+ (Decoupled logical schema with Plain IDs)
 - **Validation:** Jakarta Validation (`jakarta.validation-api`, Hibernate Validator)
 - **API Documentation:** Springdoc OpenAPI 3.0 / Swagger UI (Aggregated via Gateway)
@@ -55,7 +55,7 @@ The database tables and data schema are partitioned logically by domain (Bounded
    - **Responsibilities:** Virtual Delivery Workflow (Available $\rightarrow$ Accepted $\rightarrow$ Picked Up $\rightarrow$ Delivering $\rightarrow$ Delivered / Cancelled), **Pessimistic Locking (`SELECT ... FOR UPDATE`)** against Race Condition when drivers accept orders, driver performance metrics (AR/CR rolling window 100 orders per PRD), daily/weekly delivery earnings tracking.
 8. **`payment-service` (Port 8085):**
    - **Tables:** `payments`, `payment_transactions`.
-   - **Responsibilities:** COD management, **VNPay Sandbox Gateway** integration (URL creation, HMAC-SHA512 checksum, IPN and Return URL callback, updating order status to `PAID`).
+   - **Responsibilities:** COD management, **VietQR (Napas 247) Gateway** integration (Dynamic QR code generation, Webhook / polling verification, updating order status to `PAID`).
 9. **`review-service` (Port 8086):**
    - **Tables:** `reviews`.
    - **Responsibilities:** Post-order 5★ ratings and reviews for shops and shippers, review statistics.
@@ -154,6 +154,43 @@ public record ApiResponse<T>(
 - **Service Layer:** Mock local repositories AND external Feign clients (`@Mock private RestaurantClient restaurantClient`).
 - **Controller Layer:** `@WebMvcTest` with `@MockBean` for services.
 - **Feign Client & Contract Testing:** Verify Feign client contracts and fallback behaviors under failure.
+
+### 8. API Gateway Routing & Endpoints Synchronization
+- **Centralized Routing Prefix:** All frontend requests must route through `api-gateway` (Port 8080) with `/api/v1/...` prefix.
+- **Whitelist Public GET Endpoints (`PUBLIC_GET_PATTERNS`):**
+  - In `JwtAuthenticationFilter.java`, always register public browsing paths:
+    ```java
+    "/api/v1/restaurants/**", "/api/v1/shops/**", "/api/v1/categories/**",
+    "/api/v1/products/**", "/api/v1/foods/**", "/api/v1/toppings/**",
+    "/api/v1/vouchers/**", "/api/v1/addresses/**"
+    ```
+  - Without this, unauthenticated visitors browsing menu & toppings are blocked with `401 Unauthorized`.
+- **Clean Gateway Route Predicates:** In `api-gateway/src/main/resources/application.yml`, NEVER place spaces after commas in `Path` predicates (e.g. `Path=/api/v1/toppings/**,/api/v1/products/**` without space), otherwise Spring Cloud Gateway treats it as `" /api/v1/toppings/**"` causing route mismatch.
+- **Frontend Single Source of Truth:** All client URLs must be defined in `food-deli-client/src/services/api/endpoints.ts` and consumed via typed API service modules (`restaurantApi`, `orderApi`, `paymentApi`).
+
+### 9. Order Lifecycle & State Machine Workflow
+- **Strict State Machine Progression:**
+  $$\text{PENDING} \longrightarrow \text{CONFIRMED} \longrightarrow \text{DRIVER\_ACCEPTED} \longrightarrow \text{PICKING\_UP} \longrightarrow \text{DELIVERING} \longrightarrow \mathbf{COMPLETED}$$
+- **Role Authority & Ownership (RBAC State Guards):**
+  - **Khách hàng (Customer):** Đặt đơn $\rightarrow$ `PENDING`. Khách chỉ được hủy trong vòng 60 giây khi quán chưa bấm xác nhận.
+  - **Quán ăn (Merchant):** Chỉ có thẩm quyền bấm `CONFIRMED` (Bắt đầu nấu món). **Quán tuyệt đối KHÔNG ĐƯỢC PHÉP bấm `COMPLETED`** vì quán không trực tiếp giao hàng.
+  - **Tài xế (Shipper):** Là người **duy nhất** có quyền bấm `DELIVERING` (khi đã lấy món tại quán) và `COMPLETED` (sau khi giao tận tay khách và thu đủ tiền COD nếu có).
+- **Concurrency & Race Condition:** Nhận đơn tài xế bắt buộc dùng **Pessimistic Locking (`SELECT ... FOR UPDATE`)** để đảm bảo 1 đơn chỉ có 1 tài xế nhận duy nhất.
+- **Hậu Mãi & Quyết Toán:** Khi đơn chuyển `COMPLETED`, hệ thống tự động kích hoạt tính năng Đánh giá 5★ (Review) và quyết toán số dư ví Merchant & Shipper. Chi tiết đặc tả tại [`document/order-status-flow.md`](file:///d:/ojt-food-deli-start/document/order-status-flow.md).
+
+### 10. Mandatory Reference to Monolith Legacy Codebase (`older/grab-food-springboot`)
+- **Always Cross-Check with `older/`:** When creating, modifying, or debugging backend entities, repositories, service methods, and controllers, ALWAYS reference and cross-examine the original monolithic implementation at `older/grab-food-springboot/` (`d:\ojt-food-deli-start\older\grab-food-springboot/`).
+- **Core Controller Mappings Reference:**
+  - `ToppingController` $\longleftrightarrow$ `com.grabfood.controller.ToppingController`
+  - `RestaurantController` $\longleftrightarrow$ `com.grabfood.controller.RestaurantController`
+  - `Food/ProductController` $\longleftrightarrow$ `com.grabfood.controller.FoodController`
+  - `OrderController` $\longleftrightarrow$ `com.grabfood.controller.OrderController`
+  - `DriverController` $\longleftrightarrow$ `com.grabfood.controller.DriverController`
+  - `PaymentController` $\longleftrightarrow$ `com.grabfood.controller.PaymentController`
+- **Dual API Compatibility Standard:** Microservice controllers MUST support BOTH:
+  1. Monolith RESTful path format: `GET /api/v1/restaurants/{id}/toppings`, `GET /api/v1/foods/{id}/toppings`.
+  2. Microservice query param format: `GET /api/v1/toppings?restaurantId={id}`.
+- **Database Schema Validation:** Cross-reference Entity fields with `database/seed_all.sql` and `older/grab-food-springboot/src/main/java/com/grabfood/entity/` to prevent missing column errors (e.g. `group_name` in `toppings`).
 
 ---
 

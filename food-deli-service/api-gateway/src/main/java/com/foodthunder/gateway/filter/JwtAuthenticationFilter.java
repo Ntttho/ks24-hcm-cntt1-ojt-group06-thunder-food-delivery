@@ -32,6 +32,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     private static final List<String> EXACT_PUBLIC_PATHS = List.of(
+            "/ws",
             "/api/v1/auth/login",
             "/api/v1/auth/register",
             "/api/v1/auth/forgot-password",
@@ -40,8 +41,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     );
 
     private static final List<String> PATTERN_PUBLIC_PATHS = List.of(
+            "/ws/**",
             "/api/v1/auth/login/**",
             "/api/v1/auth/register/**",
+            "/api/v1/payments/**",
             "/actuator/**",
             "/eureka/**",
             "/fallback/**",
@@ -56,6 +59,13 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/shops/**",
             "/api/v1/categories/**",
             "/api/v1/products/**",
+            "/api/v1/foods/**",
+            "/api/v1/toppings/**",
+            "/api/v1/vouchers/**",
+            "/api/v1/reviews/restaurants/**",
+            "/api/v1/reviews/shops/**",
+            "/api/v1/users/**",
+            "/api/v1/cart/**",
             "/api/v1/addresses/suggest",
             "/api/v1/addresses/detail/**",
             "/api/v1/addresses/reverse"

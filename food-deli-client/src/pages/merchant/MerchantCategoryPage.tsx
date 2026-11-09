@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Card,
   Table,
@@ -13,8 +13,6 @@ import {
   Tooltip,
   Row,
   Col,
-  Empty,
-  Badge,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
@@ -22,12 +20,9 @@ import {
   SearchOutlined,
   EditOutlined,
   DeleteOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
-  AppstoreOutlined,
-  FolderOpenOutlined,
   SyncOutlined,
-  RightOutlined,
+  FolderOpenOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import {
   restaurantApi,
@@ -40,7 +35,6 @@ const { Title, Text } = Typography;
 
 export const MerchantCategoryPage: React.FC = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
   const currentRestaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
 
@@ -48,405 +42,271 @@ export const MerchantCategoryPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
 
-  // Modal State
+  // Modal Create/Edit state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingCategory, setEditingCategory] = useState<MenuCategoryItem | null>(null);
-  const [modalLoading, setModalLoading] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const loadCategories = async () => {
+  // Fetch Categories from API
+  const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
       const res = await restaurantApi.getCategories(currentRestaurantId);
       if (res && res.data) {
-        // Sort by displayOrder ascending
-        const sorted = [...res.data].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        setCategories(sorted);
+        setCategories(Array.isArray(res.data) ? res.data : []);
       }
     } catch {
-      message.error('Không thể tải danh sách danh mục');
+      message.error('Không thể tải danh sách danh mục món ăn');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    loadCategories();
   }, [currentRestaurantId]);
 
-  // Filter categories by search text
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  // Client-side search filtering
   const filteredCategories = useMemo(() => {
-    return categories.filter((c) => {
-      return (
-        searchText.trim() === '' ||
-        c.name.toLowerCase().includes(searchText.toLowerCase())
-      );
-    });
+    const q = searchText.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter((c) => c.name.toLowerCase().includes(q));
   }, [categories, searchText]);
 
-  // Stats
-  const totalCategories = categories.length;
-  const categoriesWithProducts = useMemo(
-    () => categories.filter((c) => (c.productCount ?? 0) > 0).length,
-    [categories]
-  );
-  const totalProducts = useMemo(
-    () => categories.reduce((sum, c) => sum + (c.productCount ?? 0), 0),
-    [categories]
-  );
+  // Handle open create modal
+  const handleOpenCreateModal = () => {
+    setEditingCategory(null);
+    setIsModalOpen(true);
+  };
 
-  // Handle Create or Update
-  const handleFormSubmit = async (values: { name: string; displayOrder?: number }) => {
-    setModalLoading(true);
+  // Handle open edit modal
+  const handleOpenEditModal = (cat: MenuCategoryItem) => {
+    setEditingCategory(cat);
+    setIsModalOpen(true);
+  };
+
+  // Handle submit create or update
+  const handleSubmitCategory = async (values: { name: string; restaurantId: number }) => {
+    setSubmitting(true);
     try {
       if (editingCategory) {
-        // Update existing category
         await restaurantApi.updateCategory(editingCategory.id, {
           name: values.name,
-          displayOrder: values.displayOrder,
+          restaurantId: values.restaurantId,
         });
-        message.success(`Đã cập nhật danh mục: "${values.name}"`);
+        message.success(`Đã cập nhật danh mục "${values.name}" thành công!`);
       } else {
-        // Create new category
         await restaurantApi.createCategory({
-          restaurantId: currentRestaurantId,
           name: values.name,
-          displayOrder: values.displayOrder ?? categories.length,
+          restaurantId: values.restaurantId,
         });
-        message.success(`Đã thêm mới danh mục: "${values.name}"`);
+        message.success(`Đã thêm danh mục mới "${values.name}" thành công!`);
       }
       setIsModalOpen(false);
       setEditingCategory(null);
-      await loadCategories();
+      fetchCategories();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Có lỗi xảy ra, vui lòng thử lại';
-      message.error(msg);
+      const errorMsg =
+        err?.response?.data?.message || err?.message || 'Có lỗi xảy ra, vui lòng thử lại';
+      message.error(errorMsg);
     } finally {
-      setModalLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Handle Delete
+  // Handle delete category
   const handleDeleteCategory = async (cat: MenuCategoryItem) => {
-    if ((cat.productCount ?? 0) > 0) {
-      message.warning(
-        `Danh mục "${cat.name}" đang có ${cat.productCount} món ăn. Vui lòng chuyển hoặc xóa các món trước khi xóa danh mục!`
-      );
-      return;
-    }
     try {
       await restaurantApi.deleteCategory(cat.id);
       message.success(`Đã xóa danh mục "${cat.name}"`);
-      await loadCategories();
+      fetchCategories();
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Không thể xóa danh mục';
-      message.error(msg);
+      const errorMsg =
+        err?.response?.data?.message ||
+        'Không thể xóa danh mục. Vui lòng đảm bảo không còn món ăn nào thuộc danh mục này.';
+      message.error(errorMsg);
     }
   };
 
-  // Handle Move Up / Move Down (Sắp xếp thứ tự hiển thị)
-  const handleMoveOrder = async (index: number, direction: 'up' | 'down') => {
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= categories.length) return;
-
-    const newCategories = [...categories];
-    const temp = newCategories[index];
-    newCategories[index] = newCategories[targetIndex];
-    newCategories[targetIndex] = temp;
-
-    // Update display orders
-    const orderedIds = newCategories.map((c) => c.id);
-    setCategories(newCategories);
-
-    try {
-      await restaurantApi.reorderCategories(currentRestaurantId, orderedIds);
-      message.success('Đã cập nhật thứ tự hiển thị trên menu');
-    } catch {
-      message.info('Đã lưu thứ tự hiển thị danh mục');
-    }
-  };
-
+  // Table columns definition
   const columns: ColumnsType<MenuCategoryItem> = [
     {
-      title: 'Thứ tự',
-      key: 'order',
-      width: 120,
-      align: 'center',
-      render: (_, record, index) => (
-        <div className="flex items-center justify-center gap-1">
-          <Tag color="orange" className="font-bold text-xs px-2 rounded-full m-0">
-            #{index + 1}
-          </Tag>
-          <div className="flex flex-col ml-1">
-            <Button
-              type="text"
-              size="small"
-              icon={<ArrowUpOutlined style={{ fontSize: '11px' }} />}
-              disabled={index === 0}
-              onClick={() => handleMoveOrder(index, 'up')}
-              className="h-5 w-5 p-0 text-slate-400 hover:text-orange-500"
-              title="Di chuyển lên trên"
-            />
-            <Button
-              type="text"
-              size="small"
-              icon={<ArrowDownOutlined style={{ fontSize: '11px' }} />}
-              disabled={index === categories.length - 1}
-              onClick={() => handleMoveOrder(index, 'down')}
-              className="h-5 w-5 p-0 text-slate-400 hover:text-orange-500"
-              title="Di chuyển xuống dưới"
-            />
-          </div>
-        </div>
-      ),
+      title: 'Mã',
+      dataIndex: 'id',
+      key: 'id',
+      width: 80,
+      render: (id: number) => <span className="font-mono text-slate-500 text-xs">#{id}</span>,
     },
     {
-      title: 'Tên Danh mục',
+      title: 'Tên danh mục',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string, record: MenuCategoryItem) => (
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-orange-50 border border-orange-100 text-orange-500 flex items-center justify-center flex-shrink-0 font-bold text-base shadow-2xs">
-            <FolderOpenOutlined />
+      render: (name: string) => (
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center font-bold">
+            <FolderOpenOutlined className="text-base" />
           </div>
           <div>
-            <div className="font-bold text-slate-800 text-sm">{name}</div>
-            <div className="text-[11px] text-slate-400">
-              Mã danh mục: #{record.id} • Thứ tự ưu tiên: {record.displayOrder ?? 0}
-            </div>
+            <span className="font-semibold text-slate-800 text-sm">{name}</span>
           </div>
         </div>
       ),
     },
     {
-      title: 'Số lượng Món ăn',
-      key: 'productCount',
-      width: 180,
+      title: 'Số món ăn',
+      key: 'itemCount',
+      width: 140,
       align: 'center',
-      render: (_, record: MenuCategoryItem) => {
-        const count = record.productCount ?? 0;
+      render: (_: any, record: MenuCategoryItem) => {
+        const c = record.itemCount ?? record.productCount ?? 0;
         return (
-          <div className="flex items-center justify-center gap-2">
-            <Tag
-              color={count > 0 ? 'blue' : 'default'}
-              className="px-2.5 py-0.5 rounded-full text-xs font-semibold m-0"
-            >
-              {count} món
-            </Tag>
-            {count > 0 && (
-              <Tooltip title="Xem các món trong danh mục này trên thực đơn">
-                <Button
-                  type="link"
-                  size="small"
-                  className="p-0 text-xs text-orange-600 hover:text-orange-700 flex items-center"
-                  onClick={() => navigate('/merchant/menu')}
-                >
-                  Xem <RightOutlined style={{ fontSize: '10px' }} />
-                </Button>
-              </Tooltip>
-            )}
-          </div>
+          <Tag color={c > 0 ? 'processing' : 'default'} className="font-semibold px-2 py-0.5">
+            {c} món
+          </Tag>
         );
       },
     },
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 160,
+      width: 130,
       align: 'center',
-      render: (_, record: MenuCategoryItem) => (
-        <Space size="middle">
-          <Tooltip title="Đổi tên danh mục">
-            <Button
-              type="text"
-              icon={<EditOutlined className="text-blue-600" />}
-              onClick={() => {
-                setEditingCategory(record);
-                setIsModalOpen(true);
-              }}
-              className="hover:bg-blue-50 rounded-lg"
-            >
-              Sửa
-            </Button>
-          </Tooltip>
-          <Tooltip title="Xóa danh mục">
-            <Popconfirm
-              title={`Xóa danh mục "${record.name}"?`}
-              description={
-                (record.productCount ?? 0) > 0
-                  ? 'Danh mục này đang chứa món ăn! Vui lòng xoá hoặc chuyển món trước khi xóa.'
-                  : 'Bạn có chắc chắn muốn xóa danh mục này không?'
-              }
-              onConfirm={() => handleDeleteCategory(record)}
-              okText="Xóa"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true, disabled: (record.productCount ?? 0) > 0 }}
-            >
+      render: (_: any, record: MenuCategoryItem) => {
+        const hasItems = (record.itemCount ?? record.productCount ?? 0) > 0;
+        return (
+          <Space size="small">
+            <Tooltip title="Chỉnh sửa">
               <Button
                 type="text"
-                danger
-                icon={<DeleteOutlined />}
-                className="hover:bg-red-50 rounded-lg"
+                size="small"
+                icon={<EditOutlined className="text-blue-600" />}
+                onClick={() => handleOpenEditModal(record)}
+                className="hover:bg-blue-50"
+              />
+            </Tooltip>
+
+            <Tooltip
+              title={
+                hasItems
+                  ? 'Danh mục đang có món ăn, xóa sẽ thất bại nếu còn món!'
+                  : 'Xóa danh mục này'
+              }
+            >
+              <Popconfirm
+                title="Xác nhận xóa danh mục?"
+                description={
+                  hasItems
+                    ? `Danh mục "${record.name}" hiện có ${record.itemCount ?? record.productCount} món ăn. Bạn có chắc muốn xóa?`
+                    : `Bạn có chắc muốn xóa danh mục "${record.name}"?`
+                }
+                onConfirm={() => handleDeleteCategory(record)}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
               >
-                Xóa
-              </Button>
-            </Popconfirm>
-          </Tooltip>
-        </Space>
-      ),
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined className="text-rose-600" />}
+                  className="hover:bg-rose-50"
+                />
+              </Popconfirm>
+            </Tooltip>
+          </Space>
+        );
+      },
     },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Title level={3} className="!mb-1 font-extrabold text-slate-800">
-            Quản lý Danh mục (Catalog) Thực đơn
-          </Title>
-          <Text className="text-slate-500 text-sm">
-            Tổ chức các nhóm món (Món khai vị, Món chính, Trà hoa quả...), đổi tên và sắp xếp thứ tự hiển thị trên menu.
-          </Text>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            icon={<SyncOutlined />}
-            onClick={loadCategories}
-            loading={loading}
-            className="rounded-xl shadow-2xs text-slate-600 hover:text-orange-500"
-          >
-            Làm mới
-          </Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setEditingCategory(null);
-              setIsModalOpen(true);
-            }}
-            className="bg-orange-500 hover:bg-orange-600 rounded-xl font-bold text-white shadow-sm"
-          >
-            + Thêm Danh mục Món
-          </Button>
-        </div>
-      </div>
-
-      {/* Metric Stats Cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={8}>
-          <Card className="rounded-2xl border-slate-200/80 shadow-2xs hover:shadow-sm transition-shadow">
+      {/* 1. Page Header */}
+      <Card className="rounded-2xl border-slate-200 shadow-xs">
+        <Row justify="space-between" align="middle" gutter={[16, 16]}>
+          <Col xs={24} md={14}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center text-xl font-bold">
-                <FolderOpenOutlined />
-              </div>
-              <div>
-                <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  Tổng danh mục
-                </div>
-                <div className="text-2xl font-black text-slate-800">
-                  {totalCategories}
-                </div>
-              </div>
-            </div>
-          </Card>
-        </Col>
-
-        <Col xs={24} sm={8}>
-          <Card className="rounded-2xl border-slate-200/80 shadow-2xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl font-bold">
+              <div className="w-12 h-12 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center text-2xl shadow-xs">
                 <AppstoreOutlined />
               </div>
               <div>
-                <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  Đã có món ăn
-                </div>
-                <div className="text-2xl font-black text-emerald-600">
-                  {categoriesWithProducts} <span className="text-xs text-slate-400 font-normal">/ {totalCategories}</span>
-                </div>
+                <Title level={4} className="!mb-0 text-slate-800">
+                  Quản Lý Danh Mục Món Ăn
+                </Title>
+                <Text className="text-slate-500 text-xs">
+                  Phân loại và sắp xếp các nhóm món ăn trong thực đơn của quán
+                </Text>
               </div>
             </div>
-          </Card>
-        </Col>
+          </Col>
 
-        <Col xs={24} sm={8}>
-          <Card className="rounded-2xl border-slate-200/80 shadow-2xs hover:shadow-sm transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-xl font-bold">
-                <Badge count={totalProducts} overflowCount={999} color="#2563eb" />
-              </div>
-              <div>
-                <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider">
-                  Tổng số món đã phân nhóm
-                </div>
-                <div className="text-2xl font-black text-blue-600">
-                  {totalProducts} <span className="text-xs text-slate-400 font-normal">món</span>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </Col>
-      </Row>
+          <Col xs={24} md={10} className="flex justify-end gap-2">
+            <Button
+              icon={<SyncOutlined spin={loading} />}
+              onClick={fetchCategories}
+              disabled={loading}
+              className="rounded-lg"
+            >
+              Làm mới
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleOpenCreateModal}
+              className="bg-orange-500 hover:bg-orange-600 border-none rounded-lg font-semibold text-white"
+            >
+              Thêm Danh Mục
+            </Button>
+          </Col>
+        </Row>
+      </Card>
 
-      {/* Main Table Card */}
-      <Card className="rounded-2xl border-slate-200/80 shadow-xs overflow-hidden">
-        {/* Search bar & helper guide */}
-        <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/50">
-          <Input
-            placeholder="Tìm kiếm danh mục theo tên..."
-            prefix={<SearchOutlined className="text-slate-400 mr-1" />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            allowClear
-            className="w-full md:w-80 rounded-xl"
-          />
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="font-semibold text-orange-600">Mẹo:</span>
-            <span>Bấm nút ⬆️ ⬇️ tại cột Thứ tự để thay đổi vị trí danh mục trên ứng dụng khách hàng.</span>
+      {/* 2. Main Table & Filter */}
+      <Card className="rounded-2xl border-slate-200 shadow-xs">
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+          <div className="w-full sm:w-80">
+            <Input
+              placeholder="Tìm theo tên danh mục..."
+              prefix={<SearchOutlined className="text-slate-400" />}
+              allowClear
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="rounded-lg"
+            />
+          </div>
+
+          <div className="text-xs text-slate-500 font-medium">
+            Tổng cộng: <strong className="text-slate-700">{filteredCategories.length}</strong> danh mục
           </div>
         </div>
 
-        {/* Categories Table */}
         <Table
-          columns={columns}
           dataSource={filteredCategories}
+          columns={columns}
           rowKey="id"
           loading={loading}
-          pagination={false}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="Quán chưa có danh mục nào. Hãy tạo danh mục đầu tiên!"
-              >
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    setEditingCategory(null);
-                    setIsModalOpen(true);
-                  }}
-                  className="bg-orange-500 hover:bg-orange-600 rounded-xl font-semibold text-white"
-                >
-                  Tạo Danh mục ngay
-                </Button>
-              </Empty>
-            ),
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: ['5', '10', '20'],
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} danh mục`,
           }}
-          className="ant-table-striped"
+          locale={{
+            emptyText: 'Chưa có danh mục nào',
+          }}
         />
       </Card>
 
-      {/* Category Create/Edit Modal */}
+      {/* 3. Form Modal */}
       <CategoryFormModal
-        open={isModalOpen}
+        isOpen={isModalOpen}
+        editingCategory={editingCategory}
+        restaurantId={currentRestaurantId}
+        submitting={submitting}
         onClose={() => {
           setIsModalOpen(false);
           setEditingCategory(null);
         }}
-        onSubmit={handleFormSubmit}
-        initialData={editingCategory}
-        loading={modalLoading}
+        onSubmit={handleSubmitCategory}
       />
     </div>
   );

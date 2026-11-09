@@ -11,7 +11,7 @@
 ## 🎯 I. MỤC TIÊU TỐI THƯỢNG CỦA SPRINT 2 (SPRINT GOAL)
 
 > **Sprint Goal:**  
-> *"Dứt điểm toàn bộ nợ kỹ thuật từ Sprint 1; hoàn thiện khép kín 100% trải nghiệm đặt món của Khách hàng (khám phá thực đơn, tùy chọn topping, giỏ hàng Redux, checkout bảo mật, thanh toán VNPay Sandbox & COD); và triển khai toàn diện Cổng Đối tác Quán ăn (Merchant Portal) nhận đơn thời gian thực kèm chuông báo WebSocket STOMP."*
+> *"Dứt điểm toàn bộ nợ kỹ thuật từ Sprint 1; hoàn thiện khép kín 100% trải nghiệm đặt món của Khách hàng (khám phá thực đơn, tùy chọn topping, giỏ hàng Redux, checkout bảo mật, thanh toán VietQR & COD); và triển khai toàn diện Cổng Đối tác Quán ăn (Merchant Portal) nhận đơn thời gian thực kèm chuông báo WebSocket STOMP."*
 
 ### 📌 Chiến Lược Trọng Tâm & Nguyên Tắc Thực Thi
 1. **Tập trung tuyệt đối vào 2 đối tượng: Khách hàng (Customer) & Đối tác Quán ăn (Merchant):**
@@ -23,7 +23,7 @@
    - Xóa bỏ toàn bộ dữ liệu giả lập (mock data) ở Trang chủ và Giỏ hàng; kết nối 100% API thật từ `restaurant-service` và `order-service`.
    - Bọc Route Guard `<ProtectedRoute>` bảo vệ thanh toán, tự động chuyển hướng đăng nhập.
 3. **Hoàn thiện Cổng Thanh toán & Hạ tầng Realtime (Thọ - Leader phụ trách):**
-   - Tích hợp cổng thanh toán trực tuyến **VNPay Sandbox** (HMAC-SHA512 checksum, IPN Webhook, Return URL, cập nhật trạng thái đơn).
+   - Tích hợp cổng thanh toán trực tuyến quét mã **VietQR (Napas 247)** (sinh mã VietQR động chuẩn EMVCo/VietQR API kèm nội dung đơn hàng, Webhook/IPN xác nhận giao dịch tự động, polling tra cứu trạng thái và cập nhật đơn hàng).
    - Thiết lập hạ tầng **Spring WebSocket STOMP Hub** (`/ws-food-deli`), phát chuông báo âm thanh "ding-dong" tức thì khi Quán có đơn mới.
 
 ---
@@ -34,12 +34,12 @@ Toàn đội gồm **6 thành viên**, tổng khối lượng công việc đư�
 
 | Thành viên | Vai trò chính | Chuyên môn cốt lõi | Story Points (SP) | Tỷ lệ đóng góp | Trách nhiệm chính trong Sprint 2 |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| **Thọ** | **Leader & Architect** | Gateway, Payment, WebSocket, Docker | **9 SP** | 17.3% | • Tích hợp Cổng thanh toán VNPay Sandbox (5 SP).<br>• Thiết lập WebSocket STOMP Hub & Chuông báo đơn (4 SP). |
+| **Thọ** | **Leader & Architect** | Gateway, Payment, WebSocket, Docker | **9 SP** | 17.3% | • Tích hợp Cổng thanh toán Quét mã VietQR (5 SP).<br>• Thiết lập WebSocket STOMP Hub & Chuông báo đơn (4 SP). |
 | **Duy** | **Backend Core Engineer** | Spring Data JPA, Concurrency, ACID | **7 SP** | 13.5% | • Lõi `order-service` xử lý đặt hàng ACID (4 SP).<br>• Backend API Quản lý Topping & gán món ăn (3 SP). |
 | **Quang anh** | **Backend / Fullstack** | Spring Boot, Merchant Portal, REST | **12 SP** | 23.1% | • Merchant Dashboard xử lý đơn Realtime (3 SP).<br>• CRUD Món ăn & Toggle Còn/Hết hàng (3 SP).<br>• Giao diện Quản lý Topping Quán (4 SP).<br>• Quản lý Menu Category & Voucher Quán (2 SP). |
 | **Nhựt** | **Frontend Core Engineer** | React 19, Auth, Router Guard, State | **7 SP** | 13.5% | • Header Role-Nav & Unified Auth UI (2 SP).<br>• Route Guard Checkout & Redirect (2 SP).<br>• Màn hình Lịch sử Đơn hàng `/orders` (3 SP). |
 | **Thịnh** | **Frontend Engineer** | UI/UX, Search, Category Filter | **9 SP** | 17.3% | • Redesign Home UI chuẩn đẹp ShopeeFood (2 SP).<br>• Category Filter & Debounce Search (2 SP).<br>• Gắn API Quán/Món thật cho Trang chủ (2 SP).<br>• Trang Chi tiết Quán & Modal Topping (3 SP). |
-| **Đức** | **Frontend Portals** | Redux Toolkit, Dashboard, Checkout | **8 SP** | 15.4% | • Đồng bộ Giỏ hàng Redux (2 SP).<br>• Bộ chọn Đa chi nhánh 1-Merchant-Many-Shops (2 SP).<br>• Giao diện Checkout Đa phương thức COD & VNPay (4 SP). |
+| **Đức** | **Frontend Portals** | Redux Toolkit, Dashboard, Checkout | **8 SP** | 15.4% | • Đồng bộ Giỏ hàng Redux (2 SP).<br>• Bộ chọn Đa chi nhánh 1-Merchant-Many-Shops (2 SP).<br>• Giao diện Checkout Đa phương thức COD & VietQR (4 SP). |
 | **TỔNG CỘNG**| **6 thành viên** | **Fullstack Microservices + React** | **52 SP** | **100%** | **17 Thẻ Trello phân bố trên 3 Phân hệ chính** |
 
 ---
@@ -60,9 +60,9 @@ flowchart TD
     subgraph FlowB["2. THANH TOÁN & ĐƠN HÀNG (CORE BACKEND)"]
         A6 --> B1{"Chọn Phương thức?"}
         B1 -- Tiền mặt (COD) --> B2["order-service: Tạo đơn PENDING\n(Duy - 4 SP)"]
-        B1 -- VNPay Sandbox --> B3["payment-service: Tạo URL Checksum SHA512\n(Thọ - 5 SP)"]
-        B3 --> B4["Cổng VNPay Sandbox (Quét mã/Test thẻ)"]
-        B4 --> B5["IPN / Return URL Callback\n(Thọ - 5 SP)"]
+        B1 -- Quét mã VietQR --> B3["payment-service: Sinh mã VietQR động\n(Thọ - 5 SP)"]
+        B3 --> B4["App Ngân hàng / Napas 247 (Khách quét mã QR)"]
+        B4 --> B5["Webhook / IPN Callback & Polling\n(Thọ - 5 SP)"]
         B5 --> B6["order-service: Cập nhật PAID -> PENDING\n(Duy & Thọ)"]
     end
 
@@ -151,18 +151,18 @@ flowchart TD
 * **Mục tiêu:** Trang theo dõi danh sách đơn hàng của khách hàng đang đăng nhập.
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
   - [ ] Route `/orders` gọi API `GET /api/v1/orders/my-orders` theo `X-User-Id`.
-  - [ ] Hiển thị danh sách thẻ đơn hàng: Mã đơn, Tên quán ăn, Thời gian đặt, Tổng tiền, Huy hiệu trạng thái đơn (`PENDING`, `CONFIRMED`, `DELIVERING`, `COMPLETED`, `CANCELLED`), Phương thức thanh toán (COD / VNPay).
+  - [ ] Hiển thị danh sách thẻ đơn hàng: Mã đơn, Tên quán ăn, Thời gian đặt, Tổng tiền, Huy hiệu trạng thái đơn (`PENDING`, `CONFIRMED`, `DELIVERING`, `COMPLETED`, `CANCELLED`), Phương thức thanh toán (COD / VietQR).
   - [ ] Nút "Xem chi tiết" mở xem danh sách món ăn, số lượng và topping đã đặt.
 
 #### 🎴 Thẻ SP2-CUST-08: Đồng bộ Giỏ hàng Redux & Xóa Bỏ Dữ liệu Giả Lập
-* **Người phụ trách:** `Đức`
-* **Nhãn (Labels):** `Frontend`, `Bug / Debt`
+* **Người phụ trách:** `Đức` (Phối hợp Backend: `Duy`)
+* **Nhãn (Labels):** `Frontend`, `Backend / Redis`, `Completed`
 * **Story Points:** 2 SP
-* **Mục tiêu:** Loại bỏ mảng tĩnh `INITIAL_CART_ITEMS`, kết nối Redux Store tập trung.
+* **Mục tiêu:** Loại bỏ dữ liệu tĩnh giả lập (`MOCK_STORE`, `MOCK_FOODS`), kết nối Redux Store tập trung và đồng bộ giỏ hàng với Redis (`order-service`).
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
-  - [ ] Giỏ hàng lấy dữ liệu từ `state.cart.items`.
-  - [ ] Áp dụng **Ràng buộc Một Quán Duy Nhất (Single-Shop Constraint)**: nếu thêm món từ quán khác $\rightarrow$ hiển thị modal xác nhận xóa giỏ cũ để tạo giỏ mới.
-  - [ ] Tăng/giảm số lượng, xóa món, lưu trạng thái giỏ hàng vào `localStorage`.
+  - [x] Giỏ hàng lấy dữ liệu từ `state.cart.items` và đồng bộ 2 chiều với Redis (`foodthunder:cart:{userId}`, TTL 30 ngày).
+  - [x] Áp dụng **Ràng buộc Một Quán Duy Nhất (Single-Shop Constraint)**: nếu thêm món từ quán khác $\rightarrow$ hiển thị modal xác nhận xóa giỏ cũ để tạo giỏ mới (cả frontend Redux lẫn backend Redis).
+  - [x] Tăng/giảm số lượng, xóa món, lưu trạng thái giỏ hàng vào `localStorage` kèm cơ chế optimistic update và background Redis sync.
 
 #### 🎴 Thẻ SP2-CUST-09: Hoàn thiện Lõi Backend `order-service` Xử lý Đặt hàng ACID *(Khắc phục nợ thẻ 1.4)*
 * **Người phụ trách:** `Duy`
@@ -171,26 +171,26 @@ flowchart TD
 * **Mục tiêu:** Xử lý logic tạo đơn hàng giao dịch ACID, xác thực giá và trạng thái quán ăn qua OpenFeign.
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
   - [ ] API `POST /api/v1/orders` chạy trong Transaction ACID, kiểm tra quán mở cửa và sản phẩm khả dụng qua `restaurant-service`.
-  - [ ] Đơn hàng COD lưu trạng thái ban đầu là `PENDING`; đơn hàng VNPay lưu trạng thái ban đầu là `AWAITING_PAYMENT`.
+  - [ ] Đơn hàng COD lưu trạng thái ban đầu là `PENDING`; đơn hàng VietQR lưu trạng thái ban đầu là `AWAITING_PAYMENT`.
   - [ ] API `GET /api/v1/orders/my-orders` lấy danh sách đơn của khách hàng đang đăng nhập.
   - [ ] API `PUT /api/v1/orders/{id}/status` kiểm tra nghiêm ngặt ma trận chuyển đổi trạng thái State Machine.
 
 ---
 
-### PHẦN B: HẠ TẦNG THANH TOÁN VNPAY & REALTIME WEBSOCKET (THỌ PHỤ TRÁCH) (9 SP)
+### PHẦN B: HẠ TẦNG THANH TOÁN VIETQR & REALTIME WEBSOCKET (THỌ PHỤ TRÁCH) (9 SP)
 
-#### 🎴 Thẻ SP2-CORE-01: Tích hợp Cổng thanh toán Trực tuyến VNPay Sandbox Toàn diện
+#### 🎴 Thẻ SP2-CORE-01: Tích hợp Cổng thanh toán Quét mã VietQR (Napas 247) Toàn diện
 * **Người phụ trách:** `Thọ` (Phối hợp Frontend: `Đức`)
 * **Nhãn (Labels):** `Backend / Fullstack`, `High Priority`
 * **Story Points:** 5 SP
-* **Mục tiêu:** Xây dựng phân hệ thanh toán trực tuyến qua cổng VNPay Sandbox với mã hóa SHA512 và IPN Webhook.
+* **Mục tiêu:** Xây dựng phân hệ thanh toán quét mã VietQR (Napas 247) tự động sinh mã QR động kèm nội dung đơn hàng, tích hợp Webhook/IPN xác nhận giao dịch tự động và API polling trạng thái thanh toán.
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
-  - [x] Khởi tạo module `payment-service` (cổng 8085), cấu hình `vnp_TmnCode`, `vnp_HashSecret`, `vnp_Url`, `vnp_ReturnUrl`.
-  - [x] Thuật toán sinh chữ ký bảo mật **HMAC-SHA512** kiểm tra tính toàn vẹn dữ liệu đơn hàng.
-  - [x] API `POST /api/v1/payments/vnpay/create-url`: Nhận `orderId` và `amount` $\rightarrow$ sinh URL thanh toán VNPay có thời hạn 15 phút.
-  - [x] API `GET /api/v1/payments/vnpay/return`: Tiếp nhận điều hướng từ trình duyệt, xác thực chữ ký `vnp_SecureHash`, kiểm tra mã phản hồi `vnp_ResponseCode == "00"` $\rightarrow$ Cập nhật trạng thái `SUCCESS` và đồng bộ `order-service` sang `PENDING`.
-  - [x] API `GET /api/v1/payments/vnpay/ipn`: Webhook Server-to-Server phản hồi JSON chuẩn cho máy chủ VNPay.
-  - [x] API `POST /api/v1/payments/cod`: Khởi tạo thanh toán tiền mặt.
+  - [ ] Cấu hình tài khoản thụ hưởng ngân hàng (`bankId` / BIN, `accountNo`, `accountName`, VietQR Template, Client ID/API Key nếu qua cổng VietQR Open API).
+  - [ ] Thuật toán tạo mã VietQR động chuẩn Napas 247 / EMVCo hoặc URL ảnh QR từ VietQR API (`https://img.vietqr.io/image/...`) tích hợp chính xác số tiền và nội dung chuyển khoản định danh duy nhất (`FOODDELI {orderId}`).
+  - [ ] API `POST /api/v1/payments/vietqr/generate`: Nhận `orderId` và `amount` $\rightarrow$ sinh payload VietQR (URL ảnh QR, mã EMVCo QR code string, thông tin ngân hàng thụ hưởng, số tiền, cú pháp chuyển khoản và thời gian hết hạn).
+  - [ ] API `POST /api/v1/payments/vietqr/webhook`: Webhook Server-to-Server tiếp nhận thông báo biến động số dư / thanh toán từ cổng/ngân hàng (xác thực chữ ký bảo mật) $\rightarrow$ Trích xuất `orderId`, đối soát số tiền $\rightarrow$ Cập nhật trạng thái `PAID` và đồng bộ `order-service` sang `PENDING`.
+  - [ ] API `GET /api/v1/payments/orders/{orderId}/status`: Endpoint tra cứu trạng thái thanh toán đơn hàng (phục vụ Polling kiểm tra trạng thái từ frontend khi khách đang mở modal quét mã).
+  - [ ] API `POST /api/v1/payments/cod`: Khởi tạo thanh toán tiền mặt khi nhận hàng.
 
 #### 🎴 Thẻ SP2-CORE-02: Thiết lập Realtime WebSocket STOMP Hub & Chuông Báo Đơn Quán Ăn
 * **Người phụ trách:** `Thọ` (Phối hợp Frontend: `Quang anh`)
@@ -199,7 +199,7 @@ flowchart TD
 * **Mục tiêu:** Thiết lập hạ tầng WebSocket STOMP đẩy sự kiện đơn hàng thời gian thực, kích hoạt chuông reo "ding-dong" tức thì tại Quán ăn.
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
   - [ ] Cấu hình Spring WebSocket STOMP endpoint `/ws-food-deli`, kênh đích `/topic/merchant/{shopId}/orders`.
-  - [ ] Khi đơn hàng được tạo (COD) hoặc thanh toán thành công (VNPay) $\rightarrow$ Backend tự động broadcast `OrderCreatedEvent`.
+  - [ ] Khi đơn hàng được tạo (COD) hoặc thanh toán thành công (VietQR) $\rightarrow$ Backend tự động broadcast `OrderCreatedEvent`.
   - [ ] Client Merchant: Listener WebSocket bắt sự kiện $\rightarrow$ tự động phát âm thanh chuông "ding-dong" và hiển thị popup thông báo đơn hàng mới.
   - [ ] Đảm bảo cơ chế tự động kết nối lại (Auto-reconnect) khi rớt mạng hoặc timeout.
 
@@ -217,15 +217,15 @@ flowchart TD
   - [ ] Dropdown chọn chi nhánh trên thanh Header của Merchant Portal (tên quán, địa chỉ, trạng thái Đang mở / Tạm đóng).
   - [ ] Khi chủ quán chuyển chi nhánh $\rightarrow$ Toàn bộ dữ liệu đơn hàng, món ăn và doanh thu tự động reload theo đúng `restaurantId` đã chọn.
 
-#### 🎴 Thẻ SP2-MERCH-02: Màn hình Thanh toán Checkout Đa Phương thức (COD & VNPay) *(Khắc phục nợ thẻ 1.5)*
+#### 🎴 Thẻ SP2-MERCH-02: Màn hình Thanh toán Checkout Đa Phương thức (COD & VietQR) *(Khắc phục nợ thẻ 1.5)*
 * **Người phụ trách:** `Đức` (Phối hợp: `Thọ`)
 * **Nhãn (Labels):** `Frontend`, `High Priority`
 * **Story Points:** 4 SP
-* **Mục tiêu:** Hoàn thiện giao diện màn hình Checkout cho phép khách chọn Tiền mặt (COD) hoặc VNPay Sandbox.
+* **Mục tiêu:** Hoàn thiện giao diện màn hình Checkout cho phép khách chọn Tiền mặt (COD) hoặc Quét mã Chuyển khoản VietQR (Napas 247).
 * **Tiêu chí hoàn thành (Acceptance Criteria):**
-  - [ ] Radio button chọn phương thức: 💵 Tiền mặt khi nhận hàng (COD) và 💳 Cổng thanh toán trực tuyến VNPay.
+  - [ ] Radio button chọn phương thức: 💵 Tiền mặt khi nhận hàng (COD) và 💳 Quét mã Chuyển khoản VietQR (Napas 247).
   - [ ] Chọn **COD**: Bấm "Đặt hàng" $\rightarrow$ Gọi API tạo đơn $\rightarrow$ Xóa giỏ hàng Redux $\rightarrow$ Chuyển sang `/orders/:id`.
-  - [ ] Chọn **VNPay**: Bấm "Thanh toán ngay" $\rightarrow$ Gọi API tạo URL thanh toán $\rightarrow$ Chuyển tiếp sang cổng VNPay Sandbox $\rightarrow$ Callback quay về `/payment/vnpay-return` hiển thị kết quả thành công và chuyển vào lịch sử đơn.
+  - [ ] Chọn **VietQR**: Bấm "Thanh toán ngay" $\rightarrow$ Gọi API sinh mã VietQR $\rightarrow$ Mở Modal quét mã QR động Napas 247 kèm Countdown timer & hướng dẫn chuyển khoản $\rightarrow$ Lắng nghe WebSocket hoặc Polling trạng thái đơn hàng $\rightarrow$ Khi thanh toán thành công tự động chuyển sang `/orders/:id`.
 
 #### 🎴 Thẻ SP2-MERCH-03: Merchant Dashboard Tiếp nhận & Xử lý Đơn hàng Thời Gian Thực *(Khắc phục nợ thẻ 1.8)*
 * **Người phụ trách:** `Quang anh`
@@ -275,7 +275,7 @@ Trong Sprint 2, hệ thống vận hành với **5 microservices chính** và **
 ```
 +---------------------------------------------------------------------------------+
 |                                 api-gateway (Port 8080)                         |
-|        JWT Auth Filter, Rate Limiting, CORS, Whitelist /api/v1/payments/vnpay/** |
+|        JWT Auth Filter, Rate Limiting, CORS, Whitelist /api/v1/payments/vietqr/**|
 +---------------------------------------------------------------------------------+
           |                       |                      |                 |
           v                       v                      v                 v
@@ -283,9 +283,9 @@ Trong Sprint 2, hệ thống vận hành với **5 microservices chính** và **
 |  auth-service    |    | restaurant-service|    | order-service |   |  payment-service  |
 |   (Port 8081)    |    |    (Port 8082)    |    |  (Port 8083)  |   |    (Port 8085)    |
 +------------------+    +-------------------+    +---------------+   +-------------------+
-| • Unified Login  |    | • Multi-shops     |    | • ACID Orders |   | • VNPay Sandbox   |
-| • Unified Reg    |    | • Menu & Products |    | • State Graph |   | • HMAC-SHA512     |
-| • Profile & Addr |    | • Toppings        |    | • Status Logs |   | • IPN Callback    |
+| • Unified Login  |    | • Multi-shops     |    | • ACID Orders |   | • VietQR Napas247 |
+| • Unified Reg    |    | • Menu & Products |    | • State Graph |   | • Dynamic QR Gen  |
+| • Profile & Addr |    | • Toppings        |    | • Status Logs |   | • Webhook Callback|
 | • User Roles     |    | • Shop Vouchers   |    | • Feign Client|   | • COD Handler     |
 +------------------+    +-------------------+    +---------------+   +-------------------+
           \                       |                      /                 /
@@ -325,7 +325,7 @@ Một thẻ công việc chỉ được kéo sang cột **`[Sprint 2: Done]`** k
 
 | Rủi ro kỹ thuật | Mức độ | Hậu quả tiềm ẩn | Biện pháp phòng ngừa & Xử lý |
 | :--- | :---: | :--- | :--- |
-| **Lệch Checksum SHA512 VNPay** | Cao | Giao dịch thành công nhưng bị từ chối do sai chữ ký hash. | Sử dụng tiện ích [`VnPayUtil`](file:///d:/ojt-food-deli-start/food-deli-service/payment-service/src/main/java/com/foodthunder/payment/util/VnPayUtil.java) đã được kiểm thử 100% bằng JUnit; mã hóa đúng chuẩn ASCII/URL-encode. |
+| **Lệch nội dung chuyển khoản VietQR** | Cao | Khách chuyển khoản nhưng hệ thống không tự khớp đơn do sai cú pháp. | Sinh mã QR động chuẩn Napas 247 nhúng cứng số tiền và mã đơn `FOODDELI {orderId}`; cung cấp song song API Polling trạng thái đơn và Webhook ngân hàng. |
 | **Mất kết nối WebSocket STOMP** | Trung bình | Quán không nhận được chuông báo đơn mới nếu mạng chập chờn. | Client tích hợp cơ chế **Auto-reconnect** (thử lại sau 5s); bổ sung cơ chế Polling dự phòng khi WebSocket ngắt kết nối. |
 | **Xung đột State Machine Đơn hàng** | Cao | Đơn hàng nhảy trạng thái không hợp lệ (ví dụ: đã hủy nhưng vẫn thanh toán). | Khóa bi quan (`SELECT ... FOR UPDATE`) trong `order-service` và `payment-service`, kiểm tra chặt chẽ `ALLOWED_TRANSITIONS`. |
 | **Xung đột Giỏ hàng Nhiều Quán** | Thấp | Khách đặt món từ 2 quán khác nhau trong 1 đơn gây lỗi logic. | Ràng buộc Single-Shop Constraint ngay tại Redux Store; cảnh báo xóa giỏ cũ trước khi thêm món quán mới. |
@@ -336,17 +336,17 @@ Một thẻ công việc chỉ được kéo sang cột **`[Sprint 2: Done]`** k
 
 * **Ngày 1 - 3 (02/11 - 04/11):**
   - Khởi tạo `common-library-service`, cấu hình Docker compose và API Gateway routes.
-  - Triển khai phân hệ `payment-service` (VNPay Sandbox + COD) và viết 9/9 test cases (*Thọ đã hoàn thành*).
+  - Triển khai phân hệ `payment-service` (VietQR Generator + Webhook/Polling + COD) và hoàn thiện bộ kiểm thử tự động.
   - Xử lý triệt để các lỗi tồn đọng Sprint 1 (Home UI, Header Nav, Route Guard).
 * **Ngày 4 - 7 (05/11 - 08/11):**
   - Hoàn thiện kết nối API thật cho Trang chủ, Trang Chi tiết Quán & Modal chọn Topping.
-  - Hoàn thiện logic ACID Đặt hàng `order-service` và Giao diện Checkout Đa phương thức.
+  - Hoàn thiện logic ACID Đặt hàng `order-service` và Giao diện Checkout Đa phương thức (COD & VietQR).
   - Xây dựng hạ tầng WebSocket STOMP Hub.
 * **Ngày 8 - 11 (09/11 - 12/11):**
   - Xây dựng Cổng Quản lý Đối tác Quán ăn (Merchant Dashboard, Chuông Ding-Dong, Bộ chọn Đa chi nhánh).
   - Triển khai CRUD Món ăn, Toggle Còn/Hết hàng và Hệ thống Topping Quán.
   - Màn hình Lịch sử Đơn hàng Khách hàng `/orders`.
 * **Ngày 12 - 14 (13/11 - 15/11):**
-  - Kiểm thử tích hợp toàn diện luồng End-to-End: Khách chọn món $\rightarrow$ Checkout VNPay Sandbox $\rightarrow$ Quán nhận đơn qua WebSocket reo chuông $\rightarrow$ Quán bấm xác nhận đơn.
+  - Kiểm thử tích hợp toàn diện luồng End-to-End: Khách chọn món $\rightarrow$ Checkout VietQR Napas 247 $\rightarrow$ Quán nhận đơn qua WebSocket reo chuông $\rightarrow$ Quán bấm xác nhận đơn.
   - Tối ưu hiệu năng, fix bug, đóng gói Docker và chuẩn bị Demo Sprint 2.
 

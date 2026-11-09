@@ -30,6 +30,12 @@ public class Order {
     @Column(name = "customer_id", nullable = false)
     private Integer customerId;
 
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "customer_phone", length = 20)
+    private String customerPhone;
+
     @Column(name = "restaurant_id", nullable = false)
     private Integer restaurantId;
 

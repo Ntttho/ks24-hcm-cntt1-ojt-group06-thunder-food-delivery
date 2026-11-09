@@ -36,8 +36,11 @@ Master microservices architecture patterns including service boundaries, inter-s
 ## Resources
 
 - `resources/structure-for-microservice.md` for detailed 10-microservice architecture, domain decomposition, and directory structure.
+- `resources/api-endpoints-and-order-workflow.md` for comprehensive API endpoints matrix, Order Status State Machine, and cross-reference mapping to `older/grab-food-springboot`.
 - `document/KIEN_TRUC_CSDL_LOGIC_MICROSERVICES.md` for decoupled database schema and Plain ID rules.
+- `document/order-status-flow.md` for the complete visual Order Lifecycle sequence and transition matrix.
 - `database/seed_all.sql` for the production 26-table MySQL schema with decoupled logical foreign keys.
+- `older/grab-food-springboot/` as the mandatory monolithic legacy baseline reference.
 
 ## Limitations
 - Use this skill only when the task clearly matches the scope described above.

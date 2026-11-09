@@ -159,7 +159,7 @@ class CategoryControllerTest {
     }
 
     @Test
-    @DisplayName("DELETE /api/v1/categories/{id} trả về 400 BadRequest khi danh mục còn món")
+    @DisplayName("DELETE /api/v1/categories/{id} trả về 409 Conflict khi danh mục còn món")
     void deleteCategory_hasProducts_badRequest() throws Exception {
         Shop shop = Shop.builder().id(1).ownerId(3).name("Quán Hạnh Dung").build();
         MenuCategory cat = MenuCategory.builder().id(10).restaurant(shop).name("Món Chay").build();
@@ -170,8 +170,8 @@ class CategoryControllerTest {
         mockMvc.perform(delete("/api/v1/categories/10")
                         .header("X-User-Id", 3)
                         .header("X-User-Role", "ROLE_MERCHANT"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("3 món ăn")));
 
         verify(menuCategoryRepository, never()).delete(any());

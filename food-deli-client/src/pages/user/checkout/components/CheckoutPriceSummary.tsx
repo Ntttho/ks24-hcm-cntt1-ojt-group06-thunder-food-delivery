@@ -7,6 +7,7 @@ interface CheckoutPriceSummaryProps {
   totalDiscount: number;
   originalTotal: number;
   finalTotal: number;
+  itemCount?: number;
   paymentMethodDiscount?: number;
 }
 
@@ -17,87 +18,61 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   totalDiscount,
   originalTotal,
   finalTotal,
+  itemCount = 1,
   paymentMethodDiscount = 0,
 }) => {
   return (
-    <div className="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm flex flex-col gap-2.5">
-      <div className="flex items-center justify-between pb-1 border-b border-surface-container-high/40">
-        <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
+    <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-2.5">
+      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+        <span className="text-sm text-gray-900 font-extrabold">
           Chi tiết hóa đơn
         </span>
-        <span className="font-label-sm text-label-sm text-on-surface-variant font-medium">
+        <span className="text-xs text-gray-400 font-medium">
           Đã bao gồm VAT
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-on-surface">
-        <span className="font-body-md text-body-md text-on-surface-variant">
-          Tiền món ăn (3 món)
-        </span>
-        <span className="font-body-md text-body-md font-medium">
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>Tiền món ăn ({itemCount} món)</span>
+        <span className="text-gray-900 font-semibold">
           {itemsSubtotal.toLocaleString('vi-VN')}đ
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-on-surface">
-        <div className="flex items-center gap-1 text-on-surface-variant">
-          <span className="font-body-md text-body-md">Phí giao hàng (1.8 km)</span>
-          <span className="material-symbols-outlined text-[15px] text-tertiary">info</span>
-        </div>
-        <span className="font-body-md text-body-md font-medium">
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>Phí giao hàng</span>
+        <span className="text-gray-900 font-semibold">
           {shippingFee.toLocaleString('vi-VN')}đ
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-on-surface">
-        <div className="flex items-center gap-1 text-on-surface-variant">
-          <span className="font-body-md text-body-md">Phí dịch vụ &amp; đóng gói</span>
-          <span className="material-symbols-outlined text-[15px] text-tertiary">info</span>
-        </div>
-        <span className="font-body-md text-body-md font-medium">
-          {serviceFee.toLocaleString('vi-VN')}đ
-        </span>
-      </div>
-
-      <div className="flex items-center justify-between text-secondary">
-        <span className="font-body-md text-body-md">Giảm giá món ăn (THUNDERNEW)</span>
-        <span className="font-body-md text-body-md font-semibold">-25.000đ</span>
-      </div>
-
-      <div className="flex items-center justify-between text-primary">
-        <span className="font-body-md text-body-md">Giảm phí vận chuyển (FREESHIP15K)</span>
-        <span className="font-body-md text-body-md font-semibold">-15.000đ</span>
-      </div>
-
-      {paymentMethodDiscount > 0 && (
-        <div className="flex items-center justify-between text-primary font-semibold">
-          <span className="font-body-md text-body-md">Ưu đãi phương thức thanh toán</span>
-          <span className="font-body-md text-body-md">
-            -{paymentMethodDiscount.toLocaleString('vi-VN')}đ
+      {serviceFee > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span>Phí dịch vụ &amp; đóng gói</span>
+          <span className="text-gray-900 font-semibold">
+            {serviceFee.toLocaleString('vi-VN')}đ
           </span>
         </div>
       )}
 
-      {/* Divider */}
-      <div className="h-px bg-surface-container-high my-1" />
-
-      <div className="flex items-end justify-between pt-1">
-        <div className="flex flex-col">
-          <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-            Tổng cộng thanh toán
-          </span>
-          <span className="font-label-sm text-label-sm text-primary font-semibold flex items-center gap-1">
-            <span className="material-symbols-outlined text-[14px]">savings</span>
-            Tiết kiệm được {totalDiscount.toLocaleString('vi-VN')}đ
-          </span>
+      {totalDiscount > 0 && (
+        <div className="flex items-center justify-between text-xs text-orange-600 font-semibold">
+          <span>Khuyến mãi &amp; giảm giá</span>
+          <span>-{totalDiscount.toLocaleString('vi-VN')}đ</span>
         </div>
-        <div className="text-right">
-          <div className="font-body-sm text-body-sm text-on-surface-variant line-through">
-            {originalTotal.toLocaleString('vi-VN')}đ
-          </div>
-          <div className="font-headline-lg text-headline-lg text-primary font-extrabold leading-none">
+      )}
+
+      <div className="pt-2 border-t border-gray-100 flex items-center justify-between">
+        <span className="text-xs font-bold text-gray-900">Tổng thanh toán cuối cùng</span>
+        <div className="flex items-baseline gap-1.5">
+          {originalTotal > finalTotal && (
+            <span className="text-xs text-gray-400 line-through">
+              {originalTotal.toLocaleString('vi-VN')}đ
+            </span>
+          )}
+          <span className="text-lg font-extrabold text-orange-600">
             {finalTotal.toLocaleString('vi-VN')}đ
-          </div>
+          </span>
         </div>
       </div>
     </div>
@@ -105,4 +80,3 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
 };
 
 export default CheckoutPriceSummary;
-
