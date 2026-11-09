@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CarOutlined, PhoneOutlined, ShopOutlined } from '@ant-design/icons';
+import { CarOutlined, PhoneOutlined, ShopOutlined, MessageOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
 
 interface OrderContactCardsProps {
   driverName?: string;
@@ -8,6 +9,7 @@ interface OrderContactCardsProps {
   restaurantId: number;
   restaurantName?: string;
   distanceKm?: number;
+  onOpenChat?: () => void;
 }
 
 export const OrderContactCards: React.FC<OrderContactCardsProps> = ({
@@ -16,6 +18,7 @@ export const OrderContactCards: React.FC<OrderContactCardsProps> = ({
   restaurantId,
   restaurantName,
   distanceKm = 2.1,
+  onOpenChat,
 }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
@@ -33,14 +36,26 @@ export const OrderContactCards: React.FC<OrderContactCardsProps> = ({
             <div className="text-xs text-gray-500">Xe máy • 59-P1 888.99</div>
           </div>
         </div>
-        {driverPhone && (
-          <a
-            href={`tel:${driverPhone}`}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-xs"
-          >
-            <PhoneOutlined /> Gọi tài xế
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {onOpenChat && (
+            <Button
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={onOpenChat}
+              className="px-3 py-1 bg-white border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold rounded-xl text-xs flex items-center gap-1 shadow-2xs"
+            >
+              Nhắn tin
+            </Button>
+          )}
+          {driverPhone && (
+            <a
+              href={`tel:${driverPhone}`}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-xs"
+            >
+              <PhoneOutlined /> Gọi tài xế
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Restaurant Card */}

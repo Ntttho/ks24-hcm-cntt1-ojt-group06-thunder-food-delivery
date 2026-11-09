@@ -42,6 +42,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final List<String> PATTERN_PUBLIC_PATHS = List.of(
             "/ws/**",
+            "/api/v1/chat/**",
             "/api/v1/auth/login/**",
             "/api/v1/auth/register/**",
             "/api/v1/payments/**",

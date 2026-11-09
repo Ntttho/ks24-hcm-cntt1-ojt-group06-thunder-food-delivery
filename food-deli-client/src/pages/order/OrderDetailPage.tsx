@@ -5,6 +5,7 @@ import {
   Button,
   Spin,
   Typography,
+  FloatButton,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -16,6 +17,7 @@ import {
   StarFilled,
   ShopOutlined,
   CarOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
@@ -27,6 +29,7 @@ import {
   OrderItemsBreakdown,
   RestaurantReviewModal,
   DriverReviewModal,
+  OrderChatDrawer,
 } from './components';
 
 const { Title, Text } = Typography;
@@ -88,6 +91,7 @@ export const OrderDetailPage: React.FC = () => {
   const [isDriverReviewOpen, setIsDriverReviewOpen] = useState<boolean>(false);
   const [restaurantReviewed, setRestaurantReviewed] = useState<boolean>(false);
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchOrderDetail = async () => {
@@ -289,11 +293,22 @@ export const OrderDetailPage: React.FC = () => {
           Quay lại danh sách đơn hàng
         </Button>
 
-        <Link to={APP_ROUTES.HOME}>
-          <Button icon={<HomeOutlined />} className="rounded-xl font-semibold">
-            Trang chủ
+        <div className="flex items-center gap-2">
+          {/* Nút Chat nhanh với Tài xế */}
+          <Button
+            icon={<MessageOutlined className="text-orange-500" />}
+            onClick={() => setIsChatOpen(true)}
+            className="rounded-xl font-bold bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+          >
+            Nhắn tin tài xế
           </Button>
-        </Link>
+
+          <Link to={APP_ROUTES.HOME}>
+            <Button icon={<HomeOutlined />} className="rounded-xl font-semibold">
+              Trang chủ
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* 2. Hero Tracking Card */}
@@ -381,6 +396,7 @@ export const OrderDetailPage: React.FC = () => {
           restaurantId={order.restaurantId}
           restaurantName={order.restaurantName}
           distanceKm={order.distanceKm}
+          onOpenChat={() => setIsChatOpen(true)}
         />
 
         {/* 5. Receiver Address */}
@@ -410,6 +426,28 @@ export const OrderDetailPage: React.FC = () => {
           distanceKm={order.distanceKm}
         />
       </div>
+
+      {/* Floating Action Button for Realtime Chat */}
+      <FloatButton
+        icon={<MessageOutlined />}
+        type="primary"
+        tooltip="Nhắn tin với tài xế"
+        style={{ right: 24, bottom: 24 }}
+        onClick={() => setIsChatOpen(true)}
+      />
+
+      {/* Real-time Customer-Driver Chat Drawer with Quick Replies */}
+      {order && (
+        <OrderChatDrawer
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          orderId={order.id}
+          orderCode={order.orderCode}
+          driverName={order.driverName}
+          driverPhone={order.driverPhone}
+          restaurantName={order.restaurantName}
+        />
+      )}
 
       {isRestaurantReviewOpen && order && (
         <RestaurantReviewModal

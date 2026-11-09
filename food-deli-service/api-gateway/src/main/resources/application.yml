@@ -56,9 +56,9 @@ spring:
           predicates:
             - Path=/api/v1/reviews/**
 
-        # 6. Realtime Chat & Notification HTTP (Load balanced)
+        # 6. Realtime Chat & Notification HTTP (Routed to order-service)
         - id: chat-notification-service-route
-          uri: lb://chat-notification-service
+          uri: lb://order-service
           predicates:
             - Path=/api/v1/chat/**
 
