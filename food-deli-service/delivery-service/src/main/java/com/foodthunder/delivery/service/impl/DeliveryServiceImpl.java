@@ -117,6 +117,8 @@ public class DeliveryServiceImpl implements DeliveryService {
             if (feignResp != null && feignResp.getBody() != null && feignResp.getBody().status() >= 400) {
                 throw new BadRequestException("Không thể nhận đơn: " + feignResp.getBody().message());
             }
+        } catch (BadRequestException be) {
+            throw be;
         } catch (Exception ex) {
             log.error("Failed to update status in order-service: {}", ex.getMessage());
             throw new BadRequestException("Lỗi đồng bộ trạng thái đơn hàng sang order-service: " + ex.getMessage());
@@ -238,6 +240,8 @@ public class DeliveryServiceImpl implements DeliveryService {
             if (resp != null && resp.getBody() != null && resp.getBody().status() >= 400) {
                 throw new BadRequestException("Không thể cập nhật tiến trình đơn: " + resp.getBody().message());
             }
+        } catch (BadRequestException be) {
+            throw be;
         } catch (Exception ex) {
             log.error("Failed to propagate delivery step to order-service: {}", ex.getMessage());
             throw new BadRequestException("Lỗi cập nhật tiến trình giao hàng: " + ex.getMessage());
@@ -294,4 +298,30 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .expiresAt(o.getExpiresAt())
                 .build();
     }
+
+    @Override
+    public DriverMetricsResponse getDriverMetrics(Integer driverId) {
+        List<DriverOffer> offers = driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(driverId);
+        long total = offers.size();
+        long completed = offers.stream().filter(o -> "ACCEPTED".equalsIgnoreCase(o.getStatus())).count();
+        long rejected = offers.stream().filter(o -> "REJECTED".equalsIgnoreCase(o.getStatus())).count();
+        long missed = offers.stream().filter(o -> "MISSED".equalsIgnoreCase(o.getStatus())).count();
+
+        double completionRate = total > 0 ? (double) Math.round((double) completed / total * 10000.0) / 100.0 : 100.0;
+        double acceptanceRate = (completed + rejected + missed) > 0
+                ? (double) Math.round((double) completed / (completed + rejected + missed) * 10000.0) / 100.0 : 100.0;
+        double earnings = completed * 20000.0; // 20.000 VNĐ / đơn hoàn thành
+
+        return DriverMetricsResponse.builder()
+                .driverId(driverId)
+                .totalOrders(total)
+                .completedOrders(completed)
+                .cancelledOrders(rejected)
+                .completionRate(completionRate)
+                .acceptanceRate(acceptanceRate)
+                .totalEarnings(earnings)
+                .ratingAvg(5.0)
+                .build();
+    }
 }
+

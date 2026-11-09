@@ -13,3 +13,4 @@ public class RemoteUpdateOrderStatusRequest {
     private String statusCode;
     private String reason;
 }
+

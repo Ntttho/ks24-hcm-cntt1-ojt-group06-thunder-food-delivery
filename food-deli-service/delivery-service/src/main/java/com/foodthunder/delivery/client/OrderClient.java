@@ -20,3 +20,4 @@ public interface OrderClient {
             @RequestHeader(value = "X-User-Role", required = false) String userRole
     );
 }
+

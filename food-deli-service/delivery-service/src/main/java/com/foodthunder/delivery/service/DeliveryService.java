@@ -53,4 +53,10 @@ public interface DeliveryService {
      * Cập nhật các bước giao hàng tiếp theo (PICKING_UP, DELIVERING, COMPLETED).
      */
     void updateDeliveryStep(Integer driverId, Long orderId, UpdateDeliveryStepRequest request);
+
+    /**
+     * Thống kê hiệu suất và thu nhập của tài xế.
+     */
+    DriverMetricsResponse getDriverMetrics(Integer driverId);
 }
+

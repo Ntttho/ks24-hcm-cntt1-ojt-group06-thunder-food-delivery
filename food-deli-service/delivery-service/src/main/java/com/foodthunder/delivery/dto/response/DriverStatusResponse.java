@@ -16,3 +16,4 @@ public class DriverStatusResponse {
     private String approvalStatus;
     private Boolean isOnline;
 }
+

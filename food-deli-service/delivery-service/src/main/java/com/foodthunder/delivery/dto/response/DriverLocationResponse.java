@@ -21,3 +21,4 @@ public class DriverLocationResponse {
     private Double speedKmh;
     private LocalDateTime createdAt;
 }
+

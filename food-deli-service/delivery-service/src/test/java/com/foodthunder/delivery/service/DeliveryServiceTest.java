@@ -5,10 +5,7 @@ import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
-import com.foodthunder.delivery.dto.response.AcceptOrderResponse;
-import com.foodthunder.delivery.dto.response.DriverLocationResponse;
-import com.foodthunder.delivery.dto.response.DriverOfferResponse;
-import com.foodthunder.delivery.dto.response.DriverStatusResponse;
+import com.foodthunder.delivery.dto.response.*;
 import com.foodthunder.delivery.entity.DriverDetail;
 import com.foodthunder.delivery.entity.DriverLocation;
 import com.foodthunder.delivery.entity.DriverOffer;
@@ -277,5 +274,24 @@ class DeliveryServiceTest {
 
         assertThat(offers).hasSize(1);
         assertThat(offers.get(0).getOrderId()).isEqualTo(500L);
+    }
+
+    @Test
+    @DisplayName("getDriverMetrics: Tính toán đúng chỉ số hiệu suất và tổng thu nhập tài xế")
+    void testGetDriverMetrics() {
+        DriverOffer acceptedOffer = DriverOffer.builder().id(10L).driverId(101).status("ACCEPTED").build();
+        DriverOffer rejectedOffer = DriverOffer.builder().id(11L).driverId(101).status("REJECTED").build();
+        when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101))
+                .thenReturn(List.of(acceptedOffer, rejectedOffer));
+
+        DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
+
+        assertThat(metrics).isNotNull();
+        assertThat(metrics.getDriverId()).isEqualTo(101);
+        assertThat(metrics.getTotalOrders()).isEqualTo(2L);
+        assertThat(metrics.getCompletedOrders()).isEqualTo(1L);
+        assertThat(metrics.getCancelledOrders()).isEqualTo(1L);
+        assertThat(metrics.getCompletionRate()).isEqualTo(50.0);
+        assertThat(metrics.getTotalEarnings()).isEqualTo(20000.0);
     }
 }

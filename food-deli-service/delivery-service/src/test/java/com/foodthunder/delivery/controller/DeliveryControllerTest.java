@@ -144,4 +144,28 @@ class DeliveryControllerTest {
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.message").value("Cập nhật tiến trình giao hàng thành công"));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/deliveries/metrics trả về 200 OK và các chỉ số hiệu suất của tài xế")
+    void testGetDriverMetricsEndpoint() throws Exception {
+        com.foodthunder.delivery.dto.response.DriverMetricsResponse metrics = com.foodthunder.delivery.dto.response.DriverMetricsResponse.builder()
+                .driverId(101)
+                .totalOrders(10L)
+                .completedOrders(8L)
+                .cancelledOrders(2L)
+                .completionRate(80.0)
+                .totalEarnings(160000.0)
+                .ratingAvg(5.0)
+                .build();
+
+        when(deliveryService.getDriverMetrics(101)).thenReturn(metrics);
+
+        mockMvc.perform(get("/api/v1/deliveries/metrics")
+                        .header("X-User-Id", "101"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data.driverId").value(101))
+                .andExpect(jsonPath("$.data.completedOrders").value(8))
+                .andExpect(jsonPath("$.data.totalEarnings").value(160000.0));
+    }
 }

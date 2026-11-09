@@ -73,3 +73,4 @@ public class DriverOffer {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+

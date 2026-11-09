@@ -24,3 +24,4 @@ public class DriverLocationRequest {
 
     private Long orderId;
 }
+

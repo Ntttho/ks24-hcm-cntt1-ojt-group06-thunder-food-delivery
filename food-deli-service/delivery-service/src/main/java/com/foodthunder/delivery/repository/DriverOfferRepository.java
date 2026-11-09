@@ -31,3 +31,4 @@ public interface DriverOfferRepository extends JpaRepository<DriverOffer, Long> 
 
     List<DriverOffer> findByDriverIdOrderByCreatedAtDesc(Integer driverId);
 }
+

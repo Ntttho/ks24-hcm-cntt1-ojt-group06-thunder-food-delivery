@@ -93,3 +93,28 @@ X-User-Role: ROLE_DRIVER
   "currentLat": 10.785000,
   "currentLng": 106.706000
 }
+
+### 11. Xem chỉ số hiệu suất & thu nhập của Tài xế #2 (Metrics / Earnings)
+GET {{gatewayUrl}}/metrics
+Content-Type: application/json
+X-User-Id: 2
+X-User-Role: ROLE_DRIVER
+
+### 12. Lấy danh sách đơn chờ nhận qua Frontend Alias (/available)
+GET {{gatewayUrl}}/available
+Content-Type: application/json
+X-User-Id: 2
+X-User-Role: ROLE_DRIVER
+
+### 13. Cập nhật tiến trình giao hàng qua alias PUT /orders/{id}/status
+PUT {{gatewayUrl}}/orders/1/status
+Content-Type: application/json
+X-User-Id: 2
+X-User-Role: ROLE_DRIVER
+
+{
+  "step": "DELIVERING",
+  "note": "Cập nhật qua alias status"
+}
+
+

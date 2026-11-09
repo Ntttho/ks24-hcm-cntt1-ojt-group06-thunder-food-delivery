@@ -10,3 +10,4 @@ import java.util.List;
 public interface DriverPenaltyRepository extends JpaRepository<DriverPenalty, Long> {
     List<DriverPenalty> findByDriverId(Integer driverId);
 }
+

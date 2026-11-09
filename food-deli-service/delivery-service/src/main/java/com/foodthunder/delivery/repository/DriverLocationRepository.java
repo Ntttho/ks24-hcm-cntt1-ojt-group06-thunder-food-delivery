@@ -13,3 +13,4 @@ public interface DriverLocationRepository extends JpaRepository<DriverLocation, 
 
     Optional<DriverLocation> findFirstByOrderIdOrderByCreatedAtDesc(Long orderId);
 }
+

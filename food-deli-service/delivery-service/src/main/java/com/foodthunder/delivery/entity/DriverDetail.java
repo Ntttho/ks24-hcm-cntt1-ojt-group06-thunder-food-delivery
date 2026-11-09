@@ -41,3 +41,4 @@ public class DriverDetail {
     @Builder.Default
     private Boolean isOnline = false;
 }
+

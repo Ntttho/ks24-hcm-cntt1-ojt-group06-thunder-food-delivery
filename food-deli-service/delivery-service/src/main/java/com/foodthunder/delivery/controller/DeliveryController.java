@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/deliveries")
+@RequestMapping({"/api/v1/deliveries", "/api/v1/delivery", "/api/v1/shippers", "/api/v1/drivers"})
 @RequiredArgsConstructor
 @Slf4j
 public class DeliveryController {
@@ -101,9 +101,9 @@ public class DeliveryController {
     }
 
     /**
-     * Lấy danh sách cuốc xe đang chờ tài xế xác nhận.
+     * Lấy danh sách cuốc xe đang chờ tài xế xác nhận (hỗ trợ cả /offers và /available).
      */
-    @GetMapping("/offers")
+    @GetMapping({"/offers", "/available", "/available-orders"})
     public ResponseEntity<ApiResponse<List<DriverOfferResponse>>> getPendingOffers(
             @RequestHeader(value = "X-User-Id", defaultValue = "2") Integer driverId) {
         List<DriverOfferResponse> res = deliveryService.getPendingOffers(driverId);
@@ -112,14 +112,24 @@ public class DeliveryController {
 
     /**
      * Cập nhật các bước giao hàng tiếp theo (PICKING_UP, DELIVERING, COMPLETED).
-     * Hỗ trợ cả POST và PUT.
+     * Hỗ trợ cả POST và PUT, cả /step và /status.
      */
-    @RequestMapping(value = "/orders/{orderId}/step", method = {RequestMethod.POST, RequestMethod.PUT})
+    @RequestMapping(value = {"/orders/{orderId}/step", "/orders/{orderId}/status"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<ApiResponse<String>> updateDeliveryStep(
             @PathVariable Long orderId,
             @Valid @RequestBody UpdateDeliveryStepRequest request,
             @RequestHeader(value = "X-User-Id", defaultValue = "2") Integer driverId) {
         deliveryService.updateDeliveryStep(driverId, orderId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật tiến trình giao hàng thành công", request.getStep()));
+    }
+
+    /**
+     * Thống kê hiệu suất và thu nhập của tài xế (hỗ trợ /metrics, /earnings, /me/metrics).
+     */
+    @GetMapping({"/metrics", "/earnings", "/me/metrics"})
+    public ResponseEntity<ApiResponse<DriverMetricsResponse>> getDriverMetrics(
+            @RequestHeader(value = "X-User-Id", defaultValue = "2") Integer driverId) {
+        DriverMetricsResponse res = deliveryService.getDriverMetrics(driverId);
+        return ResponseEntity.ok(ApiResponse.success("Thống kê tài xế thành công", res));
     }
 }

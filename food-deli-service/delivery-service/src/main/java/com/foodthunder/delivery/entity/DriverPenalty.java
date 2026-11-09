@@ -50,3 +50,4 @@ public class DriverPenalty {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }
+

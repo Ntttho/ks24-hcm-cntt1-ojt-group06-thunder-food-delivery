@@ -18,3 +18,4 @@ public class AcceptOrderResponse {
     private String status;
     private LocalDateTime respondedAt;
 }
+
