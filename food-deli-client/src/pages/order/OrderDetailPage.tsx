@@ -5,7 +5,9 @@ import {
   Button,
   Spin,
   Typography,
+  Tooltip,
   FloatButton,
+  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -21,6 +23,7 @@ import {
 } from '@ant-design/icons';
 import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
+import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
 import {
@@ -52,7 +55,10 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   DRIVER_ACCEPTED: 'Tài xế đã nhận đơn',
   DRIVER_REJECTED: 'Tài xế đã từ chối',
   CONFIRMED: 'Quán đã xác nhận',
+  PREPARING: 'Quán đang chế biến',
   PICKING_UP: 'Tài xế đang lấy món',
+  READY_FOR_PICKUP: 'Chờ tài xế lấy món',
+  PICKED_UP: 'Đang giao hàng',
   DELIVERING: 'Đang giao hàng',
   COMPLETED: 'Giao thành công',
   DELIVERED: 'Giao thành công',
@@ -70,21 +76,25 @@ interface OrderStatusPayload {
 }
 
 const getOrderStatusCode = (data: OrderStatusPayload): string => {
-  const statusId = Number(
-    data.orderStatusId ?? data.statusId ?? data.orderStatus?.id ?? data.status?.id,
-  );
-  return (
-    ORDER_STATUS_CODES_BY_ID[statusId] ??
-    data.statusCode ??
-    data.orderStatus?.code ??
-    data.status?.code ??
-    'DELIVERING'
-  );
+  if (data.statusCode) return data.statusCode.toUpperCase();
+  if (data.orderStatus?.code) return data.orderStatus.code.toUpperCase();
+  if (data.status?.code) return data.status.code.toUpperCase();
+
+  const rawId = data.orderStatusId ?? data.statusId ?? data.orderStatus?.id ?? data.status?.id;
+  if (rawId !== undefined && rawId !== null) {
+    const numericId = Number(rawId);
+    if (ORDER_STATUS_CODES_BY_ID[numericId]) {
+      return ORDER_STATUS_CODES_BY_ID[numericId];
+    }
+  }
+
+  return 'PENDING';
 };
 
 export const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
   const [order, setOrder] = useState<CustomerOrder | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [isRestaurantReviewOpen, setIsRestaurantReviewOpen] = useState<boolean>(false);
@@ -93,42 +103,36 @@ export const OrderDetailPage: React.FC = () => {
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
 
+  // 1. Initial Order Fetch
   useEffect(() => {
     const fetchOrderDetail = async () => {
-      setLoading(true);
+      if (!id) return;
       try {
-        if (!id) return;
-        const response = await orderApi.getById(id);
-        const data = response?.data;
-
-        if (data) {
+        setLoading(true);
+        const res = await orderApi.getById(id);
+        if (res && res.data) {
+          const data = res.data;
           const statusCode = getOrderStatusCode(data);
           const mappedOrder: CustomerOrder = {
-            id: data.id,
+            id: Number(data.id),
             orderCode: data.orderCode || `#ORD-${data.id}`,
-            customerId: data.customerId,
-            customerName: data.customerName,
-            customerPhone: data.customerPhone,
-            restaurantId: data.restaurantId,
-            restaurantName:
-              data.restaurantName ||
-              (data.restaurantId === 1
-                ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi'
-                : `Quán ăn #${data.restaurantId}`),
-            driverId: data.driverId,
-            driverName: data.driverName || 'Nguyễn Tuấn Tài (Tài xế Thunder)',
-            driverPhone: data.driverPhone || '0912345678',
-            receiverAddress:
-              data.receiverAddress || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-            distanceKm: data.distanceKm || 2.1,
+            customerId: Number(data.customerId || 1),
+            customerName: data.customerName || 'Khách hàng',
+            customerPhone: data.customerPhone || '0987654321',
+            restaurantId: Number(data.restaurantId || 1),
+            restaurantName: data.restaurantName || `Nhà hàng #${data.restaurantId}`,
+            driverId: data.driverId ? Number(data.driverId) : undefined,
+            driverName: data.driverName || (data.driverId ? 'Nguyễn Tuấn Tài (Tài xế Thunder)' : undefined),
+            driverPhone: data.driverPhone || (data.driverId ? '0912345678' : undefined),
+            receiverAddress: data.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
+            distanceKm: Number(data.distanceKm || 2.1),
             subtotalAmount: Number(data.subtotalAmount || 0),
-            shippingFee: Number(data.shippingFee || 18000),
+            shippingFee: Number(data.shippingFee || 16000),
             discountAmount: Number(data.discountAmount || 0),
             totalAmount: Number(data.totalAmount || 0),
-            paymentMethod: data.paymentMethod || 'COD',
+            paymentMethod: (data.paymentMethod || 'COD').toUpperCase(),
             statusCode,
-            statusLabel: data.statusLabel || ORDER_STATUS_LABELS[statusCode] || statusCode,
-            cancelReason: data.cancelReason,
+            statusLabel: ORDER_STATUS_LABELS[statusCode] || statusCode,
             createdAt: data.createdAt || new Date().toISOString(),
             items: (data.items || []).map((it: any) => ({
               id: it.id,
@@ -147,13 +151,14 @@ export const OrderDetailPage: React.FC = () => {
           };
           setOrder(mappedOrder);
 
-          // Kiểm tra trạng thái đã đánh giá quán / tài xế chưa
+          // Check review status
           if (['DELIVERED', 'COMPLETED'].includes(statusCode)) {
-            reviewApi.getOrderReviewStatus(mappedOrder.id)
-              .then((res) => {
-                if (res?.data) {
-                  if (res.data.isRestaurantReviewed) setRestaurantReviewed(true);
-                  if (res.data.isDriverReviewed) setDriverReviewed(true);
+            reviewApi
+              .getOrderReviewStatus(mappedOrder.id)
+              .then((reviewRes) => {
+                if (reviewRes?.data) {
+                  if (reviewRes.data.isRestaurantReviewed) setRestaurantReviewed(true);
+                  if (reviewRes.data.isDriverReviewed) setDriverReviewed(true);
                 }
               })
               .catch(() => {});
@@ -224,28 +229,66 @@ export const OrderDetailPage: React.FC = () => {
     fetchOrderDetail();
   }, [id]);
 
+  // 2. Realtime WebSocket STOMP Subscription: /topic/orders/{orderId}
+  useEffect(() => {
+    if (!id) return;
+
+    orderLiveTrackingWs.connect(id);
+
+    const unsubscribe = orderLiveTrackingWs.subscribeOrderUpdates((updated) => {
+      setOrder((prev) => {
+        if (!prev) return prev;
+        const newStatusCode = updated.statusCode || prev.statusCode;
+        const newStatusLabel = ORDER_STATUS_LABELS[newStatusCode] || updated.statusLabel || prev.statusLabel;
+
+        message.info({
+          content: `Cập nhật trạng thái đơn: ${newStatusLabel}`,
+          key: 'order-status-update',
+          duration: 3,
+        });
+
+        return {
+          ...prev,
+          ...updated,
+          statusCode: newStatusCode,
+          statusLabel: newStatusLabel,
+          driverId: updated.driverId ?? prev.driverId,
+          driverName: updated.driverName || prev.driverName,
+          driverPhone: updated.driverPhone || prev.driverPhone,
+        };
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      orderLiveTrackingWs.disconnect();
+    };
+  }, [id]);
+
+  // Stepper 5 bước: Chờ nhận → Đang nấu → Tài xế nhận → Đang giao → Đã giao
   const getStepCurrent = (status?: string): { current: number; statusText: string } => {
     switch (status) {
       case 'PENDING':
-        return { current: 0, statusText: 'Đơn hàng đang chờ quán xác nhận' };
+        return { current: 0, statusText: 'Đơn hàng đang chờ quán tiếp nhận' };
       case 'AWAITING_PAYMENT':
-        return { current: 0, statusText: 'Đơn hàng đang chờ thanh toán' };
+        return { current: 0, statusText: 'Đang chờ bạn hoàn tất thanh toán' };
       case 'CONFIRMED':
       case 'PREPARING':
-        return { current: 1, statusText: 'Quán ăn đang chuẩn bị món ăn tươi ngon' };
+        return { current: 1, statusText: 'Quán ăn đang chế biến món tươi ngon nóng hổi' };
       case 'DRIVER_ACCEPTED':
-        return { current: 1, statusText: 'Tài xế đã nhận đơn, quán đang chuẩn bị món' };
+        return { current: 2, statusText: 'Tài xế đã nhận đơn và đang di chuyển tới quán' };
       case 'DRIVER_REJECTED':
-        return { current: 1, statusText: 'Tài xế từ chối nhận đơn, đang tìm tài xế khác' };
+        return { current: 1, statusText: 'Đang điều phối tìm tài xế khác cho bạn' };
       case 'PICKING_UP':
-        return { current: 2, statusText: 'Tài xế đang đến lấy món' };
+        return { current: 2, statusText: 'Tài xế đang đến lấy món ăn tại quán' };
       case 'READY_FOR_PICKUP':
+        return { current: 2, statusText: 'Món ăn đã sẵn sàng, chờ tài xế nhận' };
       case 'PICKED_UP':
       case 'DELIVERING':
-        return { current: 2, statusText: 'Tài xế đang hỏa tốc giao đơn hàng tới bạn' };
+        return { current: 3, statusText: 'Tài xế đang hỏa tốc giao đơn hàng tới bạn' };
       case 'DELIVERED':
       case 'COMPLETED':
-        return { current: 3, statusText: 'Đơn hàng đã được giao thành công' };
+        return { current: 4, statusText: 'Đơn hàng đã được giao thành công!' };
       case 'CANCELLED':
         return { current: 0, statusText: 'Đơn hàng đã bị hủy' };
       case 'TIMEOUT':
@@ -348,8 +391,8 @@ export const OrderDetailPage: React.FC = () => {
                   </Button>
                 )}
 
-                {/* 2. Nút / Tag Đánh giá Tài xế nếu có */}
-                {order.driverId && (
+                {/* 2. Nút / Tag Đánh giá Tài xế nếu có hoặc Tag Không có tài xế */}
+                {order.driverId ? (
                   driverReviewed ? (
                     <Tag color="green" className="text-sm py-1 px-3 font-bold rounded-lg">
                       <StarFilled className="mr-1 text-emerald-500" />
@@ -365,6 +408,12 @@ export const OrderDetailPage: React.FC = () => {
                       Đánh giá tài xế
                     </Button>
                   )
+                ) : (
+                  <Tooltip title="Đơn hàng hoàn tất không qua tài xế giao nên không cần đánh giá tài xế">
+                    <Tag color="default" className="text-sm py-1 px-3 font-semibold rounded-lg cursor-help">
+                      Không có tài xế
+                    </Tag>
+                  </Tooltip>
                 )}
               </>
             )}
@@ -381,7 +430,7 @@ export const OrderDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 3. Live Tracking Progress Bar */}
+        {/* 3. Live Tracking Progress Bar - Stepper 5 bước */}
         <OrderLiveTrackingStepper
           current={current}
           statusText={statusText}
@@ -396,6 +445,7 @@ export const OrderDetailPage: React.FC = () => {
           restaurantId={order.restaurantId}
           restaurantName={order.restaurantName}
           distanceKm={order.distanceKm}
+          statusCode={order.statusCode}
           onOpenChat={() => setIsChatOpen(true)}
         />
 
@@ -449,6 +499,7 @@ export const OrderDetailPage: React.FC = () => {
         />
       )}
 
+      {/* Modals for Ratings */}
       {isRestaurantReviewOpen && order && (
         <RestaurantReviewModal
           isOpen={isRestaurantReviewOpen}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Tag } from 'antd';
+import { Button, Tag, Tooltip } from 'antd';
 import {
   ShopOutlined,
   ClockCircleOutlined,
@@ -191,8 +191,8 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
                   </Button>
                 )}
 
-                {/* 2. Nút / Tag Đánh giá tài xế (nếu có tài xế) */}
-                {order.driverId && (
+                {/* 2. Nút / Tag Đánh giá tài xế (nếu có tài xế) hoặc Tag Không có tài xế */}
+                {order.driverId ? (
                   driverReviewed ? (
                     <Tag color="green" className="rounded-xl px-2.5 py-1 font-bold text-xs">
                       <StarFilled className="mr-1 text-emerald-500" />
@@ -207,6 +207,12 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
                       Đánh giá tài xế
                     </Button>
                   )
+                ) : (
+                  <Tooltip title="Đơn hàng hoàn tất không qua tài xế giao nên không cần đánh giá tài xế">
+                    <Tag color="default" className="rounded-xl px-2.5 py-1 font-medium text-xs cursor-help">
+                      Không có tài xế
+                    </Tag>
+                  </Tooltip>
                 )}
               </>
             ) : (
