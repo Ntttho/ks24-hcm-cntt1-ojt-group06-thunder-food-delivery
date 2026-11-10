@@ -22,6 +22,8 @@ import {
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
+  ShipperHubPage,
+  ShipperHistoryPage,
   AdminRestaurantReviewsPage,
   AdminDriverReviewsPage,
 } from '@/pages';
@@ -234,6 +236,40 @@ export const router = createBrowserRouter([
         ),
       },
     ],
+  },
+  // Shipper / Driver Web Hub (Bọc route /shipper bằng <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>)
+  {
+    path: APP_ROUTES.SHIPPER_DASHBOARD,
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperHubPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/driver',
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperHubPage />
+      </ProtectedRoute>
+    ),
+  },
+  // Shipper / Driver History & Income Statistics (SP3-DRV-05)
+  {
+    path: APP_ROUTES.SHIPPER_HISTORY,
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperHistoryPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/driver/history',
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperHistoryPage />
+      </ProtectedRoute>
+    ),
   },
 ]);
 

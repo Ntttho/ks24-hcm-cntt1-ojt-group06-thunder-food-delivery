@@ -56,12 +56,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
 
       if (showForbiddenResult) {
+        const isDriverArea = normalizedAllowed.includes('ROLE_DRIVER') || normalizedAllowed.includes('ROLE_SHIPPER');
+        const forbiddenMessage = isDriverArea
+          ? 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Cổng làm việc này chỉ dành riêng cho Đối tác Tài xế (Driver / Shipper).'
+          : 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Khu vực này chỉ dành riêng cho Đối tác Quán ăn (Merchant) hoặc Quản trị viên (Admin).';
+
         return (
           <div className="min-h-[70vh] flex items-center justify-center p-6 bg-slate-50">
             <Result
               status="403"
               title="403 - Quyền truy cập bị từ chối"
-              subTitle="Tài khoản của bạn không có quyền truy cập vào phân hệ này. Khu vực này chỉ dành riêng cho Đối tác Quán ăn (Merchant) hoặc Quản trị viên (Admin)."
+              subTitle={forbiddenMessage}
               extra={
                 <Link to={APP_ROUTES.HOME}>
                   <Button type="primary" className="bg-orange-500 hover:bg-orange-600 font-bold rounded-xl shadow-xs">

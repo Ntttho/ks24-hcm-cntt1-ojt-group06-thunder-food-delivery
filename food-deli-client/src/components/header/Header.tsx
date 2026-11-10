@@ -350,6 +350,13 @@ export const Header: React.FC = () => {
             </span>
             {totalQuantity > 0 && <Tag color="orange">{totalQuantity} món</Tag>}
           </Link>
+          <Link
+            to={APP_ROUTES.SHIPPER_DASHBOARD}
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
+          >
+            <CarOutlined /> Cổng Tài Xế (Shipper Hub)
+          </Link>
 
           {isAuthenticated ? (
             <>
