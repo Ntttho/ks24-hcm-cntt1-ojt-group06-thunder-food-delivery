@@ -30,4 +30,5 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .withSockJS();
     }
 }
-
+// trung tâm điều phối (Traffic Controller) cho toàn bộ hệ thống WebSocket trong dự án Spring Boot. Mục đích cốt lõi là: kích hoạt giao thức STOMP, định tuyến đường đi của tin nhắn (Routing)
+// và mở cổng kết nối cho Client (React-TS).
