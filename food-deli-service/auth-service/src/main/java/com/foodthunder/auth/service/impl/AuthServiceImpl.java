@@ -152,12 +152,13 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<UserDto> getUsers(String search, String role, int page, int size) {
+    public PageResponse<UserDto> getUsers(String search, String role, String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
         String roleParam = (role != null && !role.trim().isEmpty()) ? role.trim() : null;
+        String statusParam = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : null;
 
-        Page<User> userPage = userRepository.searchUsers(searchParam, roleParam, pageable);
+        Page<User> userPage = userRepository.searchUsers(searchParam, roleParam, statusParam, pageable);
         List<UserDto> content = userPage.getContent().stream()
                 .map(u -> toUserDto(u, null))
                 .collect(Collectors.toList());
@@ -170,6 +171,153 @@ public class AuthServiceImpl implements AuthService {
                 .totalPages(userPage.getTotalPages())
                 .last(userPage.isLast())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public UserDto createUser(CreateUserRequest request) {
+        String phone = request.phone().trim();
+        if (userRepository.existsByPhone(phone)) {
+            throw new ConflictException("Số điện thoại " + phone + " đã được đăng ký trên hệ thống");
+        }
+
+        Set<Role> roles = resolveRoles(request.roles(), request.role());
+
+        User user = User.builder()
+                .phone(phone)
+                .fullName(request.fullName().trim())
+                .email(request.email() != null && !request.email().isBlank() ? request.email().trim() : null)
+                .password(passwordEncoder.encode(request.password()))
+                .roles(roles)
+                .ratingAvg(new BigDecimal("5.00"))
+                .deletedAt("LOCKED".equalsIgnoreCase(request.status()) ? java.time.LocalDateTime.now() : null)
+                .build();
+
+        User saved = userRepository.save(user);
+        log.info("Admin created new user id={}, phone={}", saved.getId(), saved.getPhone());
+        return toUserDto(saved, null);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUser(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        if (request.phone() != null && !request.phone().isBlank()) {
+            String newPhone = request.phone().trim();
+            if (!newPhone.equals(user.getPhone()) && userRepository.existsByPhoneAndIdNot(newPhone, id)) {
+                throw new ConflictException("Số điện thoại " + newPhone + " đã được sử dụng bởi tài khoản khác");
+            }
+            user.setPhone(newPhone);
+        }
+
+        if (request.fullName() != null && !request.fullName().isBlank()) {
+            user.setFullName(request.fullName().trim());
+        }
+
+        if (request.email() != null) {
+            user.setEmail(request.email().isBlank() ? null : request.email().trim());
+        }
+
+        if (request.password() != null && !request.password().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.password()));
+        }
+
+        if ((request.roles() != null && !request.roles().isEmpty()) || (request.role() != null && !request.role().isBlank())) {
+            Set<Role> updatedRoles = resolveRoles(request.roles(), request.role());
+            user.setRoles(updatedRoles);
+        }
+
+        if (request.status() != null && !request.status().isBlank()) {
+            if ("LOCKED".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else if ("ACTIVE".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(null);
+            }
+        }
+
+        User updated = userRepository.save(user);
+        log.info("Admin updated user id={}", updated.getId());
+        return toUserDto(updated, null);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUserStatus(Long id, UpdateUserStatusRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        if (request.status() != null && !request.status().isBlank()) {
+            if ("LOCKED".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else if ("ACTIVE".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(null);
+            }
+        } else if (request.isActive() != null) {
+            if (Boolean.FALSE.equals(request.isActive())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else {
+                user.setDeletedAt(null);
+            }
+        } else {
+            if (user.getDeletedAt() == null) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else {
+                user.setDeletedAt(null);
+            }
+        }
+
+        User updated = userRepository.save(user);
+        log.info("Admin updated status for user id={}, isLocked={}", updated.getId(), updated.getDeletedAt() != null);
+        return toUserDto(updated, null);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
+        log.info("Admin deleted user id={}", id);
+    }
+
+    private Set<Role> resolveRoles(List<String> rolesList, String singleRole) {
+        java.util.Set<String> roleNames = new java.util.HashSet<>();
+        if (rolesList != null && !rolesList.isEmpty()) {
+            for (String r : rolesList) {
+                if (r != null && !r.isBlank()) {
+                    roleNames.add(normalizeRoleName(r));
+                }
+            }
+        }
+        if (roleNames.isEmpty() && singleRole != null && !singleRole.isBlank()) {
+            roleNames.add(normalizeRoleName(singleRole));
+        }
+        if (roleNames.isEmpty()) {
+            roleNames.add("CUSTOMER");
+        }
+
+        Set<Role> roles = new java.util.HashSet<>();
+        for (String rName : roleNames) {
+            Role role = roleRepository.findByName(rName)
+                    .orElseGet(() -> roleRepository.save(Role.builder().name(rName).build()));
+            roles.add(role);
+        }
+        return roles;
+    }
+
+    private String normalizeRoleName(String raw) {
+        String r = raw.trim().toUpperCase();
+        if (r.startsWith("ROLE_")) {
+            r = r.substring(5);
+        }
+        if ("SHIPPER".equals(r)) {
+            r = "DRIVER";
+        }
+        return r;
     }
 
     @Override
@@ -190,14 +338,19 @@ public class AuthServiceImpl implements AuthService {
                 : (roleNames.contains("CUSTOMER") ? "CUSTOMER"
                 : (roleNames.isEmpty() ? "CUSTOMER" : roleNames.iterator().next()));
 
+        String status = user.getDeletedAt() == null ? "ACTIVE" : "LOCKED";
+
         return UserDto.builder()
                 .id(user.getId())
                 .phone(user.getPhone())
+                .email(user.getEmail())
                 .fullName(user.getFullName())
                 .ratingAvg(user.getRatingAvg())
                 .roles(roleNames)
                 .role(currentRole)
+                .status(status)
                 .createdAt(user.getCreatedAt())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 }
