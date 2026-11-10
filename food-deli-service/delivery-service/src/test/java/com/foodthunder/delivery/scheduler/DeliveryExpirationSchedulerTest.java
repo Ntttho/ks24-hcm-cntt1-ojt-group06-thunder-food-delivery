@@ -64,3 +64,4 @@ class DeliveryExpirationSchedulerTest {
         verify(driverPenaltyRepository, times(1)).expireActivePenalties(any(LocalDateTime.class));
     }
 }
+
