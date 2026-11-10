@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     DETAIL: (id: number | string) => `/users/${id}`,
+    STATUS: (id: number | string) => `/users/${id}/status`,
     ALL: '/users/all',
   },
   // Customer User Addresses (Sổ địa chỉ)
