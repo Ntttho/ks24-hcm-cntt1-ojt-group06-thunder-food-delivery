@@ -23,6 +23,8 @@ export const APP_ROUTES = {
   ADDRESS_MANAGEMENT: '/addresses',
   ADMIN_DASHBOARD: '/admin',
   MERCHANT_DASHBOARD: '/merchant',
+  MERCHANT_REVENUE: '/merchant/revenue',
+  MERCHANT_ANALYTICS: '/merchant/revenue',
   MERCHANT_MENU: '/merchant/menu',
   MERCHANT_CATEGORIES: '/merchant/categories',
   MERCHANT_TOPPINGS: '/merchant/toppings',
