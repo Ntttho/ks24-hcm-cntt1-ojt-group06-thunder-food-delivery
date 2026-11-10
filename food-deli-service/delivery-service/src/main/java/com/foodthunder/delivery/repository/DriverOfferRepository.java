@@ -5,10 +5,12 @@ import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,5 +51,16 @@ public interface DriverOfferRepository extends JpaRepository<DriverOffer, Long> 
            "AND o.status IN ('ACCEPTED', 'COMPLETED', 'DRIVER_CANCELLED') " +
            "ORDER BY o.createdAt DESC")
     List<DriverOffer> findRollingWindowAcceptedOffers(@Param("driverId") Integer driverId, Pageable pageable);
+
+    /**
+     * Tự động chuyển các offer quá hạn từ OFFERED sang IGNORED khi expiresAt <= now.
+     */
+    @Modifying
+    @Query("UPDATE DriverOffer o SET o.status = 'IGNORED', o.respondedAt = :now, " +
+           "o.responseReason = 'Tự động hết hạn (tài xế không phản hồi)' " +
+           "WHERE o.status = 'OFFERED' AND o.expiresAt IS NOT NULL AND o.expiresAt <= :now")
+    int expirePendingOffers(@Param("now") LocalDateTime now);
+
+    List<DriverOffer> findByStatusAndExpiresAtLessThanEqual(String status, LocalDateTime expiresAt);
 }
 
