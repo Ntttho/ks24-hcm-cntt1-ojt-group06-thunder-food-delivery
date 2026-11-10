@@ -10,6 +10,7 @@ import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
 import com.foodthunder.auth.model.Role;
 import com.foodthunder.auth.model.User;
+import com.foodthunder.auth.repository.DriverDetailsRepository;
 import com.foodthunder.auth.repository.RoleRepository;
 import com.foodthunder.auth.repository.UserRepository;
 import com.foodthunder.auth.security.JwtProvider;
@@ -42,6 +43,9 @@ class AuthServiceTest {
 
     @Mock
     private RoleRepository roleRepository;
+
+    @Mock
+    private DriverDetailsRepository driverDetailsRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -202,5 +206,17 @@ class AuthServiceTest {
 
         assertThat(updated).isNotNull();
         assertThat(sampleUser.getFullName()).isEqualTo("Nguyen Van A Updated");
+    }
+
+    @Test
+    @DisplayName("updateRating: persists rating average rounded to two decimals")
+    void updateRating_success() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+        when(userRepository.save(sampleUser)).thenReturn(sampleUser);
+
+        UserDto updated = authService.updateRating(1L, new BigDecimal("4.256"));
+
+        assertThat(updated.ratingAvg()).isEqualByComparingTo("4.26");
+        verify(userRepository).save(sampleUser);
     }
 }

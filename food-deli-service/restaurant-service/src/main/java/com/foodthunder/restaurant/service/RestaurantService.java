@@ -6,6 +6,7 @@ import com.foodthunder.restaurant.dto.RestaurantDetailDto;
 import com.foodthunder.restaurant.dto.RestaurantDto;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 public interface RestaurantService {
 
@@ -22,4 +23,6 @@ public interface RestaurantService {
     RestaurantDto updateRestaurantDetails(Integer id, CreateRestaurantRequest request, Integer ownerId);
 
     RestaurantDto updateShopStatus(Integer id, Boolean isOpen, String temporaryClosedReason);
+
+    RestaurantDto updateRating(Integer id, BigDecimal ratingAvg);
 }

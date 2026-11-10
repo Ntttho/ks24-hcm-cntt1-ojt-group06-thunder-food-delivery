@@ -1,6 +1,8 @@
 package com.foodthunder.restaurant.controller;
 
 import com.foodthunder.restaurant.dto.*;
+import com.foodthunder.restaurant.exception.UnauthorizedException;
+import com.foodthunder.restaurant.exception.ForbiddenException;
 import com.foodthunder.restaurant.service.ProductService;
 import com.foodthunder.restaurant.service.RestaurantService;
 import com.foodthunder.restaurant.service.ToppingService;
@@ -12,6 +14,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping({"/api/v1/restaurants", "/api/v1/shops", "/api/v1/restaurant"})
@@ -196,5 +202,25 @@ public class RestaurantController {
         String reason = payload.containsKey("temporaryClosedReason") ? (String) payload.get("temporaryClosedReason") : null;
         RestaurantDto updated = restaurantService.updateShopStatus(id, isOpen, reason);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái quán thành công", updated));
+    }
+
+    @PutMapping("/{id}/rating")
+    public ResponseEntity<ApiResponse<RestaurantDto>> updateRating(
+            @PathVariable Integer id,
+            @RequestParam BigDecimal ratingAvg,
+            @RequestHeader(value = "X-User-Role", required = false) String roleHeader
+    ) {
+        if (roleHeader == null || roleHeader.isBlank()) {
+            throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
+        }
+        Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+        if (!roles.contains("ROLE_ADMIN")) {
+            throw new ForbiddenException("Chỉ Admin mới được cập nhật điểm đánh giá");
+        }
+        RestaurantDto updated = restaurantService.updateRating(id, ratingAvg);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đánh giá nhà hàng thành công", updated));
     }
 }

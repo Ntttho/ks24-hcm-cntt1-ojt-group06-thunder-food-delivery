@@ -57,6 +57,7 @@ export interface ReviewItemDto {
   rating: number;
   comment?: string;
   images?: string[];
+  quickTags?: string[];
   createdAt: string;
 }
 

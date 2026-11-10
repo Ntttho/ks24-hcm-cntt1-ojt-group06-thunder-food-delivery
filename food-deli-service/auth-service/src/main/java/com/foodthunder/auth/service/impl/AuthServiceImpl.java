@@ -5,7 +5,9 @@ import com.foodthunder.auth.exception.ConflictException;
 import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
 import com.foodthunder.auth.model.Role;
+import com.foodthunder.auth.model.DriverDetails;
 import com.foodthunder.auth.model.User;
+import com.foodthunder.auth.repository.DriverDetailsRepository;
 import com.foodthunder.auth.repository.RoleRepository;
 import com.foodthunder.auth.repository.UserRepository;
 import com.foodthunder.auth.security.JwtProvider;
@@ -31,6 +33,7 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final DriverDetailsRepository driverDetailsRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -181,6 +184,20 @@ public class AuthServiceImpl implements AuthService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public UserDto updateRating(Long userId, BigDecimal ratingAvg) {
+        if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0
+                || ratingAvg.compareTo(BigDecimal.valueOf(5)) > 0) {
+            throw new com.foodthunder.auth.exception.BadRequestException("Điểm đánh giá phải nằm trong khoảng 0 đến 5");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng #" + userId));
+        user.setRatingAvg(ratingAvg.setScale(2, java.math.RoundingMode.HALF_UP));
+        return toUserDto(userRepository.save(user), null);
+    }
+
     private UserDto toUserDto(User user, String activeRole) {
         Set<String> roleNames = user.getRoles().stream()
                 .map(Role::getName)
@@ -189,12 +206,18 @@ public class AuthServiceImpl implements AuthService {
         String currentRole = activeRole != null ? activeRole
                 : (roleNames.contains("CUSTOMER") ? "CUSTOMER"
                 : (roleNames.isEmpty() ? "CUSTOMER" : roleNames.iterator().next()));
+        String licensePlate = roleNames.contains("DRIVER") || roleNames.contains("SHIPPER")
+                ? driverDetailsRepository.findById(user.getId())
+                        .map(DriverDetails::getLicensePlate)
+                        .orElse(null)
+                : null;
 
         return UserDto.builder()
                 .id(user.getId())
                 .phone(user.getPhone())
                 .fullName(user.getFullName())
                 .ratingAvg(user.getRatingAvg())
+                .licensePlate(licensePlate)
                 .roles(roleNames)
                 .role(currentRole)
                 .createdAt(user.getCreatedAt())

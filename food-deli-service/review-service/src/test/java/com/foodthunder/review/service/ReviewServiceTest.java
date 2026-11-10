@@ -3,6 +3,8 @@ package com.foodthunder.review.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.review.client.OrderClient;
+import com.foodthunder.review.client.RestaurantClient;
+import com.foodthunder.review.client.UserClient;
 import com.foodthunder.review.dto.client.OrderClientDto;
 import com.foodthunder.review.dto.request.SubmitOrderReviewRequest;
 import com.foodthunder.review.dto.response.OrderReviewEligibilityDto;
@@ -22,7 +24,9 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -36,6 +40,12 @@ class ReviewServiceTest {
 
     @Mock
     private OrderClient orderClient;
+
+    @Mock
+    private RestaurantClient restaurantClient;
+
+    @Mock
+    private UserClient userClient;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -77,6 +87,72 @@ class ReviewServiceTest {
                         new OrderClientDto.OrderItemClientDto(1L, 10L, "Cơm Tấm Sườn Nướng")
                 ))
                 .build();
+    }
+
+    @Test
+    @DisplayName("Deleting a restaurant review recalculates and updates its average")
+    void deleteRestaurantReview_RecalculatesRating() {
+        Review review = Review.builder()
+                .id(12L)
+                .targetType("RESTAURANT")
+                .targetId(5L)
+                .rating(1)
+                .build();
+        when(reviewRepository.findById(12L)).thenReturn(Optional.of(review));
+        when(reviewRepository.calculateAverageRating("RESTAURANT", 5L)).thenReturn(4.25);
+
+        reviewService.deleteReview(12L);
+
+        verify(reviewRepository).delete(review);
+        verify(reviewRepository).flush();
+        verify(restaurantClient).updateRating(5, new BigDecimal("4.25"), "ROLE_ADMIN");
+        verifyNoInteractions(userClient);
+    }
+
+    @Test
+    @DisplayName("Deleting the final driver review restores the default average")
+    void deleteDriverReview_UsesDefaultWhenNoReviewsRemain() {
+        Review review = Review.builder()
+                .id(13L)
+                .targetType("DRIVER")
+                .targetId(8L)
+                .rating(1)
+                .build();
+        when(reviewRepository.findById(13L)).thenReturn(Optional.of(review));
+        when(reviewRepository.calculateAverageRating("DRIVER", 8L)).thenReturn(null);
+
+        reviewService.deleteReview(13L);
+
+        verify(userClient).updateRating(8L, new BigDecimal("5.00"), "ROLE_ADMIN");
+        verifyNoInteractions(restaurantClient);
+    }
+
+    @Test
+    @DisplayName("Deleting a missing review returns not found")
+    void deleteReview_NotFound() {
+        when(reviewRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThrows(com.foodthunder.review.exception.ResourceNotFoundException.class,
+                () -> reviewService.deleteReview(404L));
+
+        verify(reviewRepository, never()).delete(any(Review.class));
+        verifyNoInteractions(restaurantClient, userClient);
+    }
+
+    @Test
+    @DisplayName("Existing driver comments retain their previously embedded quick tags")
+    void getReviewById_ParsesExistingQuickTags() {
+        Review review = Review.builder()
+                .id(14L)
+                .targetType("DRIVER")
+                .targetId(8L)
+                .comment("[Giao nhanh, Thân thiện] Tài xế lịch sự")
+                .build();
+        when(reviewRepository.findById(14L)).thenReturn(Optional.of(review));
+
+        ReviewResponseDto result = reviewService.getReviewById(14L);
+
+        assertEquals(List.of("Giao nhanh", "Thân thiện"), result.getQuickTags());
     }
 
     @Test
@@ -243,4 +319,3 @@ class ReviewServiceTest {
         assertTrue(status.getCanReviewDriver());
     }
 }
-

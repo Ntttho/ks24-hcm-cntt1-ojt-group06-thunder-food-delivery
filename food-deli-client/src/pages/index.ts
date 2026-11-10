@@ -8,3 +8,4 @@ export * from './user';
 export * from './merchant';
 export * from './order';
 export * from './admin/AdminUserPage';
+export * from './admin/AdminReviewManagementPage';

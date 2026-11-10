@@ -26,8 +26,8 @@ public class ReviewResponseDto {
     private Integer rating;
     private String comment;
     private List<String> images;
+    private List<String> quickTags;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private LocalDateTime createdAt;
 }
-

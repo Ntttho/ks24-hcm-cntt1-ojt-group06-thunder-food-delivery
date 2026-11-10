@@ -15,6 +15,7 @@ import {
   MenuOutlined,
   HomeOutlined,
   HistoryOutlined,
+  StarOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -66,6 +67,12 @@ export const Header: React.FC = () => {
         break;
       case 'admin-portal':
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        break;
+      case 'admin-restaurant-reviews':
+        navigate(APP_ROUTES.ADMIN_RESTAURANT_REVIEWS);
+        break;
+      case 'admin-driver-reviews':
+        navigate(APP_ROUTES.ADMIN_DRIVER_REVIEWS);
         break;
       case 'logout':
         handleLogoutConfirm();
@@ -120,6 +127,16 @@ export const Header: React.FC = () => {
           Trang Quản trị Hệ thống (Admin Portal)
         </span>
       ),
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-restaurant-reviews',
+      icon: <StarOutlined className="text-orange-500 text-base" />,
+      label: <span className="font-bold text-slate-700">Đánh giá nhà hàng</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-driver-reviews',
+      icon: <CarOutlined className="text-blue-600 text-base" />,
+      label: <span className="font-bold text-slate-700">Đánh giá tài xế</span>,
     });
   }
 

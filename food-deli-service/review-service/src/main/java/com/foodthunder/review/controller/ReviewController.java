@@ -24,7 +24,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @RestController
@@ -258,12 +260,15 @@ public class ReviewController {
         if (roleHeader == null || roleHeader.isBlank()) {
             throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
         }
+        Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .collect(java.util.stream.Collectors.toSet());
         for (String allowed : allowedRoles) {
-            if (roleHeader.contains(allowed)) {
+            if (roles.contains(allowed.toUpperCase())) {
                 return;
             }
         }
         throw new ForbiddenException("Bạn không có quyền thực hiện hành động này");
     }
 }
-

@@ -238,6 +238,20 @@ public class RestaurantServiceImpl implements RestaurantService {
         return mapToDto(updated);
     }
 
+    @Override
+    @Transactional
+    public RestaurantDto updateRating(Integer id, BigDecimal ratingAvg) {
+        if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0
+                || ratingAvg.compareTo(BigDecimal.valueOf(5)) > 0) {
+            throw new com.foodthunder.restaurant.exception.BadRequestException("Điểm đánh giá phải nằm trong khoảng 0 đến 5");
+        }
+
+        Shop shop = shopRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + id));
+        shop.setRatingAvg(ratingAvg.setScale(2, java.math.RoundingMode.HALF_UP));
+        return mapToDto(shopRepository.save(shop));
+    }
+
     private RestaurantDto mapToDto(Shop shop) {
         return RestaurantDto.builder()
                 .id(shop.getId())

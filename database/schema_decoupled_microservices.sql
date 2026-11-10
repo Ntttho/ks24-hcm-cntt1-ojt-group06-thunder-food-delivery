@@ -444,14 +444,19 @@ CREATE TABLE `reviews` (
   `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
   `target_type` ENUM('RESTAURANT','DRIVER') NOT NULL,
   `target_id` INT NOT NULL,               -- [Logical FK] trỏ sang restaurants.id hoặc users.id
+  `food_item_id` INT DEFAULT NULL,         -- [Logical FK] trỏ sang food_items.id
   `rating` TINYINT DEFAULT NULL,
   `comment` TEXT,
+  `images_json` TEXT,
+  `quick_tags_json` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_order_target` (`order_id`, `target_type`),
   KEY `idx_reviews_order_id` (`order_id`),
   KEY `idx_reviews_customer_id` (`customer_id`),
   KEY `idx_reviews_target` (`target_type`, `target_id`),
+  KEY `idx_reviews_food_item` (`food_item_id`),
+  KEY `idx_reviews_created_at` (`created_at`),
   CONSTRAINT `chk_reviews_rating` CHECK (`rating` BETWEEN 1 AND 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -762,4 +767,3 @@ COMMIT;
 -- =================================================================================
 -- HOÀN TẤT: Toàn bộ 26 bảng đã được tách liên kết logic, sẵn sàng cho Microservices!
 -- =================================================================================
-

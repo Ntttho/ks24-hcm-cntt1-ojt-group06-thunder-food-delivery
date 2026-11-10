@@ -12,6 +12,7 @@ public record UserDto(
         String phone,
         String fullName,
         BigDecimal ratingAvg,
+        String licensePlate,
         Set<String> roles,
         String role,
         LocalDateTime createdAt

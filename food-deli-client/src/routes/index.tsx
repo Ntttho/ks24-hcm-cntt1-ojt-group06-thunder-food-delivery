@@ -20,9 +20,11 @@ import {
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
+  AdminRestaurantReviewsPage,
+  AdminDriverReviewsPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-import { APP_ROUTES } from '@/constants';
+import { APP_ROUTES, ROLES } from '@/constants';
 
 export const router = createBrowserRouter([
   // Main Layout
@@ -53,6 +55,22 @@ export const router = createBrowserRouter([
       {
         path: APP_ROUTES.ADMIN_USERS,
         element: <AdminUserPage />,
+      },
+      {
+        path: APP_ROUTES.ADMIN_RESTAURANT_REVIEWS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminRestaurantReviewsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_DRIVER_REVIEWS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminDriverReviewsPage />
+          </ProtectedRoute>
+        ),
       },
       // User Account Management Layout (Profile, Orders, Addresses)
       {

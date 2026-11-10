@@ -42,6 +42,7 @@ public class SubmitOrderReviewRequest {
         private Long foodItemId;
 
         private List<String> images;
+
+        private List<String> quickTags;
     }
 }
-

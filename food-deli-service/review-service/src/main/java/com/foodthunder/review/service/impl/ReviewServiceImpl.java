@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.common.dto.response.PageResponse;
 import com.foodthunder.review.client.OrderClient;
+import com.foodthunder.review.client.RestaurantClient;
+import com.foodthunder.review.client.UserClient;
 import com.foodthunder.review.dto.client.OrderClientDto;
 import com.foodthunder.review.dto.request.AdminReviewRequest;
 import com.foodthunder.review.dto.request.SubmitDriverReviewRequest;
@@ -35,6 +37,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @Slf4j
@@ -44,6 +48,8 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderClient orderClient;
+    private final RestaurantClient restaurantClient;
+    private final UserClient userClient;
     private final ObjectMapper objectMapper;
 
     private static final long MAX_REVIEW_WINDOW_HOURS = 24L;
@@ -126,6 +132,7 @@ public class ReviewServiceImpl implements ReviewService {
                     .rating(driverReview.getRating())
                     .comment(driverReview.getComment())
                     .imagesJson(serializeImages(driverReview.getImages()))
+                    .quickTagsJson(serializeStringList(driverReview.getQuickTags()))
                     .build();
             savedReviews.add(reviewRepository.save(driverReviewEntity));
         }
@@ -221,6 +228,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .targetId(order.getDriverId().longValue())
                 .rating(request.getRating())
                 .comment(fullComment.toString().trim())
+                .quickTagsJson(serializeStringList(request.getQuickTags()))
                 .build();
 
         return mapToDto(reviewRepository.save(driverReviewEntity));
@@ -485,6 +493,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .rating(req.getRating())
                 .comment(req.getComment())
                 .imagesJson(serializeImages(req.getImages()))
+                .quickTagsJson(serializeStringList(req.getQuickTags()))
                 .build();
 
         return mapToDto(reviewRepository.save(review));
@@ -493,10 +502,24 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public void deleteReview(Long id) {
-        if (!reviewRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Không tìm thấy đánh giá #" + id + " để xóa");
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đánh giá #" + id + " để xóa"));
+
+        reviewRepository.delete(review);
+        reviewRepository.flush();
+
+        Double average = reviewRepository.calculateAverageRating(review.getTargetType(), review.getTargetId());
+        BigDecimal ratingAvg = BigDecimal.valueOf(average != null ? average : 5.0)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if ("RESTAURANT".equalsIgnoreCase(review.getTargetType())) {
+            restaurantClient.updateRating(Math.toIntExact(review.getTargetId()), ratingAvg, "ROLE_ADMIN");
+        } else if ("DRIVER".equalsIgnoreCase(review.getTargetType())) {
+            userClient.updateRating(review.getTargetId(), ratingAvg, "ROLE_ADMIN");
+        } else {
+            throw new BadRequestException("Loại đối tượng đánh giá không hợp lệ: " + review.getTargetType());
         }
-        reviewRepository.deleteById(id);
+
         log.info("Admin successfully deleted review #{}", id);
     }
 
@@ -543,18 +566,26 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private String serializeImages(List<String> images) {
-        if (images == null || images.isEmpty()) {
+        return serializeStringList(images);
+    }
+
+    private String serializeStringList(List<String> values) {
+        if (values == null || values.isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(images);
+            return objectMapper.writeValueAsString(values);
         } catch (Exception e) {
-            log.warn("Failed to serialize review images: {}", e.getMessage());
+            log.warn("Failed to serialize review list values: {}", e.getMessage());
             return null;
         }
     }
 
     private List<String> deserializeImages(String json) {
+        return deserializeStringList(json);
+    }
+
+    private List<String> deserializeStringList(String json) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -576,7 +607,25 @@ public class ReviewServiceImpl implements ReviewService {
                 .rating(r.getRating())
                 .comment(r.getComment())
                 .images(deserializeImages(r.getImagesJson()))
+                .quickTags(deserializeQuickTags(r))
                 .createdAt(r.getCreatedAt())
                 .build();
+    }
+
+    private List<String> deserializeQuickTags(Review review) {
+        List<String> quickTags = deserializeStringList(review.getQuickTagsJson());
+        if (!quickTags.isEmpty() || !"DRIVER".equalsIgnoreCase(review.getTargetType())
+                || review.getComment() == null || !review.getComment().startsWith("[")) {
+            return quickTags;
+        }
+
+        int closingBracket = review.getComment().indexOf(']');
+        if (closingBracket <= 1) {
+            return quickTags;
+        }
+        return Arrays.stream(review.getComment().substring(1, closingBracket).split(","))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .toList();
     }
 }
