@@ -2,6 +2,7 @@ package com.foodthunder.delivery.repository;
 
 import com.foodthunder.delivery.entity.DriverOffer;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -30,5 +31,23 @@ public interface DriverOfferRepository extends JpaRepository<DriverOffer, Long> 
     List<DriverOffer> findByDriverIdAndStatus(Integer driverId, String status);
 
     List<DriverOffer> findByDriverIdOrderByCreatedAtDesc(Integer driverId);
+
+    /**
+     * Query Rolling Window: Lấy tối đa N offer gần nhất có trạng thái kết thúc để tính AR (chuẩn PRD).
+     * Bao gồm: ACCEPTED, COMPLETED, DRIVER_CANCELLED, REJECTED, IGNORED, EXPIRED
+     */
+    @Query("SELECT o FROM DriverOffer o WHERE o.driverId = :driverId " +
+           "AND o.status IN ('ACCEPTED', 'COMPLETED', 'DRIVER_CANCELLED', 'REJECTED', 'IGNORED', 'EXPIRED') " +
+           "ORDER BY o.createdAt DESC")
+    List<DriverOffer> findRollingWindowEligibleOffers(@Param("driverId") Integer driverId, Pageable pageable);
+
+    /**
+     * Query Rolling Window: Lấy tối đa N đơn tài xế đã tiếp nhận gần nhất để tính CR (chuẩn PRD).
+     * Bao gồm: ACCEPTED, COMPLETED, DRIVER_CANCELLED
+     */
+    @Query("SELECT o FROM DriverOffer o WHERE o.driverId = :driverId " +
+           "AND o.status IN ('ACCEPTED', 'COMPLETED', 'DRIVER_CANCELLED') " +
+           "ORDER BY o.createdAt DESC")
+    List<DriverOffer> findRollingWindowAcceptedOffers(@Param("driverId") Integer driverId, Pageable pageable);
 }
 

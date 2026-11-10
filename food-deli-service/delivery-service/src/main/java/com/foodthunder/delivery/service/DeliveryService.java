@@ -1,5 +1,6 @@
 package com.foodthunder.delivery.service;
 
+import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
 import com.foodthunder.delivery.dto.response.*;
@@ -15,9 +16,15 @@ public interface DeliveryService {
     AcceptOrderResponse acceptOrder(Integer driverId, Long orderId);
 
     /**
-     * Tài xế từ chối cuốc xe.
+     * Tài xế từ chối cuốc xe (khi đang ở bước nhận lời mời - OFFERED).
      */
     void rejectOrder(Integer driverId, Long orderId, String reason);
+
+    /**
+     * Tài xế hủy nhận đơn sau khi đã tiếp nhận (Driver Cancel / Trả đơn).
+     * Cập nhật chỉ số Cancellation Rate (CR) và tự động phạt nếu CR > 10%.
+     */
+    DriverMetricsResponse cancelOrder(Integer driverId, Long orderId, DriverCancelOrderRequest request);
 
     /**
      * Bật/tắt trạng thái trực tuyến nhận cuốc.

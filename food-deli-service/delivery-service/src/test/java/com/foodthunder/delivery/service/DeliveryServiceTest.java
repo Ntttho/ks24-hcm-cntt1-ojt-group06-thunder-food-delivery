@@ -3,18 +3,21 @@ package com.foodthunder.delivery.service;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
+import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
 import com.foodthunder.delivery.dto.response.*;
 import com.foodthunder.delivery.entity.DriverDetail;
 import com.foodthunder.delivery.entity.DriverLocation;
 import com.foodthunder.delivery.entity.DriverOffer;
+import com.foodthunder.delivery.entity.DriverPenalty;
 import com.foodthunder.delivery.exception.BadRequestException;
 import com.foodthunder.delivery.exception.ConflictException;
 import com.foodthunder.delivery.exception.ResourceNotFoundException;
 import com.foodthunder.delivery.repository.DriverDetailRepository;
 import com.foodthunder.delivery.repository.DriverLocationRepository;
 import com.foodthunder.delivery.repository.DriverOfferRepository;
+import com.foodthunder.delivery.repository.DriverPenaltyRepository;
 import com.foodthunder.delivery.service.impl.DeliveryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +26,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,6 +54,9 @@ class DeliveryServiceTest {
     private DriverOfferRepository driverOfferRepository;
 
     @Mock
+    private DriverPenaltyRepository driverPenaltyRepository;
+
+    @Mock
     private OrderClient orderClient;
 
     @InjectMocks
@@ -61,6 +69,10 @@ class DeliveryServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(driverPenaltyRepository.findActivePenalties(any(), any())).thenReturn(Collections.emptyList());
+        lenient().when(driverOfferRepository.findRollingWindowEligibleOffers(any(), any())).thenReturn(Collections.emptyList());
+        lenient().when(driverOfferRepository.findRollingWindowAcceptedOffers(any(), any())).thenReturn(Collections.emptyList());
+
         onlineDriver = DriverDetail.builder()
                 .userId(101)
                 .licensePlate("59A1-12345")
@@ -283,6 +295,10 @@ class DeliveryServiceTest {
         DriverOffer rejectedOffer = DriverOffer.builder().id(11L).driverId(101).status("REJECTED").build();
         when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101))
                 .thenReturn(List.of(acceptedOffer, rejectedOffer));
+        when(driverOfferRepository.findRollingWindowEligibleOffers(eq(101), any(Pageable.class)))
+                .thenReturn(List.of(acceptedOffer, rejectedOffer));
+        when(driverOfferRepository.findRollingWindowAcceptedOffers(eq(101), any(Pageable.class)))
+                .thenReturn(List.of(acceptedOffer));
 
         DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
 
@@ -292,6 +308,193 @@ class DeliveryServiceTest {
         assertThat(metrics.getCompletedOrders()).isEqualTo(1L);
         assertThat(metrics.getCancelledOrders()).isEqualTo(1L);
         assertThat(metrics.getCompletionRate()).isEqualTo(50.0);
+        assertThat(metrics.getAcceptanceRate()).isEqualTo(50.0);
+        assertThat(metrics.getCancellationRate()).isEqualTo(0.0);
         assertThat(metrics.getTotalEarnings()).isEqualTo(20000.0);
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02 TC-DRV-04: Tính toán AR và CR trên Rolling Window 100 chuẩn PRD (85 accepted, 5 cancelled)")
+    void testCalculateMetrics_HappyPath_PRD() {
+        List<DriverOffer> rollingOffers = new ArrayList<>();
+        // 85 accepted
+        for (int i = 1; i <= 85; i++) {
+            rollingOffers.add(DriverOffer.builder().id((long) i).driverId(101).status("ACCEPTED").build());
+        }
+        // 15 rejected
+        for (int i = 86; i <= 100; i++) {
+            rollingOffers.add(DriverOffer.builder().id((long) i).driverId(101).status("REJECTED").build());
+        }
+
+        List<DriverOffer> acceptedOrders = new ArrayList<>();
+        // 80 completed
+        for (int i = 1; i <= 80; i++) {
+            acceptedOrders.add(DriverOffer.builder().id((long) i).driverId(101).status("COMPLETED").build());
+        }
+        // 5 chargeable cancelled
+        for (int i = 81; i <= 85; i++) {
+            acceptedOrders.add(DriverOffer.builder().id((long) i).driverId(101).status("DRIVER_CANCELLED").cancellationChargeable(true).build());
+        }
+
+        when(driverOfferRepository.findRollingWindowEligibleOffers(eq(101), any(Pageable.class))).thenReturn(rollingOffers);
+        when(driverOfferRepository.findRollingWindowAcceptedOffers(eq(101), any(Pageable.class))).thenReturn(acceptedOrders);
+        when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101)).thenReturn(rollingOffers);
+
+        DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
+
+        assertThat(metrics.getAcceptanceRate()).isEqualTo(85.0);
+        // CR = 5 / 85 * 100 = 5.88%
+        assertThat(metrics.getCancellationRate()).isEqualTo(5.88);
+        assertThat(metrics.getRollingWindowOffers()).isEqualTo(100L);
+        assertThat(metrics.getRollingWindowAccepted()).isEqualTo(85L);
+        assertThat(metrics.getRollingWindowCancelled()).isEqualTo(5L);
+        assertThat(metrics.getPerformanceStatus()).isEqualTo("WARNING"); // CR 5.88% > 3% nhưng <= 10%
+        assertThat(metrics.getIsSuspended()).isFalse();
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Kiểm tra điều kiện biên Zero-Division (0 offers / 0 đơn nhận -> AR=100%, CR=0%)")
+    void testCalculateMetrics_ZeroDivisionEdgeCase() {
+        when(driverOfferRepository.findRollingWindowEligibleOffers(eq(101), any(Pageable.class))).thenReturn(Collections.emptyList());
+        when(driverOfferRepository.findRollingWindowAcceptedOffers(eq(101), any(Pageable.class))).thenReturn(Collections.emptyList());
+        when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101)).thenReturn(Collections.emptyList());
+
+        DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
+
+        assertThat(metrics.getAcceptanceRate()).isEqualTo(100.0);
+        assertThat(metrics.getCancellationRate()).isEqualTo(0.0);
+        assertThat(metrics.getPerformanceStatus()).isEqualTo("GOOD");
+        assertThat(metrics.getIsSuspended()).isFalse();
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Tự động phạt LOW_AR_COOLDOWN và tạm khóa nhận cuốc khi AR < 80%")
+    void testAutomaticPenalty_WhenArBelow80() {
+        List<DriverOffer> rollingOffers = List.of(
+                DriverOffer.builder().id(1L).driverId(101).status("ACCEPTED").build(),
+                DriverOffer.builder().id(2L).driverId(101).status("REJECTED").build()
+        ); // AR = 1/2 = 50.0% < 80%
+
+        when(driverOfferRepository.findRollingWindowEligibleOffers(eq(101), any(Pageable.class))).thenReturn(rollingOffers);
+        when(driverOfferRepository.findRollingWindowAcceptedOffers(eq(101), any(Pageable.class))).thenReturn(List.of(rollingOffers.get(0)));
+        when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101)).thenReturn(rollingOffers);
+        when(driverPenaltyRepository.save(any(DriverPenalty.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
+
+        assertThat(metrics.getAcceptanceRate()).isEqualTo(50.0);
+        assertThat(metrics.getPerformanceStatus()).isEqualTo("DANGER");
+        assertThat(metrics.getIsSuspended()).isTrue();
+        assertThat(metrics.getPenaltyType()).isEqualTo("LOW_AR_COOLDOWN");
+        verify(driverPenaltyRepository, atLeastOnce()).save(any(DriverPenalty.class));
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Tự động phạt HIGH_CR_SUSPENSION và tạm khóa nhận cuốc khi CR > 10%")
+    void testAutomaticPenalty_WhenCrAbove10() {
+        DriverOffer accepted1 = DriverOffer.builder().id(1L).driverId(101).status("ACCEPTED").build();
+        DriverOffer cancelledChargeable = DriverOffer.builder().id(2L).driverId(101).status("DRIVER_CANCELLED").cancellationChargeable(true).build();
+        List<DriverOffer> acceptedOrders = List.of(accepted1, cancelledChargeable); // CR = 1/2 = 50.0% > 10%
+
+        when(driverOfferRepository.findRollingWindowEligibleOffers(eq(101), any(Pageable.class))).thenReturn(acceptedOrders);
+        when(driverOfferRepository.findRollingWindowAcceptedOffers(eq(101), any(Pageable.class))).thenReturn(acceptedOrders);
+        when(driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(101)).thenReturn(acceptedOrders);
+        when(driverPenaltyRepository.save(any(DriverPenalty.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DriverMetricsResponse metrics = deliveryService.getDriverMetrics(101);
+
+        assertThat(metrics.getCancellationRate()).isEqualTo(50.0);
+        assertThat(metrics.getPerformanceStatus()).isEqualTo("DANGER");
+        assertThat(metrics.getIsSuspended()).isTrue();
+        assertThat(metrics.getPenaltyType()).isEqualTo("HIGH_CR_SUSPENSION");
+        verify(driverPenaltyRepository, atLeastOnce()).save(any(DriverPenalty.class));
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Chặn tài xế nhận đơn (acceptOrder) khi đang có hình phạt ACTIVE")
+    void testAcceptOrder_BlockedWhenDriverSuspended() {
+        DriverPenalty activePenalty = DriverPenalty.builder()
+                .id(99L)
+                .driverId(101)
+                .type("LOW_AR_COOLDOWN")
+                .status("ACTIVE")
+                .reason("Tỷ lệ nhận đơn AR (70.0%) dưới 80%")
+                .startsAt(LocalDateTime.now().minusMinutes(5))
+                .endsAt(LocalDateTime.now().plusMinutes(10))
+                .build();
+
+        when(driverDetailRepository.findById(101)).thenReturn(Optional.of(onlineDriver));
+        when(driverPenaltyRepository.findActivePenalties(eq(101), any(LocalDateTime.class)))
+                .thenReturn(List.of(activePenalty));
+
+        assertThatThrownBy(() -> deliveryService.acceptOrder(101, 500L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Tài khoản tài xế đang bị tạm khóa nhận cuốc");
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Ẩn danh sách cuốc xe đang mời (getPendingOffers) khi tài xế bị phạt")
+    void testGetPendingOffers_HiddenWhenDriverSuspended() {
+        DriverPenalty activePenalty = DriverPenalty.builder()
+                .id(99L)
+                .driverId(101)
+                .type("HIGH_CR_SUSPENSION")
+                .status("ACTIVE")
+                .reason("Tỷ lệ hủy đơn CR vượt 10%")
+                .startsAt(LocalDateTime.now().minusHours(1))
+                .endsAt(LocalDateTime.now().plusHours(23))
+                .build();
+
+        when(driverPenaltyRepository.findActivePenalties(eq(101), any(LocalDateTime.class)))
+                .thenReturn(List.of(activePenalty));
+
+        List<DriverOfferResponse> offers = deliveryService.getPendingOffers(101);
+
+        assertThat(offers).isEmpty();
+        verify(driverOfferRepository, never()).findByDriverIdAndStatus(anyInt(), anyString());
+    }
+
+    @Test
+    @DisplayName("SP3-DRV-02: Tài xế hủy nhận đơn thành công (cancelOrder) và phân loại lý do có tính phí lỗi hay không")
+    void testCancelOrder_ChargeableVsNonChargeable() {
+        DriverOffer acceptedOffer = DriverOffer.builder()
+                .id(1L)
+                .orderId(500L)
+                .driverId(101)
+                .status("ACCEPTED")
+                .build();
+
+        when(driverOfferRepository.findByOrderIdAndDriverId(500L, 101)).thenReturn(Optional.of(acceptedOffer));
+        when(driverOfferRepository.save(any(DriverOffer.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // 1. Hủy do thủng lốp (VEHICLE_ISSUE) -> chargeable = true
+        DriverCancelOrderRequest req1 = DriverCancelOrderRequest.builder()
+                .reasonCode("VEHICLE_ISSUE")
+                .note("Bị thủng lốp trên đường đi")
+                .build();
+
+        DriverMetricsResponse res1 = deliveryService.cancelOrder(101, 500L, req1);
+
+        assertThat(res1).isNotNull();
+        assertThat(acceptedOffer.getStatus()).isEqualTo("DRIVER_CANCELLED");
+        assertThat(acceptedOffer.getCancellationChargeable()).isTrue();
+        verify(orderClient, atLeastOnce()).updateOrderStatus(eq(500L), any(RemoteUpdateOrderStatusRequest.class), eq(101), eq("ROLE_DRIVER"));
+
+        // 2. Hủy do khách yêu cầu (CUSTOMER_REQUEST) -> chargeable = false
+        DriverOffer acceptedOffer2 = DriverOffer.builder()
+                .id(2L)
+                .orderId(501L)
+                .driverId(101)
+                .status("ACCEPTED")
+                .build();
+        when(driverOfferRepository.findByOrderIdAndDriverId(501L, 101)).thenReturn(Optional.of(acceptedOffer2));
+
+        DriverCancelOrderRequest req2 = DriverCancelOrderRequest.builder()
+                .reasonCode("CUSTOMER_REQUEST")
+                .note("Khách gọi điện bảo không muốn ăn nữa")
+                .build();
+
+        deliveryService.cancelOrder(101, 501L, req2);
+        assertThat(acceptedOffer2.getCancellationChargeable()).isFalse();
     }
 }

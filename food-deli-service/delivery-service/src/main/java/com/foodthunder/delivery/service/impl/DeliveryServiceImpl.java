@@ -3,27 +3,32 @@ package com.foodthunder.delivery.service.impl;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
+import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
 import com.foodthunder.delivery.dto.response.*;
 import com.foodthunder.delivery.entity.DriverDetail;
 import com.foodthunder.delivery.entity.DriverLocation;
 import com.foodthunder.delivery.entity.DriverOffer;
+import com.foodthunder.delivery.entity.DriverPenalty;
 import com.foodthunder.delivery.exception.BadRequestException;
 import com.foodthunder.delivery.exception.ConflictException;
 import com.foodthunder.delivery.exception.ResourceNotFoundException;
 import com.foodthunder.delivery.repository.DriverDetailRepository;
 import com.foodthunder.delivery.repository.DriverLocationRepository;
 import com.foodthunder.delivery.repository.DriverOfferRepository;
+import com.foodthunder.delivery.repository.DriverPenaltyRepository;
 import com.foodthunder.delivery.service.DeliveryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,6 +40,7 @@ public class DeliveryServiceImpl implements DeliveryService {
     private final DriverDetailRepository driverDetailRepository;
     private final DriverLocationRepository driverLocationRepository;
     private final DriverOfferRepository driverOfferRepository;
+    private final DriverPenaltyRepository driverPenaltyRepository;
     private final OrderClient orderClient;
 
     @Override
@@ -53,6 +59,9 @@ public class DeliveryServiceImpl implements DeliveryService {
         if (!"APPROVED".equalsIgnoreCase(driver.getApprovalStatus())) {
             throw new BadRequestException("Tài khoản tài xế chưa được phê duyệt (Trạng thái: " + driver.getApprovalStatus() + ")");
         }
+
+        // 1.1 Kiểm tra chế tài phạt / Tự động tạm khóa nhận cuốc (AR < 80% hoặc CR > 10%)
+        checkDriverSuspension(driverId);
 
         // 2. KHÓA BI QUAN (PESSIMISTIC LOCKING - SELECT ... FOR UPDATE)
         // Lấy tất cả offers của orderId này kèm khóa ghi độc quyền X-Lock trên CSDL.
@@ -147,6 +156,9 @@ public class DeliveryServiceImpl implements DeliveryService {
         driverOfferRepository.save(offer);
 
         log.info("Driver #{} rejected order #{}, reason: {}", driverId, orderId, offer.getResponseReason());
+
+        // Đánh giá lại AR và tự động thi hành chế tài nếu AR < 80%
+        evaluateAndApplyPenalties(driverId);
     }
 
     @Override
@@ -208,6 +220,13 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     @Override
     public List<DriverOfferResponse> getPendingOffers(Integer driverId) {
+        // Nếu tài xế đang bị tạm khóa nhận cuốc (AR < 80% hoặc CR > 10%), không hiển thị đơn mới
+        List<DriverPenalty> activePenalties = driverPenaltyRepository.findActivePenalties(driverId, LocalDateTime.now());
+        if (!activePenalties.isEmpty()) {
+            log.info("Driver #{} is currently suspended from accepting orders, returning empty offers list", driverId);
+            return Collections.emptyList();
+        }
+
         List<DriverOffer> offers = driverOfferRepository.findByDriverIdAndStatus(driverId, "OFFERED");
         return offers.stream().map(this::mapToOfferResponse).collect(Collectors.toList());
     }
@@ -300,27 +319,197 @@ public class DeliveryServiceImpl implements DeliveryService {
     }
 
     @Override
-    public DriverMetricsResponse getDriverMetrics(Integer driverId) {
-        List<DriverOffer> offers = driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(driverId);
-        long total = offers.size();
-        long completed = offers.stream().filter(o -> "ACCEPTED".equalsIgnoreCase(o.getStatus())).count();
-        long rejected = offers.stream().filter(o -> "REJECTED".equalsIgnoreCase(o.getStatus())).count();
-        long missed = offers.stream().filter(o -> "MISSED".equalsIgnoreCase(o.getStatus())).count();
+    @Transactional
+    public DriverMetricsResponse cancelOrder(Integer driverId, Long orderId, DriverCancelOrderRequest request) {
+        DriverOffer offer = driverOfferRepository.findByOrderIdAndDriverId(orderId, driverId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin đơn hàng #" + orderId + " được tiếp nhận bởi tài xế #" + driverId));
 
-        double completionRate = total > 0 ? (double) Math.round((double) completed / total * 10000.0) / 100.0 : 100.0;
-        double acceptanceRate = (completed + rejected + missed) > 0
-                ? (double) Math.round((double) completed / (completed + rejected + missed) * 10000.0) / 100.0 : 100.0;
-        double earnings = completed * 20000.0; // 20.000 VNĐ / đơn hoàn thành
+        if (!"ACCEPTED".equalsIgnoreCase(offer.getStatus()) && !"PICKING_UP".equalsIgnoreCase(offer.getStatus())) {
+            throw new BadRequestException("Chỉ có thể hủy trả các đơn hàng bạn đã tiếp nhận!");
+        }
+
+        String reasonCode = request.getReasonCode() != null ? request.getReasonCode().trim().toUpperCase() : "PERSONAL_REASON";
+        boolean isChargeable = !"CUSTOMER_REQUEST".equalsIgnoreCase(reasonCode)
+                && !"SYSTEM_ISSUE".equalsIgnoreCase(reasonCode);
+
+        offer.setStatus("DRIVER_CANCELLED");
+        offer.setCancellationChargeable(isChargeable);
+        offer.setRespondedAt(LocalDateTime.now());
+        offer.setResponseReason("Tài xế hủy đơn: [" + reasonCode + "] " + (request.getNote() != null ? request.getNote() : ""));
+        driverOfferRepository.save(offer);
+
+        try {
+            RemoteUpdateOrderStatusRequest feignReq = RemoteUpdateOrderStatusRequest.builder()
+                    .statusCode("DRIVER_REJECTED")
+                    .reason("Tài xế trả đơn: " + reasonCode + (request.getNote() != null ? " - " + request.getNote() : ""))
+                    .build();
+
+            orderClient.updateOrderStatus(orderId, feignReq, driverId, "ROLE_DRIVER");
+        } catch (Exception ex) {
+            log.warn("Failed to propagate driver order cancellation to order-service: {}", ex.getMessage());
+        }
+
+        log.info("Driver #{} cancelled order #{}, chargeable: {}", driverId, orderId, isChargeable);
+
+        return getDriverMetrics(driverId);
+    }
+
+    @Override
+    @Transactional
+    public DriverMetricsResponse getDriverMetrics(Integer driverId) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Rolling Window 100 cho Acceptance Rate (AR) chuẩn PRD
+        List<DriverOffer> rollingOffers = driverOfferRepository.findRollingWindowEligibleOffers(driverId, PageRequest.of(0, 100));
+        long rollingOffersCount = rollingOffers.size();
+        long rollingAcceptedCount = rollingOffers.stream()
+                .filter(o -> List.of("ACCEPTED", "COMPLETED", "DRIVER_CANCELLED").contains(o.getStatus().toUpperCase()))
+                .count();
+        double acceptanceRate = rollingOffersCount == 0 ? 100.0
+                : (double) Math.round((double) rollingAcceptedCount / rollingOffersCount * 10000.0) / 100.0;
+
+        // 2. Rolling Window 100 cho Cancellation Rate (CR) chuẩn PRD
+        List<DriverOffer> rollingAcceptedOrders = driverOfferRepository.findRollingWindowAcceptedOffers(driverId, PageRequest.of(0, 100));
+        long rollingAcceptedOrdersCount = rollingAcceptedOrders.size();
+        long rollingChargeableCancelledCount = rollingAcceptedOrders.stream()
+                .filter(o -> "DRIVER_CANCELLED".equalsIgnoreCase(o.getStatus()) && Boolean.TRUE.equals(o.getCancellationChargeable()))
+                .count();
+        double cancellationRate = rollingAcceptedOrdersCount == 0 ? 0.0
+                : (double) Math.round((double) rollingChargeableCancelledCount / rollingAcceptedOrdersCount * 10000.0) / 100.0;
+
+        // 3. Đánh giá và tự động thi hành chế tài phạt nếu vi phạm ngưỡng AR < 80% hoặc CR > 10%
+        DriverPenalty activePenalty = evaluateAndApplyPenalties(driverId, acceptanceRate, cancellationRate, now);
+
+        // 4. Trạng thái hiệu suất tổng thể (GOOD, WARNING, DANGER)
+        String performanceStatus;
+        if (acceptanceRate < 80.0 || cancellationRate > 10.0 || activePenalty != null) {
+            performanceStatus = "DANGER";
+        } else if (acceptanceRate < 85.0 || cancellationRate > 3.0) {
+            performanceStatus = "WARNING";
+        } else {
+            performanceStatus = "GOOD";
+        }
+
+        // 5. Thống kê toàn thời gian (hỗ trợ tương thích ngược)
+        List<DriverOffer> allOffers = driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(driverId);
+        long totalAll = allOffers.size();
+        long completedAll = allOffers.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()) || "ACCEPTED".equalsIgnoreCase(o.getStatus())).count();
+        long cancelledAll = allOffers.stream().filter(o -> "REJECTED".equalsIgnoreCase(o.getStatus()) || "DRIVER_CANCELLED".equalsIgnoreCase(o.getStatus())).count();
+        double completionRate = totalAll > 0 ? (double) Math.round((double) completedAll / totalAll * 10000.0) / 100.0 : 100.0;
+        double earnings = completedAll * 20000.0;
+
+        boolean isSuspended = activePenalty != null || acceptanceRate < 80.0 || cancellationRate > 10.0;
 
         return DriverMetricsResponse.builder()
                 .driverId(driverId)
-                .totalOrders(total)
-                .completedOrders(completed)
-                .cancelledOrders(rejected)
+                .totalOrders(totalAll)
+                .completedOrders(completedAll)
+                .cancelledOrders(cancelledAll)
                 .completionRate(completionRate)
                 .acceptanceRate(acceptanceRate)
+                .cancellationRate(cancellationRate)
                 .totalEarnings(earnings)
                 .ratingAvg(5.0)
+                .rollingWindowOffers(rollingOffersCount)
+                .rollingWindowAccepted(rollingAcceptedCount)
+                .rollingWindowCancelled(rollingChargeableCancelledCount)
+                .isSuspended(isSuspended)
+                .penaltyType(activePenalty != null ? activePenalty.getType() : (acceptanceRate < 80.0 ? "LOW_AR_COOLDOWN" : (cancellationRate > 10.0 ? "HIGH_CR_SUSPENSION" : null)))
+                .penaltyReason(activePenalty != null ? activePenalty.getReason() : (acceptanceRate < 80.0 ? "Tỷ lệ nhận đơn AR (" + acceptanceRate + "%) dưới 80%" : (cancellationRate > 10.0 ? "Tỷ lệ hủy đơn CR (" + cancellationRate + "%) vượt 10%" : null)))
+                .penaltyEndsAt(activePenalty != null ? activePenalty.getEndsAt() : null)
+                .performanceStatus(performanceStatus)
+                .build();
+    }
+
+    private void checkDriverSuspension(Integer driverId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<DriverPenalty> activePenalties = driverPenaltyRepository.findActivePenalties(driverId, now);
+        if (!activePenalties.isEmpty()) {
+            DriverPenalty penalty = activePenalties.get(0);
+            String endsAtStr = penalty.getEndsAt() != null ? penalty.getEndsAt().toString() : "Vô thời hạn";
+            String msg = String.format("Tài khoản tài xế đang bị tạm khóa nhận cuốc: %s. Thời hạn mở khóa: %s",
+                    penalty.getReason(), endsAtStr);
+            log.warn("Blocked driver #{} from accepting order: {}", driverId, msg);
+            throw new BadRequestException(msg);
+        }
+
+        // Kiểm tra nhanh AR/CR hiện tại
+        DriverMetricsResponse metrics = calculateRealtimeMetrics(driverId);
+        if (Boolean.TRUE.equals(metrics.getIsSuspended())) {
+            throw new BadRequestException("Tài khoản tài xế đang bị tạm khóa nhận cuốc do vi phạm hiệu suất: " + metrics.getPenaltyReason());
+        }
+    }
+
+    private DriverPenalty evaluateAndApplyPenalties(Integer driverId) {
+        DriverMetricsResponse metrics = calculateRealtimeMetrics(driverId);
+        return evaluateAndApplyPenalties(driverId, metrics.getAcceptanceRate(), metrics.getCancellationRate(), LocalDateTime.now());
+    }
+
+    private DriverPenalty evaluateAndApplyPenalties(Integer driverId, double ar, double cr, LocalDateTime now) {
+        List<DriverPenalty> existingActive = driverPenaltyRepository.findActivePenalties(driverId, now);
+        if (!existingActive.isEmpty()) {
+            return existingActive.get(0);
+        }
+
+        // Tự động tạm khóa nếu AR < 80% (LOW_AR_COOLDOWN 15 phút)
+        if (ar < 80.0) {
+            DriverPenalty penalty = DriverPenalty.builder()
+                    .driverId(driverId)
+                    .type("LOW_AR_COOLDOWN")
+                    .status("ACTIVE")
+                    .reason(String.format("Tỷ lệ nhận đơn AR (%.2f%%) dưới ngưỡng tối thiểu 80%% trên rolling window 100 offer gần nhất", ar))
+                    .startsAt(now)
+                    .endsAt(now.plusMinutes(15))
+                    .build();
+            log.warn("Applying LOW_AR_COOLDOWN for driver #{}: AR = {}%", driverId, ar);
+            return driverPenaltyRepository.save(penalty);
+        }
+
+        // Tự động tạm khóa nếu CR > 10% (HIGH_CR_SUSPENSION 24 giờ)
+        if (cr > 10.0) {
+            DriverPenalty penalty = DriverPenalty.builder()
+                    .driverId(driverId)
+                    .type("HIGH_CR_SUSPENSION")
+                    .status("ACTIVE")
+                    .reason(String.format("Tỷ lệ hủy đơn CR (%.2f%%) vượt ngưỡng tối đa 10%% trên rolling window 100 đơn nhận gần nhất", cr))
+                    .startsAt(now)
+                    .endsAt(now.plusHours(24))
+                    .build();
+            log.warn("Applying HIGH_CR_SUSPENSION for driver #{}: CR = {}%", driverId, cr);
+            return driverPenaltyRepository.save(penalty);
+        }
+
+        return null;
+    }
+
+    private DriverMetricsResponse calculateRealtimeMetrics(Integer driverId) {
+        List<DriverOffer> rollingOffers = driverOfferRepository.findRollingWindowEligibleOffers(driverId, PageRequest.of(0, 100));
+        long rollingOffersCount = rollingOffers.size();
+        long rollingAcceptedCount = rollingOffers.stream()
+                .filter(o -> List.of("ACCEPTED", "COMPLETED", "DRIVER_CANCELLED").contains(o.getStatus().toUpperCase()))
+                .count();
+        double acceptanceRate = rollingOffersCount == 0 ? 100.0
+                : (double) Math.round((double) rollingAcceptedCount / rollingOffersCount * 10000.0) / 100.0;
+
+        List<DriverOffer> rollingAcceptedOrders = driverOfferRepository.findRollingWindowAcceptedOffers(driverId, PageRequest.of(0, 100));
+        long rollingAcceptedOrdersCount = rollingAcceptedOrders.size();
+        long rollingChargeableCancelledCount = rollingAcceptedOrders.stream()
+                .filter(o -> "DRIVER_CANCELLED".equalsIgnoreCase(o.getStatus()) && Boolean.TRUE.equals(o.getCancellationChargeable()))
+                .count();
+        double cancellationRate = rollingAcceptedOrdersCount == 0 ? 0.0
+                : (double) Math.round((double) rollingChargeableCancelledCount / rollingAcceptedOrdersCount * 10000.0) / 100.0;
+
+        boolean isSuspended = acceptanceRate < 80.0 || cancellationRate > 10.0;
+
+        return DriverMetricsResponse.builder()
+                .driverId(driverId)
+                .acceptanceRate(acceptanceRate)
+                .cancellationRate(cancellationRate)
+                .rollingWindowOffers(rollingOffersCount)
+                .rollingWindowAccepted(rollingAcceptedCount)
+                .rollingWindowCancelled(rollingChargeableCancelledCount)
+                .isSuspended(isSuspended)
+                .penaltyReason(acceptanceRate < 80.0 ? "AR (" + acceptanceRate + "%) < 80%" : (cancellationRate > 10.0 ? "CR (" + cancellationRate + "%) > 10%" : null))
                 .build();
     }
 }

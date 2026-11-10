@@ -168,4 +168,32 @@ class DeliveryControllerTest {
                 .andExpect(jsonPath("$.data.completedOrders").value(8))
                 .andExpect(jsonPath("$.data.totalEarnings").value(160000.0));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/deliveries/orders/{orderId}/cancel trả về 200 OK khi tài xế hủy nhận đơn")
+    void testCancelOrderEndpoint() throws Exception {
+        com.foodthunder.delivery.dto.request.DriverCancelOrderRequest req = com.foodthunder.delivery.dto.request.DriverCancelOrderRequest.builder()
+                .reasonCode("VEHICLE_ISSUE")
+                .note("Xe bị thủng lốp")
+                .build();
+
+        com.foodthunder.delivery.dto.response.DriverMetricsResponse metrics = com.foodthunder.delivery.dto.response.DriverMetricsResponse.builder()
+                .driverId(101)
+                .acceptanceRate(90.0)
+                .cancellationRate(5.0)
+                .performanceStatus("GOOD")
+                .build();
+
+        when(deliveryService.cancelOrder(eq(101), eq(500L), any(com.foodthunder.delivery.dto.request.DriverCancelOrderRequest.class))).thenReturn(metrics);
+
+        mockMvc.perform(post("/api/v1/deliveries/orders/500/cancel")
+                        .header("X-User-Id", "101")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.message").value("Hủy nhận đơn và trả về hệ thống thành công"))
+                .andExpect(jsonPath("$.data.driverId").value(101))
+                .andExpect(jsonPath("$.data.cancellationRate").value(5.0));
+    }
 }
