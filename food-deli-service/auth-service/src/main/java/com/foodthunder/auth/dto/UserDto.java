@@ -10,9 +10,12 @@ import java.util.Set;
 public record UserDto(
         Long id,
         String phone,
+        String email,
         String fullName,
         BigDecimal ratingAvg,
         Set<String> roles,
         String role,
-        LocalDateTime createdAt
+        String status,
+        LocalDateTime createdAt,
+        LocalDateTime deletedAt
 ) {}
