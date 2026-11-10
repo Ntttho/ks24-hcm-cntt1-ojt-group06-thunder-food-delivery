@@ -48,7 +48,7 @@ spring:
         - id: delivery-service-route
           uri: lb://delivery-service
           predicates:
-            - Path=/api/v1/deliveries/**,/api/v1/shippers/**
+            - Path=/api/v1/deliveries/**,/api/v1/delivery/**,/api/v1/shippers/**,/api/v1/drivers/**
 
         # 5. Review & Rating Microservice (Load balanced)
         - id: review-service-route
