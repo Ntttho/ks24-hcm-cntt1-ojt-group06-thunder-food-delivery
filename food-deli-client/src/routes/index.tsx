@@ -3,6 +3,7 @@ import { MainLayout, AuthLayout, MerchantLayout, UserLayout } from '@/layouts';
 import {
   HomePage,
   LoginPage,
+  AdminLoginPage,
   RegisterPage,
   AddressManagementPage,
   ProfilePage,
@@ -17,14 +18,17 @@ import {
   MerchantToppingPage,
   MerchantVoucherPage,
   MerchantReviewPage,
+  MerchantRevenuePage,
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
   ShipperHubPage,
   ShipperHistoryPage,
+  AdminRestaurantReviewsPage,
+  AdminDriverReviewsPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-import { APP_ROUTES } from '@/constants';
+import { APP_ROUTES, ROLES } from '@/constants';
 
 export const router = createBrowserRouter([
   // Main Layout
@@ -50,11 +54,43 @@ export const router = createBrowserRouter([
       },
       {
         path: APP_ROUTES.USERS,
-        element: <AdminUserPage />,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_DASHBOARD,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: APP_ROUTES.ADMIN_USERS,
-        element: <AdminUserPage />,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_RESTAURANT_REVIEWS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminRestaurantReviewsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_DRIVER_REVIEWS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminDriverReviewsPage />
+          </ProtectedRoute>
+        ),
       },
       // User Account Management Layout (Profile, Orders, Addresses)
       {
@@ -121,6 +157,11 @@ export const router = createBrowserRouter([
       },
     ],
   },
+  // Dedicated Admin Portal Login Page
+  {
+    path: APP_ROUTES.ADMIN_LOGIN,
+    element: <AdminLoginPage />,
+  },
   // Merchant Layout: Merchant Dashboard, Menu & Toppings Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {
     path: APP_ROUTES.MERCHANT_DASHBOARD,
@@ -135,6 +176,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.MERCHANT_REVENUE,
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
+            <MerchantRevenuePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/merchant/analytics',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
+            <MerchantRevenuePage />
           </ProtectedRoute>
         ),
       },

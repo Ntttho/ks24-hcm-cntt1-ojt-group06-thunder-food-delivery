@@ -444,6 +444,7 @@ CREATE TABLE `reviews` (
   `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
   `target_type` ENUM('RESTAURANT','DRIVER') NOT NULL,
   `target_id` INT NOT NULL,               -- [Logical FK] trỏ sang restaurants.id hoặc users.id
+  -- `food_item_id` INT DEFAULT NULL,         -- [Logical FK] trỏ sang food_items.id
   `rating` TINYINT DEFAULT NULL,
   `comment` TEXT,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -762,4 +763,3 @@ COMMIT;
 -- =================================================================================
 -- HOÀN TẤT: Toàn bộ 26 bảng đã được tách liên kết logic, sẵn sàng cho Microservices!
 -- =================================================================================
-

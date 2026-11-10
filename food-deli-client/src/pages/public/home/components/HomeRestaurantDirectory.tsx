@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Row, Col, Pagination, Spin } from 'antd';
-import { StarFilled, ClockCircleOutlined, ShopOutlined } from '@ant-design/icons';
+import { StarFilled, ClockCircleOutlined, ShopOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { getOptimizedCloudinaryUrl } from '@/services/modules/cloudinaryService';
 
 export interface RestaurantItem {
@@ -38,6 +38,31 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
   loading,
 }) => {
   const navigate = useNavigate();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener('resize', checkScroll);
+    return () => window.removeEventListener('resize', checkScroll);
+  }, [cuisines, checkScroll]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const offset = direction === 'left' ? -220 : 220;
+    el.scrollBy({ left: offset, behavior: 'smooth' });
+    setTimeout(checkScroll, 300);
+  };
 
   return (
     <section className="space-y-5">
@@ -46,18 +71,50 @@ export const HomeRestaurantDirectory: React.FC<HomeRestaurantDirectoryProps> = (
         <p className="mt-1 text-sm text-gray-500">Tìm quán phù hợp theo loại ẩm thực hoặc tên nhà hàng</p>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-        {cuisines.map((cuisine) => (
-          <Button
-            key={cuisine}
-            type={selectedCuisine === cuisine ? 'primary' : 'default'}
-            shape="round"
-            className={selectedCuisine === cuisine ? 'border-orange-500 bg-orange-500 font-semibold' : 'font-medium'}
-            onClick={() => onSelectCuisine(cuisine)}
+      <div className="relative group/cuisines py-1">
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => handleScroll('left')}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/95 shadow-md border border-gray-200 text-gray-700 hover:text-orange-600 hover:border-orange-300 flex items-center justify-center transition-all cursor-pointer"
+            aria-label="Cuộn sang trái"
           >
-            {cuisine}
-          </Button>
-        ))}
+            <LeftOutlined className="text-xs" />
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          onScroll={checkScroll}
+          className="flex gap-2 overflow-x-auto pb-2 px-1 scroll-smooth thin-scrollbar"
+        >
+          {cuisines.map((cuisine) => (
+            <Button
+              key={cuisine}
+              type={selectedCuisine === cuisine ? 'primary' : 'default'}
+              shape="round"
+              className={`shrink-0 ${
+                selectedCuisine === cuisine
+                  ? 'border-orange-500 bg-orange-500 font-semibold'
+                  : 'font-medium hover:border-orange-300'
+              }`}
+              onClick={() => onSelectCuisine(cuisine)}
+            >
+              {cuisine}
+            </Button>
+          ))}
+        </div>
+
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => handleScroll('right')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/95 shadow-md border border-gray-200 text-gray-700 hover:text-orange-600 hover:border-orange-300 flex items-center justify-center transition-all cursor-pointer"
+            aria-label="Cuộn sang phải"
+          >
+            <RightOutlined className="text-xs" />
+          </button>
+        )}
       </div>
 
       {loading ? (

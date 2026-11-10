@@ -207,7 +207,7 @@ export const CartPage: React.FC = () => {
   if (items.length === 0) {
     return (
       <div className="bg-gray-50 min-h-screen flex flex-col font-sans">
-        <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-100 shadow-sm">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-100 shadow-sm">
           <div className="max-w-xl mx-auto h-16 px-4 flex items-center justify-between">
             <button
               type="button"
@@ -239,14 +239,46 @@ export const CartPage: React.FC = () => {
         </header>
 
         <main className="flex-1 max-w-xl mx-auto w-full pt-20 px-4 pb-12">
-          {/* SePay Awaiting Payment Section with 8-min countdown */}
+          {/* SePay Awaiting Payment Section with 8-min countdown if available */}
           <AwaitingPaymentOrdersCard
             orders={activeOrders}
             onRefresh={fetchActiveOrders}
           />
 
-          {/* Ongoing Kitchen/Delivery Orders */}
-          {ongoingOrders.length > 0 ? (
+          {/* Primary Empty Cart Card - Always Visible when Cart is Empty */}
+          <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm text-center mb-6">
+            <div className="w-24 h-24 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-5xl mx-auto mb-5 shadow-inner border border-orange-100">
+              <ShoppingCartOutlined />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-2">
+              Giỏ hàng của bạn đang trống
+            </h2>
+            <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
+              Bạn chưa có món ăn nào trong giỏ hàng. Hãy dạo quanh các quán ăn nổi bật và chọn cho mình những món ngon yêu thích nhé!
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button
+                type="primary"
+                size="large"
+                onClick={() => navigate(APP_ROUTES.HOME)}
+                className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 rounded-xl font-bold h-11 px-8 shadow-md shadow-orange-500/20 text-sm"
+              >
+                Khám phá món ngon ngay
+              </Button>
+              {isAuthenticated && (
+                <Button
+                  size="large"
+                  onClick={() => navigate(APP_ROUTES.ORDERS)}
+                  className="w-full sm:w-auto rounded-xl font-semibold border-gray-200 text-gray-700 hover:text-orange-600 hover:border-orange-300 h-11 px-6 text-sm"
+                >
+                  Xem đơn hàng của tôi
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Ongoing Kitchen/Delivery Orders if any */}
+          {ongoingOrders.length > 0 && (
             <div className="space-y-4 mb-6">
               <div className="flex items-center justify-between">
                 <span className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
@@ -324,45 +356,8 @@ export const CartPage: React.FC = () => {
                   </Card>
                 );
               })}
-
-              {/* Empty Cart Prompt */}
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-2xs text-center mt-6">
-                <div className="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-2">
-                  <ShoppingCartOutlined />
-                </div>
-                <h3 className="font-bold text-gray-800 text-sm mb-1">Giỏ hàng món mới đang trống</h3>
-                <p className="text-gray-400 text-xs mb-3">
-                  Bạn có muốn chọn thêm món tráng miệng hoặc nước uống khác không?
-                </p>
-                <Button
-                  onClick={() => navigate(APP_ROUTES.HOME)}
-                  className="rounded-xl font-semibold border-orange-200 text-orange-600 hover:border-orange-400"
-                >
-                  Khám phá món ngon khác
-                </Button>
-              </div>
             </div>
-          ) : activeOrders.length === 0 ? (
-            <div className="flex flex-col items-center justify-center text-center py-12">
-              <div className="w-28 h-28 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-5xl mb-6 shadow-inner border border-orange-100">
-                <ShoppingCartOutlined />
-              </div>
-              <h2 className="text-2xl font-extrabold text-gray-900 mb-2">
-                Giỏ hàng của bạn đang trống
-              </h2>
-              <p className="text-gray-500 text-sm max-w-xs mb-8">
-                Bạn chưa chọn món nào vào giỏ. Hãy dạo quanh các quán ăn nổi bật và thêm món nhé!
-              </p>
-              <Button
-                type="primary"
-                size="large"
-                onClick={() => navigate(APP_ROUTES.HOME)}
-                className="bg-orange-500 hover:bg-orange-600 rounded-2xl font-bold h-12 px-8 shadow-md shadow-orange-500/20 text-base"
-              >
-                Khám phá món ngon ngay
-              </Button>
-            </div>
-          ) : null}
+          )}
         </main>
       </div>
     );

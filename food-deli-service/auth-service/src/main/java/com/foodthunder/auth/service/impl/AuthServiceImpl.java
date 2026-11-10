@@ -1,11 +1,14 @@
 package com.foodthunder.auth.service.impl;
 
 import com.foodthunder.auth.dto.*;
+import com.foodthunder.auth.exception.BadRequestException;
 import com.foodthunder.auth.exception.ConflictException;
 import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
 import com.foodthunder.auth.model.Role;
+import com.foodthunder.auth.model.DriverDetails;
 import com.foodthunder.auth.model.User;
+import com.foodthunder.auth.repository.DriverDetailsRepository;
 import com.foodthunder.auth.repository.RoleRepository;
 import com.foodthunder.auth.repository.UserRepository;
 import com.foodthunder.auth.security.JwtProvider;
@@ -31,6 +34,7 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final DriverDetailsRepository driverDetailsRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -152,12 +156,13 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<UserDto> getUsers(String search, String role, int page, int size) {
+    public PageResponse<UserDto> getUsers(String search, String role, String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
         String roleParam = (role != null && !role.trim().isEmpty()) ? role.trim() : null;
+        String statusParam = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : null;
 
-        Page<User> userPage = userRepository.searchUsers(searchParam, roleParam, pageable);
+        Page<User> userPage = userRepository.searchUsers(searchParam, roleParam, statusParam, pageable);
         List<UserDto> content = userPage.getContent().stream()
                 .map(u -> toUserDto(u, null))
                 .collect(Collectors.toList());
@@ -173,12 +178,194 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
+    public UserDto createUser(CreateUserRequest request) {
+        String phone = request.phone().trim();
+        if (userRepository.existsByPhone(phone)) {
+            throw new ConflictException("Số điện thoại " + phone + " đã được đăng ký trên hệ thống");
+        }
+
+        Set<Role> roles = resolveRoles(request.roles(), request.role());
+
+        User user = User.builder()
+                .phone(phone)
+                .fullName(request.fullName().trim())
+                .email(request.email() != null && !request.email().isBlank() ? request.email().trim() : null)
+                .password(passwordEncoder.encode(request.password()))
+                .roles(roles)
+                .ratingAvg(new BigDecimal("5.00"))
+                .deletedAt("LOCKED".equalsIgnoreCase(request.status()) ? java.time.LocalDateTime.now() : null)
+                .build();
+
+        User saved = userRepository.save(user);
+        log.info("Admin created new user id={}, phone={}", saved.getId(), saved.getPhone());
+        return toUserDto(saved, null);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUser(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép chỉnh sửa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
+        if (request.phone() != null && !request.phone().isBlank()) {
+            String newPhone = request.phone().trim();
+            if (!newPhone.equals(user.getPhone()) && userRepository.existsByPhoneAndIdNot(newPhone, id)) {
+                throw new ConflictException("Số điện thoại " + newPhone + " đã được sử dụng bởi tài khoản khác");
+            }
+            user.setPhone(newPhone);
+        }
+
+        if (request.fullName() != null && !request.fullName().isBlank()) {
+            user.setFullName(request.fullName().trim());
+        }
+
+        if (request.email() != null) {
+            user.setEmail(request.email().isBlank() ? null : request.email().trim());
+        }
+
+        if (request.password() != null && !request.password().isBlank()) {
+            user.setPassword(passwordEncoder.encode(request.password()));
+        }
+
+        if ((request.roles() != null && !request.roles().isEmpty()) || (request.role() != null && !request.role().isBlank())) {
+            Set<Role> updatedRoles = resolveRoles(request.roles(), request.role());
+            user.setRoles(updatedRoles);
+        }
+
+        if (request.status() != null && !request.status().isBlank()) {
+            if ("LOCKED".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else if ("ACTIVE".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(null);
+            }
+        }
+
+        User updated = userRepository.save(user);
+        log.info("Admin updated user id={}", updated.getId());
+        return toUserDto(updated, null);
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateUserStatus(Long id, UpdateUserStatusRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép khóa hoặc thay đổi trạng thái của tài khoản Quản trị viên (Admin)");
+        }
+
+        if (request.status() != null && !request.status().isBlank()) {
+            if ("LOCKED".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else if ("ACTIVE".equalsIgnoreCase(request.status())) {
+                user.setDeletedAt(null);
+            }
+        } else if (request.isActive() != null) {
+            if (Boolean.FALSE.equals(request.isActive())) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else {
+                user.setDeletedAt(null);
+            }
+        } else {
+            if (user.getDeletedAt() == null) {
+                user.setDeletedAt(java.time.LocalDateTime.now());
+            } else {
+                user.setDeletedAt(null);
+            }
+        }
+
+        User updated = userRepository.save(user);
+        log.info("Admin updated status for user id={}, isLocked={}", updated.getId(), updated.getDeletedAt() != null);
+        return toUserDto(updated, null);
+    }
+
+    @Override
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
+
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
+        user.setDeletedAt(java.time.LocalDateTime.now());
+        userRepository.save(user);
+        log.info("Admin deleted user id={}", id);
+    }
+
+    private boolean isUserAdmin(User user) {
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .anyMatch(r -> r.getName() != null &&
+                        ("ADMIN".equalsIgnoreCase(r.getName()) || "ROLE_ADMIN".equalsIgnoreCase(r.getName())));
+    }
+
+    private Set<Role> resolveRoles(List<String> rolesList, String singleRole) {
+        java.util.Set<String> roleNames = new java.util.HashSet<>();
+        if (rolesList != null && !rolesList.isEmpty()) {
+            for (String r : rolesList) {
+                if (r != null && !r.isBlank()) {
+                    roleNames.add(normalizeRoleName(r));
+                }
+            }
+        }
+        if (roleNames.isEmpty() && singleRole != null && !singleRole.isBlank()) {
+            roleNames.add(normalizeRoleName(singleRole));
+        }
+        if (roleNames.isEmpty()) {
+            roleNames.add("CUSTOMER");
+        }
+
+        Set<Role> roles = new java.util.HashSet<>();
+        for (String rName : roleNames) {
+            Role role = roleRepository.findByName(rName)
+                    .orElseGet(() -> roleRepository.save(Role.builder().name(rName).build()));
+            roles.add(role);
+        }
+        return roles;
+    }
+
+    private String normalizeRoleName(String raw) {
+        String r = raw.trim().toUpperCase();
+        if (r.startsWith("ROLE_")) {
+            r = r.substring(5);
+        }
+        if ("SHIPPER".equals(r)) {
+            r = "DRIVER";
+        }
+        return r;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
         return userRepository.findAll(Sort.by(Sort.Direction.DESC, "id")).stream()
                 .filter(u -> u.getDeletedAt() == null)
                 .map(u -> toUserDto(u, null))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public UserDto updateRating(Long userId, BigDecimal ratingAvg) {
+        if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0
+                || ratingAvg.compareTo(BigDecimal.valueOf(5)) > 0) {
+            throw new com.foodthunder.auth.exception.BadRequestException("Điểm đánh giá phải nằm trong khoảng 0 đến 5");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng #" + userId));
+        user.setRatingAvg(ratingAvg.setScale(2, java.math.RoundingMode.HALF_UP));
+        return toUserDto(userRepository.save(user), null);
     }
 
     private UserDto toUserDto(User user, String activeRole) {
@@ -189,15 +376,26 @@ public class AuthServiceImpl implements AuthService {
         String currentRole = activeRole != null ? activeRole
                 : (roleNames.contains("CUSTOMER") ? "CUSTOMER"
                 : (roleNames.isEmpty() ? "CUSTOMER" : roleNames.iterator().next()));
+        String licensePlate = roleNames.contains("DRIVER") || roleNames.contains("SHIPPER")
+                ? driverDetailsRepository.findById(user.getId())
+                        .map(DriverDetails::getLicensePlate)
+                        .orElse(null)
+                : null;
+
+        String status = user.getDeletedAt() == null ? "ACTIVE" : "LOCKED";
 
         return UserDto.builder()
                 .id(user.getId())
                 .phone(user.getPhone())
+                .email(user.getEmail())
                 .fullName(user.getFullName())
                 .ratingAvg(user.getRatingAvg())
+                .licensePlate(licensePlate)
                 .roles(roleNames)
                 .role(currentRole)
+                .status(status)
                 .createdAt(user.getCreatedAt())
+                .deletedAt(user.getDeletedAt())
                 .build();
     }
 }

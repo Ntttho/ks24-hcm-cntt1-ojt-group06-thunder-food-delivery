@@ -30,18 +30,19 @@
 | **US-OPS-01**  | Hạ tầng Cổng thanh toán VietQR Napas 247 (Dynamic QR + Webhook)| Core / Backend | 🟠 High | Sprint 2 | ✅ Hoàn thành | 5 SP |
 | **US-OPS-02**  | Kiến trúc Microservices Hub, Gateway JWT & Eureka | Architecture | 🟠 High | Sprint 1 | ✅ Hoàn thành | 13 SP |
 | **US-DRV-01**  | Backend Delivery & Khóa bi quan chống Race Condition | Shipper / Core | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 8 SP |
-| **US-DRV-02**  | Shipper Web Hub (Radar quét đơn & 1-Click Nhận cuốc) | Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
-| **US-DRV-03**  | Giao diện Điều hướng Quy trình Giao hàng Ảo hóa | Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-DRV-02**  | Shipper Radar (1-Click, dừng hiển thị khi đang nhận 1 đơn)| Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
+| **US-DRV-03**  | Giao diện Điều hướng Giao hàng Ảo hóa Trực quan, Dễ hiểu| Shipper | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
 | **US-DRV-04**  | Bộ máy Tính toán Hiệu suất Tài xế Chuẩn PRD (AR / CR) | Shipper / Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
-| **US-DRV-05**  | Thống kê Ví thu nhập & Lịch sử cuốc xe đã hoàn tất | Shipper | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
-| **US-ADM-01**  | Màn hình Quản trị Người dùng & Khóa/Mở tài khoản | Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-DRV-05**  | Quản lý Lịch sử Đơn hàng & Thống kê Ví thu nhập Tài xế| Shipper | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-ADM-01**  | Màn hình Quản trị Người dùng (CRUD: Thêm/Sửa/Khóa/Xóa)| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
 | **US-ADM-02**  | Phân hệ Phê duyệt Quán ăn mới & Tài xế mới gia nhập sàn| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
 | **US-ADM-03**  | Cấu hình Tham số Toàn sàn (Phí ship, % Hoa hồng sàn) | Admin | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
-| **US-ADM-04**  | Quản trị Toàn Bộ Đánh Giá Hệ Thống (Xem/Tìm/Lọc/Xóa) | Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-ADM-04**  | Quản trị Review Xem & Xóa (Tách 2 trang Quán & Tài xế)| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
+| **US-ADM-05**  | Dashboard Quản lý Tổng thu Toàn sàn & Biểu đồ Tháng | Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 5 SP |
 | **US-FIX-MERCH**| Khắc phục lỗi tồn đọng Merchant (Multi-shop, Toggle, STOMP)| Merchant | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 4 SP |
 | **US-FIX-ADM**  | Khắc phục lỗi tồn đọng Admin (Duyệt hồ sơ, Tag Shipper)| Admin | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
 | **US-CUST-08** | Theo dõi Tiến trình Đơn hàng Realtime (Live Stepper) | Customer | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
-| **US-CHAT-01** | Hộp thoại Chat 2 chiều Realtime giữa Khách & Quán/Xế | Cust / Merch / Drv | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
+| **US-CHAT-01** | Soạn tin nhắn Chat 2 chiều Khách hàng <-> Tài xế Realtime| Cust / Driver | 🟡 Medium | Sprint 3 | ⏳ Sprint 3 Goal | 3 SP |
 | **US-OPS-03**  | Đóng gói Docker Compose, Load Test HikariCP & Nghiệm thu| DevOps / Lead | 🟠 High | Sprint 3 | ⏳ Sprint 3 Goal | 7 SP |
 
 ---
@@ -115,45 +116,43 @@
 
 * **US-DRV-01: Backend Delivery & Khóa bi quan chống Race Condition**
   * **Ý chính:** Áp dụng **Pessimistic Locking (`SELECT ... FOR UPDATE`)** khi nhiều tài xế cùng bấm nhận 1 đơn hàng $\rightarrow$ Người đầu tiên nhận thành công, người thứ hai nhận phản hồi `409 Conflict` an toàn, không tranh chấp.
-* **US-DRV-02: Shipper Web Hub - Radar Quét Đơn Khả Dụng**
-  * **Ý chính:** Giao diện tối ưu Mobile Web hiển thị danh sách các đơn đã được quán xác nhận (`CONFIRMED`) đang chờ tài xế gần đó tiếp nhận.
-* **US-DRV-03: Quy trình Giao hàng Ảo hóa (Virtual Delivery Workflow)**
-  * **Ý chính:** Trượt/Bấm chuyển đổi trạng thái từng bước: *"Nhận cuốc"* $\rightarrow$ *"Đã đến quán lấy món"* $\rightarrow$ *"Đang giao"* $\rightarrow$ *"Giao thành công & Thu tiền COD"*.
+* **US-DRV-02: Shipper Web Hub - Radar Quét Đơn & Ràng Buộc Đơn Duy Nhất (Single Active Order)**
+  * **Ý chính:** Giao diện tối ưu Mobile Web hiển thị danh sách các đơn đã được quán xác nhận (`CONFIRMED`) đang chờ tài xế lân cận tiếp nhận. **Đặc biệt: Dừng hiển thị đơn mới khi tài xế đã và đang nhận 1 đơn hàng** (`DRIVER_ACCEPTED`, `PICKING_UP`, `DELIVERING`) để tài xế tập trung giao 1 đơn duy nhất.
+* **US-DRV-03: Quy trình Giao hàng Ảo hóa Trực quan, Dễ hiểu (Virtual Delivery Workflow)**
+  * **Ý chính:** Các nút thao tác chuyển đổi trạng thái một chạm rõ ràng, dễ hiểu: *"Đã đến quán lấy món"* $\rightarrow$ *"Bắt đầu đi giao"* $\rightarrow$ *"Giao thành công & Thu tiền COD"*.
 * **US-DRV-04: Bộ máy Tính toán Chỉ số Hiệu suất Tài xế Chuẩn PRD**
-  * **Ý chính:** Thuật toán tính toán độc lập trên rolling window 100 đơn gần nhất theo đúng [`DRIVER_PERFORMANCE_PRD.md`](file:///d:/ojt-food-deli-start/DRIVER_PERFORMANCE_PRD.md):
-    * **Tỉ lệ chấp nhận đơn (Acceptance Rate - AR):** $AR = \frac{\text{accepted\_offers}}{\text{eligible\_offers}} \times 100\%$
-    * **Tỉ lệ hủy đơn (Cancellation Rate - CR):** $CR = \frac{\text{chargeable\_driver\_cancelled}}{\text{accepted\_orders}} \times 100\%$
-* **US-DRV-05: Thống kê Ví Thu nhập & Lịch sử Cuốc xe**
-  * **Ý chính:** Xem tổng số tiền cước giao thu được trong ngày/tuần và danh sách chi tiết các đơn đã hoàn thành.
+  * **Ý chính:** Thuật toán tính toán độc lập trên rolling window 100 đơn gần nhất: Tỷ lệ chấp nhận đơn (AR $\ge 80\%$) và Tỷ lệ hủy đơn (CR $\le 10\%$).
+* **US-DRV-05: Quản lý Lịch sử Đơn hàng & Thống kê Ví Thu nhập**
+  * **Ý chính:** Danh sách chi tiết các cuốc xe đã hoàn thành, tổng tiền ship thu được trong ngày/tuần và số dư ví.
 
 ---
 
-### 💬 EPIC 5: TƯƠNG TÁC THỜI GIAN THỰC & ĐÁNH GIÁ (REALTIME & REVIEWS)
+### 💬 EPIC 5: TƯƠNG TÁC THỜI GIAN THỰC & CHAT (REALTIME & CHAT)
 *(Căn cứ: SRS Mục 4.2 & 4.3 - FR-08, FR-10, FR-11, FR-17, FR-18)*
 
 * **US-RT-01: Theo dõi Đơn hàng Thời gian thực (Live Stepper 5 bước)**
-  * **Ý chính:** Màn hình `/orders/:id` kết nối STOMP WebSocket tự động nhảy trạng thái khi Quán/Tài xế bấm thao tác mà **không cần khách hàng tải lại (F5) trang**.
-* **US-CHAT-01: Hộp thoại Live Chat Trực tiếp Khách hàng $\leftrightarrow$ Quán ăn / Tài xế**
-  * **Ý chính:** Widget chat nổi thời gian thực giúp khách nhắn tin dặn dò quán (ít đường, không hành...) và lưu trữ lịch sử vào bảng `chat_messages`.
-* **US-REV-01: Phân hệ Đánh giá 5★ & Thống kê Uy tín (`review-service`)**
-  * **Ý chính:** Sau khi đơn chuyển sang `COMPLETED`, hiển thị Modal cho khách chấm sao (1 - 5★) và để lại nhận xét riêng cho Quán ăn và Tài xế.
+  * **Ý chính:** Màn hình `/orders/:id` kết nối STOMP WebSocket tự động nhảy trạng thái khi Quán/Tài xế bấm thao tác mà không cần tải lại (F5) trang.
+* **US-CHAT-01: Soạn Tin Nhắn Chat 2 Chiều Trực Tiếp Khách Hàng $\leftrightarrow$ Tài Xế**
+  * **Ý chính:** Khung chat nổi thời gian thực qua WebSocket STOMP giúp Khách hàng và Tài xế nhắn tin trực tiếp dặn dò, trao đổi lộ trình kèm các mẫu tin nhắn nhanh (Quick Replies).
 
 ---
 
 ### ⚙️ EPIC 6: CỔNG QUẢN TRỊ VIÊN HỆ THỐNG (SYSTEM ADMIN PORTAL)
 *(Căn cứ: SRS Mục 4.5 - FR-24, FR-25, FR-26, FR-27)*
 
-* **US-ADM-01: Quản lý Người dùng Toàn sàn & Khóa/Mở tài khoản**
-  * **Ý chính:** Danh sách toàn bộ tài khoản (Khách hàng, Quán, Tài xế); hỗ trợ tìm kiếm, phân trang và thao tác khóa/mở khóa khi có vi phạm.
+* **US-ADM-01: Quản lý Người dùng Toàn sàn (CRUD Toàn Diện - `/admin/users`)**
+  * **Ý chính:** Đầy đủ thao tác: Xem danh sách phân trang/tìm kiếm/lọc role, Thêm mới tài khoản, Sửa thông tin & vai trò, Khóa/Mở khóa hoặc Xóa tài khoản vi phạm.
 * **US-ADM-02: Phân hệ Phê duyệt Quán ăn Mới & Tài xế Mới**
   * **Ý chính:** Màn hình kiểm duyệt hồ sơ mở quán mới (`restaurant_change_requests`) và duyệt hồ sơ xin làm tài xế mới (`driver_details` pending).
-* **US-ADM-03: Cấu hình Tham số Toàn sàn & Global Dashboard**
-  * **Ý chính:** Bảng cấu hình phí vận chuyển mỗi km, % hoa hồng sàn (`system_settings`) và biểu đồ thống kê KPI tổng quan toàn sàn.
-* **US-ADM-04: Quản trị Toàn Bộ Đánh Giá Toàn Sàn (`/admin/reviews`)**
-  * **Ý chính:** Màn hình Admin quản trị toàn bộ đánh giá 5★ của hệ thống; tìm kiếm theo quán, tài xế, khách hàng; lọc theo số sao; quyền ẩn/xóa đánh giá vi phạm tiêu chuẩn.
+* **US-ADM-03: Cấu hình Tham số Toàn sàn (System Settings)**
+  * **Ý chính:** Bảng cấu hình phí vận chuyển mỗi km, % hoa hồng sàn (`system_settings`).
+* **US-ADM-04: Quản trị Đánh Giá Toàn Sàn Xem & Xóa (Tách Biệt 2 Trang)**
+  * **Ý chính:** Tách 2 màn hình riêng biệt: Trang 1 Quản lý đánh giá Quán ăn (`/admin/reviews/restaurants`), Trang 2 Quản lý đánh giá Tài xế (`/admin/reviews/drivers`). Hỗ trợ xem chi tiết và nút Xóa đánh giá vi phạm tiêu chuẩn.
+* **US-ADM-05: Giao diện Quản lý Tổng thu & Chỉ số Hệ thống (`/admin/analytics`)**
+  * **Ý chính:** Biểu đồ doanh thu toàn sàn tính theo tháng và 5 thẻ thống kê: Số lượng người dùng, Số lượng nhà hàng, Số lượng đối tác kinh doanh (Merchants), Tỷ lệ đơn thành công / tổng đơn đặt hàng, Số lượng món ăn toàn sàn.
 * **US-FIX-MERCH: Khắc phục Lỗi Tồn Đọng Phân hệ Merchant**
   * **Ý chính:** Sửa triệt để các lỗi ở Cổng Quán: lỗi chọn chi nhánh (Branch Switcher đa quán), toggle trạng thái món ăn, đồng bộ chuông đơn STOMP, bổ sung báo cáo doanh thu đa quán.
-* **US-FIX-ADM: Khắc phục Lỗi Tồn Đọng Phân hệ Admin**
+* **US-FIX-ADM: Khắc phục Lỗi Tồn Đọng Phân hệ Admin & Customer**
   * **Ý chính:** Sửa các lỗi phê duyệt hồ sơ quán/tài xế, lưu cấu hình hệ thống, và đồng bộ hiển thị Tag "Không có tài xế" trên chi tiết đơn hàng khi đơn hoàn tất không có shipper.
 
 ---

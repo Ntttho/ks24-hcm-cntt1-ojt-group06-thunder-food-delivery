@@ -7,3 +7,4 @@ export * from './userApi';
 export * from './cartApi';
 export * from './cloudinaryService';
 export * from './driverApi';
+export * from './revenueApi';

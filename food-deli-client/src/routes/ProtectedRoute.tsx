@@ -30,9 +30,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 1. Phải đăng nhập: Khách vãng lai chưa đăng nhập bị chuyển hướng đến /login
+  // 1. Phải đăng nhập: Khách vãng lai chưa đăng nhập bị chuyển hướng đến /login (hoặc /admin/login nếu truy cập /admin)
   if (!isAuthenticated) {
-    return <Navigate to={APP_ROUTES.LOGIN} state={{ from: location }} replace />;
+    const isAccessingAdmin = location.pathname.startsWith('/admin');
+    const defaultLoginTarget = isAccessingAdmin ? APP_ROUTES.ADMIN_LOGIN : APP_ROUTES.LOGIN;
+    return <Navigate to={redirectTo || defaultLoginTarget} state={{ from: location }} replace />;
   }
 
   // 2. Kiểm tra phân quyền RBAC: Bắt buộc role của người dùng phải thuộc allowedRoles
