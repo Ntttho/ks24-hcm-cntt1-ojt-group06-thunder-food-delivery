@@ -5,7 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.common.dto.response.PageResponse;
 import com.foodthunder.review.client.OrderClient;
+import com.foodthunder.review.client.RestaurantClient;
+import com.foodthunder.review.client.UserClient;
 import com.foodthunder.review.dto.client.OrderClientDto;
+import com.foodthunder.review.dto.client.ReviewOrderContextDto;
+import com.foodthunder.review.dto.client.ReviewOrderContextRequest;
 import com.foodthunder.review.dto.request.AdminReviewRequest;
 import com.foodthunder.review.dto.request.SubmitDriverReviewRequest;
 import com.foodthunder.review.dto.request.SubmitOrderReviewRequest;
@@ -13,6 +17,7 @@ import com.foodthunder.review.dto.request.SubmitRestaurantReviewRequest;
 import com.foodthunder.review.dto.response.OrderReviewEligibilityDto;
 import com.foodthunder.review.dto.response.OrderReviewStatusDto;
 import com.foodthunder.review.dto.response.ReviewResponseDto;
+import com.foodthunder.review.dto.response.ReviewOrderItemDto;
 import com.foodthunder.review.dto.response.ReviewSummaryDto;
 import com.foodthunder.review.entity.Review;
 import com.foodthunder.review.exception.BadRequestException;
@@ -35,6 +40,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @Slf4j
@@ -44,9 +51,13 @@ public class ReviewServiceImpl implements ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderClient orderClient;
+    private final RestaurantClient restaurantClient;
+    private final UserClient userClient;
     private final ObjectMapper objectMapper;
 
     private static final long MAX_REVIEW_WINDOW_HOURS = 24L;
+    private static final int MAX_ORDER_CONTEXT_BATCH_SIZE = 100;
+    private static final Set<String> VALID_TARGET_TYPES = Set.of("RESTAURANT", "DRIVER");
 
     @Override
     @Transactional
@@ -126,6 +137,7 @@ public class ReviewServiceImpl implements ReviewService {
                     .rating(driverReview.getRating())
                     .comment(driverReview.getComment())
                     .imagesJson(serializeImages(driverReview.getImages()))
+                    .quickTagsJson(serializeStringList(driverReview.getQuickTags()))
                     .build();
             savedReviews.add(reviewRepository.save(driverReviewEntity));
         }
@@ -221,6 +233,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .targetId(order.getDriverId().longValue())
                 .rating(request.getRating())
                 .comment(fullComment.toString().trim())
+                .quickTagsJson(serializeStringList(request.getQuickTags()))
                 .build();
 
         return mapToDto(reviewRepository.save(driverReviewEntity));
@@ -441,11 +454,12 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional(readOnly = true)
     public PageResponse<ReviewResponseDto> getAdminReviews(String targetType, Long targetId, Integer rating, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String normalizedTargetType = normalizeTargetType(targetType);
 
         Specification<Review> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (targetType != null && !targetType.isBlank()) {
-                predicates.add(cb.equal(root.get("targetType"), targetType.toUpperCase()));
+            if (normalizedTargetType != null) {
+                predicates.add(cb.equal(root.get("targetType"), normalizedTargetType));
             }
             if (targetId != null) {
                 predicates.add(cb.equal(root.get("targetId"), targetId));
@@ -460,7 +474,9 @@ public class ReviewServiceImpl implements ReviewService {
         };
 
         Page<Review> result = reviewRepository.findAll(spec, pageable);
-        List<ReviewResponseDto> dtoList = result.getContent().stream().map(this::mapToDto).toList();
+        List<ReviewResponseDto> dtoList = new ArrayList<>(
+                result.getContent().stream().map(this::mapToDto).toList());
+        enrichAdminOrderContexts(dtoList);
 
         return PageResponse.of(dtoList, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages(), result.isLast());
     }
@@ -470,21 +486,28 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewResponseDto getReviewById(Long id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đánh giá #" + id));
-        return mapToDto(review);
+        ReviewResponseDto dto = mapToDto(review);
+        enrichAdminOrderContexts(List.of(dto));
+        return dto;
     }
 
     @Override
     @Transactional
     public ReviewResponseDto createAdminReview(AdminReviewRequest req) {
+        String targetType = normalizeTargetType(req.getTargetType());
+        if (targetType == null) {
+            throw new BadRequestException("targetType không được để trống");
+        }
         Review review = Review.builder()
                 .orderId(req.getOrderId())
                 .customerId(req.getCustomerId())
-                .targetType(req.getTargetType().toUpperCase())
+                .targetType(targetType)
                 .targetId(req.getTargetId())
                 .foodItemId(req.getFoodItemId())
                 .rating(req.getRating())
                 .comment(req.getComment())
                 .imagesJson(serializeImages(req.getImages()))
+                .quickTagsJson(serializeStringList(req.getQuickTags()))
                 .build();
 
         return mapToDto(reviewRepository.save(review));
@@ -493,10 +516,23 @@ public class ReviewServiceImpl implements ReviewService {
     @Override
     @Transactional
     public void deleteReview(Long id) {
-        if (!reviewRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Không tìm thấy đánh giá #" + id + " để xóa");
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đánh giá #" + id + " để xóa"));
+        String targetType = normalizeTargetType(review.getTargetType());
+
+        reviewRepository.delete(review);
+        reviewRepository.flush();
+
+        Double average = reviewRepository.calculateAverageRating(targetType, review.getTargetId());
+        BigDecimal ratingAvg = BigDecimal.valueOf(average != null ? average : 5.0)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if ("RESTAURANT".equals(targetType)) {
+            restaurantClient.updateRating(Math.toIntExact(review.getTargetId()), ratingAvg, "ROLE_ADMIN");
+        } else if ("DRIVER".equals(targetType)) {
+            userClient.updateRating(review.getTargetId(), ratingAvg, "ROLE_ADMIN");
         }
-        reviewRepository.deleteById(id);
+
         log.info("Admin successfully deleted review #{}", id);
     }
 
@@ -543,18 +579,26 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private String serializeImages(List<String> images) {
-        if (images == null || images.isEmpty()) {
+        return serializeStringList(images);
+    }
+
+    private String serializeStringList(List<String> values) {
+        if (values == null || values.isEmpty()) {
             return null;
         }
         try {
-            return objectMapper.writeValueAsString(images);
+            return objectMapper.writeValueAsString(values);
         } catch (Exception e) {
-            log.warn("Failed to serialize review images: {}", e.getMessage());
+            log.warn("Failed to serialize review list values: {}", e.getMessage());
             return null;
         }
     }
 
     private List<String> deserializeImages(String json) {
+        return deserializeStringList(json);
+    }
+
+    private List<String> deserializeStringList(String json) {
         if (json == null || json.isBlank()) {
             return Collections.emptyList();
         }
@@ -576,7 +620,88 @@ public class ReviewServiceImpl implements ReviewService {
                 .rating(r.getRating())
                 .comment(r.getComment())
                 .images(deserializeImages(r.getImagesJson()))
+                .quickTags(deserializeQuickTags(r))
                 .createdAt(r.getCreatedAt())
                 .build();
+    }
+
+    private String normalizeTargetType(String targetType) {
+        if (targetType == null) {
+            return null;
+        }
+        String normalized = targetType.trim().toUpperCase(Locale.ROOT);
+        if (!VALID_TARGET_TYPES.contains(normalized)) {
+            throw new BadRequestException("Loại đối tượng đánh giá không hợp lệ: " + targetType);
+        }
+        return normalized;
+    }
+
+    private void enrichAdminOrderContexts(List<ReviewResponseDto> reviews) {
+        reviews.forEach(review -> review.setOrderContextAvailable(false));
+        List<Long> orderIds = reviews.stream()
+                .map(ReviewResponseDto::getOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (orderIds.isEmpty()) {
+            return;
+        }
+
+        Map<Long, ReviewOrderContextDto> contextsByOrderId = new HashMap<>();
+        for (int start = 0; start < orderIds.size(); start += MAX_ORDER_CONTEXT_BATCH_SIZE) {
+            List<Long> batchOrderIds = orderIds.subList(
+                    start,
+                    Math.min(start + MAX_ORDER_CONTEXT_BATCH_SIZE, orderIds.size()));
+            try {
+                ApiResponse<List<ReviewOrderContextDto>> response = orderClient.getReviewOrderContexts(
+                        new ReviewOrderContextRequest(batchOrderIds), "ROLE_ADMIN");
+                if (response == null || response.data() == null) {
+                    log.warn("Order service returned no review context for order IDs {}", batchOrderIds);
+                    continue;
+                }
+
+                response.data().stream()
+                        .filter(Objects::nonNull)
+                        .filter(context -> context.getOrderId() != null)
+                        .forEach(context -> contextsByOrderId.putIfAbsent(context.getOrderId(), context));
+            } catch (Exception ex) {
+                log.warn("Failed to load order context for admin review order IDs {}", batchOrderIds, ex);
+            }
+        }
+
+        reviews.forEach(review -> {
+            ReviewOrderContextDto context = contextsByOrderId.get(review.getOrderId());
+            if (context == null) {
+                return;
+            }
+            review.setOrderContextAvailable(true);
+            review.setOrderRestaurantId(context.getRestaurantId());
+            review.setOrderItems(context.getItems() == null
+                    ? List.of()
+                    : context.getItems().stream()
+                            .map(item -> ReviewOrderItemDto.builder()
+                                    .foodId(item.getFoodId() == null ? null : item.getFoodId().longValue())
+                                    .foodName(item.getFoodName())
+                                    .quantity(item.getQuantity())
+                                    .build())
+                            .toList());
+        });
+    }
+
+    private List<String> deserializeQuickTags(Review review) {
+        List<String> quickTags = deserializeStringList(review.getQuickTagsJson());
+        if (!quickTags.isEmpty() || !"DRIVER".equalsIgnoreCase(review.getTargetType())
+                || review.getComment() == null || !review.getComment().startsWith("[")) {
+            return quickTags;
+        }
+
+        int closingBracket = review.getComment().indexOf(']');
+        if (closingBracket <= 1) {
+            return quickTags;
+        }
+        return Arrays.stream(review.getComment().substring(1, closingBracket).split(","))
+                .map(String::trim)
+                .filter(tag -> !tag.isEmpty())
+                .toList();
     }
 }

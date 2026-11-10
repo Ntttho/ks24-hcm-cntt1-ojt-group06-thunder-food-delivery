@@ -29,6 +29,14 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
 }) => {
   const [form] = Form.useForm();
 
+  const isTargetAdmin = (() => {
+    if (!user) return false;
+    const r = (user.role || '').toUpperCase();
+    if (r.includes('ADMIN')) return true;
+    if (user.roles && user.roles.some((roleName: string) => roleName.toUpperCase().includes('ADMIN'))) return true;
+    return false;
+  })();
+
   useEffect(() => {
     if (isOpen && user) {
       // Normalize role string (e.g., ROLE_MERCHANT -> MERCHANT, SHIPPER -> DRIVER)
@@ -86,9 +94,19 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
       centered
       width={560}
     >
+      {isTargetAdmin && (
+        <Alert
+          type="warning"
+          showIcon
+          message="Tài khoản Quản trị viên được bảo vệ hệ thống"
+          description="Hệ thống không cho phép chỉnh sửa thông tin, vai trò hoặc trạng thái của tài khoản Quản trị viên (Admin)."
+          className="mt-3 mb-1 rounded-xl"
+        />
+      )}
       <Form
         form={form}
         layout="vertical"
+        disabled={isTargetAdmin}
         onFinish={handleFinish}
         className="pt-3"
         requiredMark="optional"
@@ -203,8 +221,9 @@ export const EditUserModal: React.FC<EditUserModalProps> = ({
             type="primary"
             htmlType="submit"
             loading={submitting}
+            disabled={isTargetAdmin}
             icon={<SaveOutlined />}
-            className="bg-blue-600 hover:bg-blue-700 border-none font-medium rounded-lg px-5 shadow-sm"
+            className="bg-blue-600 hover:bg-blue-700 border-none font-medium rounded-lg px-5 shadow-sm disabled:bg-slate-300"
           >
             Lưu Thay Đổi
           </Button>

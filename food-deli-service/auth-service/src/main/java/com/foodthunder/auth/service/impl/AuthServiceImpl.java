@@ -1,11 +1,14 @@
 package com.foodthunder.auth.service.impl;
 
 import com.foodthunder.auth.dto.*;
+import com.foodthunder.auth.exception.BadRequestException;
 import com.foodthunder.auth.exception.ConflictException;
 import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
 import com.foodthunder.auth.model.Role;
+import com.foodthunder.auth.model.DriverDetails;
 import com.foodthunder.auth.model.User;
+import com.foodthunder.auth.repository.DriverDetailsRepository;
 import com.foodthunder.auth.repository.RoleRepository;
 import com.foodthunder.auth.repository.UserRepository;
 import com.foodthunder.auth.security.JwtProvider;
@@ -31,6 +34,7 @@ import java.util.stream.Collectors;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final DriverDetailsRepository driverDetailsRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
@@ -204,6 +208,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép chỉnh sửa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
         if (request.phone() != null && !request.phone().isBlank()) {
             String newPhone = request.phone().trim();
             if (!newPhone.equals(user.getPhone()) && userRepository.existsByPhoneAndIdNot(newPhone, id)) {
@@ -248,6 +256,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép khóa hoặc thay đổi trạng thái của tài khoản Quản trị viên (Admin)");
+        }
+
         if (request.status() != null && !request.status().isBlank()) {
             if ("LOCKED".equalsIgnoreCase(request.status())) {
                 user.setDeletedAt(java.time.LocalDateTime.now());
@@ -279,9 +291,22 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
         user.setDeletedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
         log.info("Admin deleted user id={}", id);
+    }
+
+    private boolean isUserAdmin(User user) {
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .anyMatch(r -> r.getName() != null &&
+                        ("ADMIN".equalsIgnoreCase(r.getName()) || "ROLE_ADMIN".equalsIgnoreCase(r.getName())));
     }
 
     private Set<Role> resolveRoles(List<String> rolesList, String singleRole) {
@@ -329,6 +354,20 @@ public class AuthServiceImpl implements AuthService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public UserDto updateRating(Long userId, BigDecimal ratingAvg) {
+        if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0
+                || ratingAvg.compareTo(BigDecimal.valueOf(5)) > 0) {
+            throw new com.foodthunder.auth.exception.BadRequestException("Điểm đánh giá phải nằm trong khoảng 0 đến 5");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng #" + userId));
+        user.setRatingAvg(ratingAvg.setScale(2, java.math.RoundingMode.HALF_UP));
+        return toUserDto(userRepository.save(user), null);
+    }
+
     private UserDto toUserDto(User user, String activeRole) {
         Set<String> roleNames = user.getRoles().stream()
                 .map(Role::getName)
@@ -337,6 +376,11 @@ public class AuthServiceImpl implements AuthService {
         String currentRole = activeRole != null ? activeRole
                 : (roleNames.contains("CUSTOMER") ? "CUSTOMER"
                 : (roleNames.isEmpty() ? "CUSTOMER" : roleNames.iterator().next()));
+        String licensePlate = roleNames.contains("DRIVER") || roleNames.contains("SHIPPER")
+                ? driverDetailsRepository.findById(user.getId())
+                        .map(DriverDetails::getLicensePlate)
+                        .orElse(null)
+                : null;
 
         String status = user.getDeletedAt() == null ? "ACTIVE" : "LOCKED";
 
@@ -346,6 +390,7 @@ public class AuthServiceImpl implements AuthService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .ratingAvg(user.getRatingAvg())
+                .licensePlate(licensePlate)
                 .roles(roleNames)
                 .role(currentRole)
                 .status(status)

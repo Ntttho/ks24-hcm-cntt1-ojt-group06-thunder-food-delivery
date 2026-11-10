@@ -3,7 +3,10 @@ package com.foodthunder.order.service;
 import com.foodthunder.order.dto.CreateOrderRequest;
 import com.foodthunder.order.dto.OrderResponse;
 import com.foodthunder.order.dto.PageResponse;
+import com.foodthunder.order.dto.ReviewOrderContextResponse;
 import com.foodthunder.order.dto.UpdateOrderStatusRequest;
+
+import java.util.List;
 
 public interface OrderService {
 
@@ -12,6 +15,8 @@ public interface OrderService {
     PageResponse<OrderResponse> getMyOrders(Integer customerId, int page, int size);
 
     OrderResponse getOrderById(Long orderId, Integer requestingUserId, String requestingUserRole);
+
+    List<ReviewOrderContextResponse> getReviewOrderContexts(List<Long> orderIds);
 
     PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, String keyword, int page, int size);
 

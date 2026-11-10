@@ -13,6 +13,7 @@ public record UserDto(
         String email,
         String fullName,
         BigDecimal ratingAvg,
+        String licensePlate,
         Set<String> roles,
         String role,
         String status,

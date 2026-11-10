@@ -131,7 +131,19 @@ export const AdminUserPage: React.FC = () => {
     }
   };
 
+  const isUserAdmin = (user?: User | null) => {
+    if (!user) return false;
+    const r = (user.role || '').toUpperCase();
+    if (r.includes('ADMIN')) return true;
+    if (user.roles && user.roles.some((roleName: string) => roleName.toUpperCase().includes('ADMIN'))) return true;
+    return false;
+  };
+
   const handleEditUser = async (id: number | string, payload: UpdateUserPayload) => {
+    if (selectedUser && isUserAdmin(selectedUser)) {
+      message.warning('Không được phép chỉnh sửa tài khoản Quản trị viên (Admin)!');
+      return;
+    }
     setActionSubmitting(true);
     try {
       await userApi.updateUser(id, payload);
@@ -147,6 +159,10 @@ export const AdminUserPage: React.FC = () => {
   };
 
   const handleToggleStatus = async (user: User) => {
+    if (isUserAdmin(user)) {
+      message.warning('Không được phép khóa hoặc thay đổi trạng thái của tài khoản Quản trị viên (Admin)!');
+      return;
+    }
     const currentStatus = user.status?.toUpperCase() || 'ACTIVE';
     const newStatus = currentStatus === 'LOCKED' ? 'ACTIVE' : 'LOCKED';
     const actionLabel = newStatus === 'ACTIVE' ? 'Mở khóa' : 'Khóa';
@@ -161,6 +177,10 @@ export const AdminUserPage: React.FC = () => {
   };
 
   const handleDeleteUser = async (user: User) => {
+    if (isUserAdmin(user)) {
+      message.warning('Không được phép xóa tài khoản Quản trị viên (Admin)!');
+      return;
+    }
     try {
       await userApi.deleteUser(user.id);
       message.success(`Đã xóa/vô hiệu hóa tài khoản #${user.id} thành công!`);
@@ -297,6 +317,20 @@ export const AdminUserPage: React.FC = () => {
       width: 150,
       fixed: 'right',
       render: (_, record) => {
+        if (isUserAdmin(record)) {
+          return (
+            <Tooltip title="Tài khoản Quản trị viên được bảo vệ hệ thống: Không cho phép chỉnh sửa, khóa hoặc xóa">
+              <Tag
+                color="cyan"
+                icon={<SafetyCertificateOutlined />}
+                className="px-2.5 py-1 font-semibold text-xs rounded-lg m-0 border border-cyan-200 bg-cyan-50 text-cyan-700 flex items-center gap-1 w-fit cursor-default"
+              >
+                Bảo vệ hệ thống
+              </Tag>
+            </Tooltip>
+          );
+        }
+
         const isLocked = record.status?.toUpperCase() === 'LOCKED';
         return (
           <Space size={4}>

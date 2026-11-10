@@ -39,5 +39,6 @@ public class AdminReviewRequest {
     private String comment;
 
     private List<String> images;
-}
 
+    private List<String> quickTags;
+}

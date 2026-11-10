@@ -21,13 +21,16 @@ public class ReviewResponseDto {
     private String customerAvatar;
     private String targetType;
     private Long targetId;
+    private Integer orderRestaurantId;
+    private Boolean orderContextAvailable;
+    private List<ReviewOrderItemDto> orderItems;
     private Long foodItemId;
     private String foodName;
     private Integer rating;
     private String comment;
     private List<String> images;
+    private List<String> quickTags;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private LocalDateTime createdAt;
 }
-
