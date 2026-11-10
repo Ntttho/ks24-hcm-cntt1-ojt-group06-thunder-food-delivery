@@ -27,7 +27,7 @@ import {
 import { restaurantApi } from '@/services/modules/restaurantApi';
 import { userApi } from '@/services/modules/userApi';
 import { reviewApi } from '@/services/api/reviewApi';
-import type { ReviewItemDto } from '@/services/api/reviewApi';
+import type { ReviewItemDto, ReviewOrderItemDto } from '@/services/api/reviewApi';
 import type { Shop } from '@/services/modules/restaurantApi';
 import type { User } from '@/types/auth.types';
 
@@ -46,6 +46,7 @@ interface ReviewWithDetails extends ReviewItemDto {
   targetImage?: string;
   foodName?: string;
   licensePlate?: string;
+  orderItems: Array<ReviewOrderItemDto & { imageUrl?: string; displayName: string }>;
 }
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'];
@@ -53,11 +54,11 @@ const PAGE_SIZE_OPTIONS = ['10', '20', '50'];
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Đã xảy ra lỗi, vui lòng thử lại.';
 
-const getProductName = (restaurant: Shop | undefined, productId: number | undefined) => {
+const getProduct = (restaurant: Shop | undefined, productId: number | undefined) => {
   if (!restaurant || productId == null) return undefined;
   for (const category of restaurant.categories ?? []) {
     const product = category.products.find((item) => item.id === productId);
-    if (product) return product.name;
+    if (product) return product;
   }
   return undefined;
 };
@@ -66,12 +67,14 @@ const loadReviewDetails = async (
   reviews: ReviewItemDto[],
   targetType: ReviewTargetType,
 ): Promise<{ reviews: ReviewWithDetails[]; incomplete: boolean }> => {
+  const typedReviews = reviews.filter((review) => review.targetType === targetType);
   const userIds = new Set<number>();
   const restaurantIds = new Set<number>();
-  reviews.forEach((review) => {
+  typedReviews.forEach((review) => {
     userIds.add(review.customerId);
     if (targetType === 'DRIVER') userIds.add(review.targetId);
     if (targetType === 'RESTAURANT') restaurantIds.add(review.targetId);
+    if (review.orderRestaurantId != null) restaurantIds.add(review.orderRestaurantId);
   });
 
   const [userResults, restaurantResults] = await Promise.all([
@@ -98,14 +101,19 @@ const loadReviewDetails = async (
   const users = new Map<number, User | undefined>(userResults);
   const restaurants = new Map<number, Shop | undefined>(restaurantResults);
   const incomplete =
-    userResults.some(([, user]) => !user) || restaurantResults.some(([, shop]) => !shop);
+    typedReviews.some((review) => !review.orderContextAvailable) ||
+    userResults.some(([, user]) => !user) ||
+    restaurantResults.some(([, shop]) => !shop);
 
   return {
     incomplete,
-    reviews: reviews.map((review) => {
+    reviews: typedReviews.map((review) => {
       const customer = users.get(review.customerId);
       const targetUser = targetType === 'DRIVER' ? users.get(review.targetId) : undefined;
       const restaurant = targetType === 'RESTAURANT' ? restaurants.get(review.targetId) : undefined;
+      const orderRestaurant = review.orderRestaurantId == null
+        ? restaurant
+        : restaurants.get(review.orderRestaurantId);
 
       return {
         ...review,
@@ -115,8 +123,16 @@ const loadReviewDetails = async (
           (targetUser?.fullName || restaurant?.name) ||
           `${targetType === 'DRIVER' ? 'Tài xế' : 'Nhà hàng'} #${review.targetId}`,
         targetImage: restaurant?.imageUrl,
-        foodName: getProductName(restaurant, review.foodItemId),
+        foodName: getProduct(restaurant, review.foodItemId)?.name,
         licensePlate: targetUser?.licensePlate,
+        orderItems: (review.orderItems ?? []).map((item) => {
+          const product = getProduct(orderRestaurant, item.foodId);
+          return {
+            ...item,
+            displayName: item.foodName || product?.name || `Món #${item.foodId}`,
+            imageUrl: product?.imageUrl,
+          };
+        }),
       };
     }),
   };
@@ -147,7 +163,9 @@ const AdminReviewManagementPage: React.FC<AdminReviewManagementPageProps> = ({ t
           page,
           size: pageSize,
         });
-        const content = response.data?.content ?? [];
+        const content = (response.data?.content ?? []).filter(
+          (review) => review.targetType === targetType,
+        );
         const details = await loadReviewDetails(content, targetType);
         if (!active) return;
         setReviews(details.reviews);
@@ -322,6 +340,44 @@ const AdminReviewManagementPage: React.FC<AdminReviewManagementPageProps> = ({ t
                         </div>
                       )}
                     </div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-3">
+                    <Text className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Món trong đơn hàng #{review.orderId}
+                    </Text>
+                    {!review.orderContextAvailable ? (
+                      <Text type="secondary">Không tìm thấy hoặc không tải được thông tin đơn hàng.</Text>
+                    ) : review.orderItems.length === 0 ? (
+                      <Text type="secondary">Đơn hàng không có thông tin món ăn.</Text>
+                    ) : (
+                      <div className="flex flex-wrap gap-3">
+                        {review.orderItems.map((item, index) => (
+                          <div
+                            key={`${review.orderId}-${item.foodId}-${index}`}
+                            className="flex items-center gap-2"
+                          >
+                            {item.imageUrl ? (
+                              <Image
+                                src={item.imageUrl}
+                                alt={item.displayName}
+                                width={40}
+                                height={40}
+                                className="rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-orange-100 text-xs text-orange-700">
+                                Món
+                              </div>
+                            )}
+                            <Text className="text-sm text-slate-700">
+                              {item.displayName}
+                              {item.quantity != null ? ` × ${item.quantity}` : ''}
+                            </Text>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">

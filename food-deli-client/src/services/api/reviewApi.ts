@@ -52,6 +52,9 @@ export interface ReviewItemDto {
   customerAvatar?: string;
   targetType: 'RESTAURANT' | 'DRIVER';
   targetId: number;
+  orderRestaurantId?: number;
+  orderContextAvailable?: boolean;
+  orderItems?: ReviewOrderItemDto[];
   foodItemId?: number;
   foodName?: string;
   rating: number;
@@ -59,6 +62,12 @@ export interface ReviewItemDto {
   images?: string[];
   quickTags?: string[];
   createdAt: string;
+}
+
+export interface ReviewOrderItemDto {
+  foodId: number;
+  foodName?: string;
+  quantity?: number;
 }
 
 export interface ReviewSummaryDto {

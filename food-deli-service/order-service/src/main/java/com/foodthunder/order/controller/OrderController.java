@@ -2,6 +2,7 @@ package com.foodthunder.order.controller;
 
 import com.foodthunder.order.dto.*;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.exception.UnauthorizedException;
 import com.foodthunder.order.service.OrderService;
 import jakarta.validation.Valid;
@@ -10,6 +11,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -68,6 +72,16 @@ public class OrderController {
         Integer userId = parseUserId(userIdHeader, null);
         OrderResponse response = orderService.getOrderById(id, userId, userRoleHeader);
         return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết đơn hàng thành công", response));
+    }
+
+    @PostMapping("/review-contexts")
+    public ResponseEntity<ApiResponse<List<ReviewOrderContextResponse>>> getReviewOrderContexts(
+            @Valid @RequestBody ReviewOrderContextRequest request,
+            @RequestHeader(value = "X-User-Role", required = false) String userRoleHeader
+    ) {
+        requireAdminRole(userRoleHeader);
+        List<ReviewOrderContextResponse> response = orderService.getReviewOrderContexts(request.getOrderIds());
+        return ResponseEntity.ok(ApiResponse.success("Lấy ngữ cảnh đơn hàng cho đánh giá thành công", response));
     }
 
     /**
@@ -156,5 +170,16 @@ public class OrderController {
             }
         }
         return fallback;
+    }
+
+    private void requireAdminRole(String userRoleHeader) {
+        if (userRoleHeader == null || userRoleHeader.isBlank()) {
+            throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
+        }
+        boolean isAdmin = Arrays.stream(userRoleHeader.split("[,\\s]+"))
+                .anyMatch(role -> "ROLE_ADMIN".equalsIgnoreCase(role.trim()));
+        if (!isAdmin) {
+            throw new ForbiddenException("Chỉ quản trị viên mới được truy xuất ngữ cảnh đánh giá");
+        }
     }
 }
