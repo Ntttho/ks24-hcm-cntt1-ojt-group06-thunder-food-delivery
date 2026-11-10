@@ -223,6 +223,18 @@ export const Header: React.FC = () => {
               <Badge count={totalQuantity} size="small" color="#f97316" />
             )}
           </Link>
+
+          <Link
+            to={APP_ROUTES.SHIPPER_DASHBOARD}
+            className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+              location.pathname === APP_ROUTES.SHIPPER_DASHBOARD
+                ? 'text-emerald-600 bg-emerald-50 font-bold'
+                : 'text-gray-600 hover:text-emerald-600 hover:bg-gray-50'
+            }`}
+          >
+            <CarOutlined />
+            <span>Cổng Tài Xế</span>
+          </Link>
         </nav>
 
         {/* Right actions: Cart Badge & User Profile / Login */}
@@ -319,6 +331,13 @@ export const Header: React.FC = () => {
               <ShoppingCartOutlined /> Giỏ hàng
             </span>
             {totalQuantity > 0 && <Tag color="orange">{totalQuantity} món</Tag>}
+          </Link>
+          <Link
+            to={APP_ROUTES.SHIPPER_DASHBOARD}
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
+          >
+            <CarOutlined /> Cổng Tài Xế (Shipper Hub)
           </Link>
 
           {isAuthenticated ? (

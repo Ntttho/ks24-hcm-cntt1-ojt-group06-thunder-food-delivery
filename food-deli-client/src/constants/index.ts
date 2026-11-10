@@ -29,6 +29,7 @@ export const APP_ROUTES = {
   MERCHANT_VOUCHERS: '/merchant/vouchers',
   MERCHANT_REVIEWS: '/merchant/reviews',
   SHIPPER_DASHBOARD: '/shipper',
+  SHIPPER_HISTORY: '/shipper/history',
   NOT_FOUND: '*',
 } as const;
 
