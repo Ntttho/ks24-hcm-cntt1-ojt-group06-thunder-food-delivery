@@ -25,6 +25,8 @@ export const APP_ROUTES = {
   MERCHANT_DASHBOARD: '/merchant',
   ADMIN_RESTAURANT_REVIEWS: '/admin/reviews/restaurants',
   ADMIN_DRIVER_REVIEWS: '/admin/reviews/drivers',
+  MERCHANT_REVENUE: '/merchant/revenue',
+  MERCHANT_ANALYTICS: '/merchant/revenue',
   MERCHANT_MENU: '/merchant/menu',
   MERCHANT_CATEGORIES: '/merchant/categories',
   MERCHANT_TOPPINGS: '/merchant/toppings',

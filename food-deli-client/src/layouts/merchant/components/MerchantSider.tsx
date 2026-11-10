@@ -11,6 +11,7 @@ import {
   FolderOutlined,
   GiftOutlined,
   MessageOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import type { Shop } from '@/services/modules/restaurantApi';
 
@@ -43,6 +44,12 @@ export const MerchantSider: React.FC<MerchantSiderProps> = ({
       icon: <InboxOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Tiếp nhận đơn hàng</span>,
       onClick: () => onNavigate('/merchant'),
+    },
+    {
+      key: '/merchant/revenue',
+      icon: <BarChartOutlined className="text-lg" />,
+      label: <span className="font-semibold text-sm">Báo cáo doanh thu</span>,
+      onClick: () => onNavigate('/merchant/revenue'),
     },
     {
       key: '/merchant/menu',

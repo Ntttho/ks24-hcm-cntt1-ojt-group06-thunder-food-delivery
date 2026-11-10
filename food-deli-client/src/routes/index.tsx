@@ -17,6 +17,7 @@ import {
   MerchantToppingPage,
   MerchantVoucherPage,
   MerchantReviewPage,
+  MerchantRevenuePage,
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
@@ -151,6 +152,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
             <MerchantDashboardPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.MERCHANT_REVENUE,
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
+            <MerchantRevenuePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/merchant/analytics',
+        element: (
+          <ProtectedRoute allowedRoles={['ROLE_MERCHANT']}>
+            <MerchantRevenuePage />
           </ProtectedRoute>
         ),
       },

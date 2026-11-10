@@ -36,4 +36,21 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id IN :orderIds")
     List<Order> findAllWithItemsByIdIn(@Param("orderIds") Collection<Long> orderIds);
+    @Query("SELECT o FROM Order o WHERE o.restaurantId = :restaurantId " +
+           "AND o.createdAt >= :startDate AND o.createdAt <= :endDate " +
+           "ORDER BY o.createdAt ASC")
+    java.util.List<Order> findByRestaurantIdAndCreatedAtBetween(
+            @Param("restaurantId") Integer restaurantId,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate
+    );
+
+    @Query("SELECT o FROM Order o WHERE o.restaurantId IN :restaurantIds " +
+           "AND o.createdAt >= :startDate AND o.createdAt <= :endDate " +
+           "ORDER BY o.createdAt ASC")
+    java.util.List<Order> findByRestaurantIdInAndCreatedAtBetween(
+            @Param("restaurantIds") java.util.List<Integer> restaurantIds,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate
+    );
 }

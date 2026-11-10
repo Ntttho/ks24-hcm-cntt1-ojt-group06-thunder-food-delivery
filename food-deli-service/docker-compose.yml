@@ -183,6 +183,8 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_NAME=grabfood_db
@@ -222,6 +224,8 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_NAME=grabfood_db
@@ -259,6 +263,8 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_NAME=grabfood_db
@@ -292,6 +298,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      - EUREKA_HOST=discovery-service
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
@@ -300,7 +307,7 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=root
       - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx220m -XX:+UseSerialGC
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx220m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC
     mem_limit: 300m
     networks:
       - foodthunder-network
