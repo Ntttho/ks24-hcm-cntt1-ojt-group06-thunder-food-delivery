@@ -58,8 +58,8 @@ public class PaymentServiceImpl implements PaymentService {
         // 1. Kiểm tra đơn hàng có tồn tại bên order-service (nếu khả dụng)
         try {
             ResponseEntity<ApiResponse<RemoteOrderDto>> orderResp = orderClient.getOrderDetail(orderId, "SYSTEM", "0");
-            if (orderResp != null && orderResp.getBody() != null && orderResp.getBody().data() != null) {
-                RemoteOrderDto order = orderResp.getBody().data();
+            if (orderResp != null && orderResp.getBody() != null && orderResp.getBody().getData() != null) {
+                RemoteOrderDto order = orderResp.getBody().getData();
                 if ("CANCELLED".equalsIgnoreCase(order.getStatus()) || "COMPLETED".equalsIgnoreCase(order.getStatus())) {
                     throw new BadRequestException("Không thể tạo thanh toán cho đơn hàng đã " + order.getStatus());
                 }
