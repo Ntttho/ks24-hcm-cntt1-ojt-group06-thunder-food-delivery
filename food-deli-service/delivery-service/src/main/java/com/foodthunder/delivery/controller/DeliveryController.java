@@ -1,6 +1,7 @@
 package com.foodthunder.delivery.controller;
 
 import com.foodthunder.common.dto.response.ApiResponse;
+import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
 import com.foodthunder.delivery.dto.response.*;
@@ -46,6 +47,20 @@ public class DeliveryController {
         log.info("REST request to reject order #{} by driver #{}", orderId, driverId);
         deliveryService.rejectOrder(driverId, orderId, reason);
         return ResponseEntity.ok(ApiResponse.success("Đã từ chối đơn hàng thành công", "REJECTED"));
+    }
+
+    /**
+     * Tài xế hủy nhận đơn sau khi đã tiếp nhận (Driver Cancel / Trả đơn).
+     * Cập nhật chỉ số Cancellation Rate (CR) và tự động phạt nếu CR > 10%.
+     */
+    @PostMapping({"/orders/{orderId}/cancel", "/orders/{orderId}/driver-cancel"})
+    public ResponseEntity<ApiResponse<DriverMetricsResponse>> cancelOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody DriverCancelOrderRequest request,
+            @RequestHeader(value = "X-User-Id", defaultValue = "2") Integer driverId) {
+        log.info("REST request to cancel accepted order #{} by driver #{}", orderId, driverId);
+        DriverMetricsResponse res = deliveryService.cancelOrder(driverId, orderId, request);
+        return ResponseEntity.ok(ApiResponse.success("Hủy nhận đơn và trả về hệ thống thành công", res));
     }
 
     /**
