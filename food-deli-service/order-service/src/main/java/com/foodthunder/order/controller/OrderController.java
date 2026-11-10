@@ -177,7 +177,7 @@ public class OrderController {
             throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
         }
         boolean isAdmin = Arrays.stream(userRoleHeader.split("[,\\s]+"))
-                .anyMatch(role -> "ROLE_ADMIN".equalsIgnoreCase(role.trim()));
+                .anyMatch(role -> "ROLE_ADMIN".equalsIgnoreCase(role.trim()) || "ADMIN".equalsIgnoreCase(role.trim()));
         if (!isAdmin) {
             throw new ForbiddenException("Chỉ quản trị viên mới được truy xuất ngữ cảnh đánh giá");
         }

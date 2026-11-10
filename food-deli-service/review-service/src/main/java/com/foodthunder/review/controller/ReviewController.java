@@ -263,9 +263,13 @@ public class ReviewController {
         Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
                 .map(String::trim)
                 .map(String::toUpperCase)
+                .map(r -> r.startsWith("ROLE_") ? r.substring(5) : r)
                 .collect(java.util.stream.Collectors.toSet());
         for (String allowed : allowedRoles) {
-            if (roles.contains(allowed.toUpperCase())) {
+            String normalizedAllowed = allowed.toUpperCase().startsWith("ROLE_")
+                    ? allowed.toUpperCase().substring(5)
+                    : allowed.toUpperCase();
+            if (roles.contains(normalizedAllowed)) {
                 return;
             }
         }

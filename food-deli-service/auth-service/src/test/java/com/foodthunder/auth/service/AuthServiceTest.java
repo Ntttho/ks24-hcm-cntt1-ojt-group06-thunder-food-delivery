@@ -1,10 +1,7 @@
 package com.foodthunder.auth.service;
 
-import com.foodthunder.auth.dto.AuthResponse;
-import com.foodthunder.auth.dto.LoginRequest;
-import com.foodthunder.auth.dto.RegisterRequest;
-import com.foodthunder.auth.dto.UpdateProfileRequest;
-import com.foodthunder.auth.dto.UserDto;
+import com.foodthunder.auth.dto.*;
+import com.foodthunder.auth.exception.BadRequestException;
 import com.foodthunder.auth.exception.ConflictException;
 import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
@@ -218,5 +215,69 @@ class AuthServiceTest {
 
         assertThat(updated.ratingAvg()).isEqualByComparingTo("4.26");
         verify(userRepository).save(sampleUser);
+    }
+
+    @Test
+    @DisplayName("updateUser: throws BadRequestException when target user is an Admin")
+    void updateUser_adminTarget_throwsBadRequest() {
+        Role adminRole = Role.builder().id(2).name("ROLE_ADMIN").build();
+        User adminUser = User.builder()
+                .id(99L)
+                .fullName("System Admin")
+                .phone("0900000001")
+                .roles(new HashSet<>(Set.of(adminRole)))
+                .build();
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(adminUser));
+
+        UpdateUserRequest request = new UpdateUserRequest("Hacker Admin", "0900000002", null, null, null, null, null);
+
+        assertThatThrownBy(() -> authService.updateUser(99L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Không được phép chỉnh sửa tài khoản có vai trò Quản trị viên (Admin)");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateUserStatus: throws BadRequestException when target user is an Admin")
+    void updateUserStatus_adminTarget_throwsBadRequest() {
+        Role adminRole = Role.builder().id(2).name("ADMIN").build();
+        User adminUser = User.builder()
+                .id(99L)
+                .fullName("System Admin")
+                .phone("0900000001")
+                .roles(new HashSet<>(Set.of(adminRole)))
+                .build();
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(adminUser));
+
+        UpdateUserStatusRequest request = new UpdateUserStatusRequest("LOCKED", false);
+
+        assertThatThrownBy(() -> authService.updateUserStatus(99L, request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Không được phép khóa hoặc thay đổi trạng thái của tài khoản Quản trị viên (Admin)");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("deleteUser: throws BadRequestException when target user is an Admin")
+    void deleteUser_adminTarget_throwsBadRequest() {
+        Role adminRole = Role.builder().id(2).name("ROLE_ADMIN").build();
+        User adminUser = User.builder()
+                .id(99L)
+                .fullName("System Admin")
+                .phone("0900000001")
+                .roles(new HashSet<>(Set.of(adminRole)))
+                .build();
+
+        when(userRepository.findById(99L)).thenReturn(Optional.of(adminUser));
+
+        assertThatThrownBy(() -> authService.deleteUser(99L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
+
+        verify(userRepository, never()).save(any());
     }
 }

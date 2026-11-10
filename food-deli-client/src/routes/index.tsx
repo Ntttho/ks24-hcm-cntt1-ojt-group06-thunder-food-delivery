@@ -3,6 +3,7 @@ import { MainLayout, AuthLayout, MerchantLayout, UserLayout } from '@/layouts';
 import {
   HomePage,
   LoginPage,
+  AdminLoginPage,
   RegisterPage,
   AddressManagementPage,
   ProfilePage,
@@ -51,11 +52,27 @@ export const router = createBrowserRouter([
       },
       {
         path: APP_ROUTES.USERS,
-        element: <AdminUserPage />,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_DASHBOARD,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: APP_ROUTES.ADMIN_USERS,
-        element: <AdminUserPage />,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminUserPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: APP_ROUTES.ADMIN_RESTAURANT_REVIEWS,
@@ -137,6 +154,11 @@ export const router = createBrowserRouter([
         element: <RegisterPage />,
       },
     ],
+  },
+  // Dedicated Admin Portal Login Page
+  {
+    path: APP_ROUTES.ADMIN_LOGIN,
+    element: <AdminLoginPage />,
   },
   // Merchant Layout: Merchant Dashboard, Menu & Toppings Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {

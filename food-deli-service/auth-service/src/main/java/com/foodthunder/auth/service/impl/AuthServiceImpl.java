@@ -1,6 +1,7 @@
 package com.foodthunder.auth.service.impl;
 
 import com.foodthunder.auth.dto.*;
+import com.foodthunder.auth.exception.BadRequestException;
 import com.foodthunder.auth.exception.ConflictException;
 import com.foodthunder.auth.exception.ResourceNotFoundException;
 import com.foodthunder.auth.exception.UnauthorizedException;
@@ -207,6 +208,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép chỉnh sửa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
         if (request.phone() != null && !request.phone().isBlank()) {
             String newPhone = request.phone().trim();
             if (!newPhone.equals(user.getPhone()) && userRepository.existsByPhoneAndIdNot(newPhone, id)) {
@@ -251,6 +256,10 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép khóa hoặc thay đổi trạng thái của tài khoản Quản trị viên (Admin)");
+        }
+
         if (request.status() != null && !request.status().isBlank()) {
             if ("LOCKED".equalsIgnoreCase(request.status())) {
                 user.setDeletedAt(java.time.LocalDateTime.now());
@@ -282,9 +291,22 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + id));
 
+        if (isUserAdmin(user)) {
+            throw new BadRequestException("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
+        }
+
         user.setDeletedAt(java.time.LocalDateTime.now());
         userRepository.save(user);
         log.info("Admin deleted user id={}", id);
+    }
+
+    private boolean isUserAdmin(User user) {
+        if (user == null || user.getRoles() == null) {
+            return false;
+        }
+        return user.getRoles().stream()
+                .anyMatch(r -> r.getName() != null &&
+                        ("ADMIN".equalsIgnoreCase(r.getName()) || "ROLE_ADMIN".equalsIgnoreCase(r.getName())));
     }
 
     private Set<Role> resolveRoles(List<String> rolesList, String singleRole) {

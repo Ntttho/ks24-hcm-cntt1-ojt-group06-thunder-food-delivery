@@ -217,7 +217,7 @@ public class RestaurantController {
                 .map(String::trim)
                 .map(String::toUpperCase)
                 .collect(Collectors.toSet());
-        if (!roles.contains("ROLE_ADMIN")) {
+        if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
             throw new ForbiddenException("Chỉ Admin mới được cập nhật điểm đánh giá");
         }
         RestaurantDto updated = restaurantService.updateRating(id, ratingAvg);

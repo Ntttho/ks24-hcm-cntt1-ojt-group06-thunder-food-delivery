@@ -82,6 +82,8 @@ public class UserController {
         requireAdminRole(roleHeader);
         UserDto updatedUser = authService.updateRating(id, ratingAvg);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đánh giá tài xế thành công", updatedUser));
+    }
+
     /**
      * Cập nhật thông tin và vai trò người dùng (Dành cho Admin Portal)
      * PUT /api/v1/users/{id}
@@ -158,7 +160,7 @@ public class UserController {
                 .map(String::trim)
                 .map(String::toUpperCase)
                 .collect(java.util.stream.Collectors.toSet());
-        if (!roles.contains("ROLE_ADMIN")) {
+        if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
             throw new AccessDeniedException("Chỉ Admin mới được cập nhật điểm đánh giá");
         }
     }
