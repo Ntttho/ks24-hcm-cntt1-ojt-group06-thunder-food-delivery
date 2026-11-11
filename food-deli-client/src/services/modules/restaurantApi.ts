@@ -6,6 +6,8 @@ export interface Shop {
   ownerId?: number;
   name: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   phoneNumber?: string;
   rating?: number;
   imageUrl?: string;

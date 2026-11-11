@@ -10,15 +10,12 @@ import {
   Star,
   Award,
   TrendingUp,
-  Phone,
   CheckCircle,
-  AlertCircle,
   RotateCcw,
   DollarSign,
-  ChevronRight,
   ShieldCheck,
-  Package,
 } from './icons';
+import { ActiveDeliveryView } from './components/ActiveDeliveryView';
 import { useAuth } from '@/hooks/useAuth';
 import {
   driverApi,
@@ -206,7 +203,32 @@ export const ShipperHubPage: React.FC = () => {
     message.info('Đã tạm ẩn đơn khỏi radar. Nhấn "Quét lại" nếu muốn hiện lại.');
   };
 
-  // 7. Chỉnh sửa trạng thái đơn (PICKING_UP -> DELIVERING -> COMPLETED hoặc DRIVER_REJECTED)
+  // 7. Chỉnh sửa trạng thái đơn (Mốc 1: Tới quán lấy món -> DELIVERING)
+  const handleConfirmPickupAndDeliver = async () => {
+    if (!currentOrder || isUpdatingStatus) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      const updated = await driverApi.confirmPickupAndStartDelivery(
+        currentOrder.id,
+        currentOrder.statusCode
+      );
+      setCurrentOrder(updated);
+      message.success('Đã xác nhận lấy món! Bắt đầu giao hàng tới khách.');
+    } catch (err: any) {
+      if (err?.partialOrder) {
+        setCurrentOrder(err.partialOrder);
+      }
+      const errMsg =
+        err?.response?.data?.message || err?.message || 'Lỗi chuyển trạng thái sang đang giao.';
+      console.error('Lỗi cập nhật Mốc 1:', err);
+      message.error(errMsg);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  // 8. Chỉnh sửa trạng thái đơn (COMPLETED hoặc DRIVER_REJECTED)
   const handleUpdateOrderStatus = async (nextStatus: string, reason?: string) => {
     if (!currentOrder || isUpdatingStatus) return;
 
@@ -389,247 +411,17 @@ export const ShipperHubPage: React.FC = () => {
           )}
 
           {/* =========================================================================
-              VIEW 1: ACTIVE ORDER NAVIGATION (ĐƠN HÀNG ĐANG THỰC HIỆN)
+              VIEW 1: ACTIVE ORDER NAVIGATION (SP3-DRV-04)
              ========================================================================= */}
           {currentOrder && (
-            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
-              {/* Top Active Order Indicator */}
-              <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white p-4 rounded-3xl shadow-lg shadow-orange-500/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-white/20 p-2 rounded-full">
-                      <Bike className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-orange-100 block">
-                        ĐƠN HÀNG ĐANG THỰC HIỆN
-                      </span>
-                      <h2 className="text-base font-black leading-tight">
-                        #{currentOrder.orderCode}
-                      </h2>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-orange-100 block">Cước giao hàng</span>
-                    <span className="text-lg font-black">
-                      +{currentOrder.shippingFee.toLocaleString('vi-VN')} đ
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status Stepper */}
-                <div className="mt-4 pt-3 border-t border-white/20 grid grid-cols-3 gap-2 text-center text-[11px] font-bold">
-                  <div
-                    className={`py-1.5 rounded-lg transition-all ${
-                      currentOrder.statusCode === 'DRIVER_ACCEPTED'
-                        ? 'bg-white text-orange-700 shadow-sm'
-                        : 'bg-white/10 text-white'
-                    }`}
-                  >
-                    1. Tới quán
-                  </div>
-                  <div
-                    className={`py-1.5 rounded-lg transition-all ${
-                      currentOrder.statusCode === 'PICKING_UP'
-                        ? 'bg-white text-orange-700 shadow-sm'
-                        : 'bg-white/10 text-white'
-                    }`}
-                  >
-                    2. Lấy món
-                  </div>
-                  <div
-                    className={`py-1.5 rounded-lg transition-all ${
-                      currentOrder.statusCode === 'DELIVERING'
-                        ? 'bg-white text-orange-700 shadow-sm'
-                        : 'bg-white/10 text-white'
-                    }`}
-                  >
-                    3. Giao khách
-                  </div>
-                </div>
-              </div>
-
-              {/* Navigation Route & Contact Card */}
-              <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/80 space-y-4">
-                <div className="relative pl-6 space-y-4">
-                  <div className="absolute left-2.5 top-2 bottom-2 w-0.5 bg-slate-200"></div>
-
-                  {/* 1. Point of Pickup */}
-                  <div className="relative">
-                    <div className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-emerald-500 ring-4 ring-emerald-100"></div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-bold text-emerald-700 uppercase">
-                          ĐIỂM LẤY MÓN (NHÀ HÀNG)
-                        </p>
-                        <h3 className="font-bold text-slate-900 text-sm mt-0.5">
-                          {currentOrder.restaurantName}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                          {currentOrder.restaurantAddress}
-                        </p>
-                      </div>
-                      {currentOrder.restaurantPhone && (
-                        <a
-                          href={`tel:${currentOrder.restaurantPhone}`}
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all shrink-0"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Gọi quán</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 2. Point of Delivery */}
-                  <div className="relative">
-                    <div className="absolute -left-6 top-1 w-3.5 h-3.5 rounded-full bg-rose-500 ring-4 ring-rose-100"></div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-[10px] font-bold text-rose-700 uppercase">
-                          ĐIỂM GIAO MÓN (KHÁCH HÀNG)
-                        </p>
-                        <h3 className="font-bold text-slate-900 text-sm mt-0.5">
-                          {currentOrder.receiverName}
-                          {currentOrder.receiverPhone ? ` • ${currentOrder.receiverPhone}` : ''}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                          {currentOrder.receiverAddress}
-                        </p>
-                      </div>
-                      {currentOrder.receiverPhone && (
-                        <a
-                          href={`tel:${currentOrder.receiverPhone}`}
-                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition-all shrink-0"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Gọi khách</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Items & COD Checklist */}
-                <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-                    <span className="flex items-center gap-1">
-                      <Package className="w-3.5 h-3.5 text-slate-400" />
-                      Chi tiết món ({currentOrder.items.length})
-                    </span>
-                    <span className="text-slate-500">Khoảng cách: {currentOrder.distanceKm} km</span>
-                  </div>
-
-                  <div className="bg-slate-50 p-3 rounded-2xl space-y-1.5 text-xs">
-                    {currentOrder.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-start text-slate-800">
-                        <span className="font-medium">
-                          {item.quantity}x {item.name}
-                          {item.toppings && item.toppings.length > 0 && (
-                            <span className="text-[11px] text-slate-500 block">
-                              + {item.toppings.join(', ')}
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-bold">
-                          {(item.price * item.quantity).toLocaleString('vi-VN')} đ
-                        </span>
-                      </div>
-                    ))}
-
-                    {currentOrder.note && (
-                      <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-amber-800 bg-amber-50/80 p-2 rounded-xl flex items-start gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
-                        <span>Ghi chú: {currentOrder.note}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Payment / COD Info */}
-                <div
-                  className={`p-3.5 rounded-2xl flex items-center justify-between text-xs ${
-                    currentOrder.codAmount > 0
-                      ? 'bg-amber-50 border border-amber-200 text-amber-900'
-                      : 'bg-emerald-50 border border-emerald-200 text-emerald-900'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <DollarSign
-                      className={`w-4 h-4 ${
-                        currentOrder.codAmount > 0 ? 'text-amber-600' : 'text-emerald-600'
-                      }`}
-                    />
-                    <div>
-                      <span className="font-bold block">
-                        {currentOrder.codAmount > 0
-                          ? 'TIỀN MẶT CẦN THU (COD)'
-                          : 'KHÔNG THU TIỀN MẶT (0đ COD)'}
-                      </span>
-                      <span className="text-[11px] opacity-80">{formatPaymentLabel(currentOrder)}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-sm font-black">
-                      {currentOrder.codAmount > 0
-                        ? `${currentOrder.codAmount.toLocaleString('vi-VN')} đ`
-                        : '0 đ'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Progression Button (State Machine) */}
-              <div className="pt-2 space-y-2">
-                {currentOrder.statusCode === 'DRIVER_ACCEPTED' && (
-                  <>
-                    <button
-                      onClick={() => handleUpdateOrderStatus('PICKING_UP')}
-                      disabled={isUpdatingStatus}
-                      className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                    >
-                      <span>
-                        {isUpdatingStatus ? 'ĐANG CẬP NHẬT...' : '1. ĐÃ TỚI QUÁN & ĐANG LẤY MÓN'}
-                      </span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setIsReturnModalOpen(true)}
-                      disabled={isUpdatingStatus}
-                      className="w-full py-2.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 font-bold text-xs rounded-2xl transition-all cursor-pointer disabled:opacity-60"
-                    >
-                      Trả đơn / Không thể giao đơn này
-                    </button>
-                  </>
-                )}
-
-                {currentOrder.statusCode === 'PICKING_UP' && (
-                  <button
-                    onClick={() => handleUpdateOrderStatus('DELIVERING')}
-                    disabled={isUpdatingStatus}
-                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-black text-sm rounded-2xl shadow-lg shadow-orange-500/30 transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                  >
-                    <span>
-                      {isUpdatingStatus ? 'ĐANG CẬP NHẬT...' : '2. ĐÃ LẤY XONG & BẮT ĐẦU GIAO'}
-                    </span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                )}
-
-                {currentOrder.statusCode === 'DELIVERING' && (
-                  <button
-                    onClick={() => handleUpdateOrderStatus('COMPLETED')}
-                    disabled={isUpdatingStatus}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-600/30 transition-all active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    <span>
-                      {isUpdatingStatus ? 'ĐANG HOÀN TẤT...' : '3. ĐÃ GIAO THÀNH CÔNG & THU TIỀN'}
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
+            <ActiveDeliveryView
+              key={currentOrder.id}
+              order={currentOrder}
+              isUpdatingStatus={isUpdatingStatus}
+              onConfirmPickupAndDeliver={handleConfirmPickupAndDeliver}
+              onCompleteDelivery={() => handleUpdateOrderStatus('COMPLETED')}
+              onOpenReturnModal={() => setIsReturnModalOpen(true)}
+            />
           )}
 
           {/* =========================================================================
