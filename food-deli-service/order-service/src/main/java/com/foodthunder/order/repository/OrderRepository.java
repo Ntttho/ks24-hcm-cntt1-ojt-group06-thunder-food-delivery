@@ -53,4 +53,25 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate
     );
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.deletedAt IS NULL")
+    long countAllActiveOrders();
+
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.deletedAt IS NULL AND UPPER(o.status.code) = UPPER(:statusCode)")
+    long countActiveOrdersByStatusCode(@Param("statusCode") String statusCode);
+
+    @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.deletedAt IS NULL AND UPPER(o.status.code) = 'COMPLETED'")
+    java.math.BigDecimal sumCompletedTotalRevenue();
+
+    @Query("SELECT MONTH(o.createdAt), COALESCE(SUM(o.totalAmount), 0), COUNT(o.id) " +
+           "FROM Order o " +
+           "WHERE o.deletedAt IS NULL " +
+           "AND UPPER(o.status.code) = 'COMPLETED' " +
+           "AND o.createdAt >= :startDate AND o.createdAt < :endDate " +
+           "GROUP BY MONTH(o.createdAt) " +
+           "ORDER BY MONTH(o.createdAt) ASC")
+    List<Object[]> findMonthlyCompletedRevenueBetween(
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate
+    );
 }

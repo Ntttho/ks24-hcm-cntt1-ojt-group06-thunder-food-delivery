@@ -9,3 +9,4 @@ export * from './cloudinaryService';
 export * from './driverApi';
 export * from './revenueApi';
 export * from './adminApprovalApi';
+export * from './adminAnalyticsApi';

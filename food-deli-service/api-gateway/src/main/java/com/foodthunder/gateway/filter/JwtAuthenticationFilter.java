@@ -77,29 +77,46 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/drivers/**/location"
     );
 
+    private static final List<String> ADMIN_ONLY_PATTERNS = List.of(
+            "/api/v1/admin/**",
+            "/api/v1/users/admin/**",
+            "/api/v1/restaurants/admin/**",
+            "/api/v1/reviews/admin",
+            "/api/v1/reviews/admin/**"
+    );
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         String path = request.getURI().getPath();
         HttpMethod method = request.getMethod();
 
-        // 1. Check if path is public
-        if (isPublicPath(path, method)) {
-            // Optional: If Authorization header is provided, propagate user claims anyway
+        // 1. Check if path is public (admin endpoints must never bypass JWT validation)
+        if (!isAdminPath(path) && isPublicPath(path, method)) {
+            // Optional: If Authorization header is provided, propagate trusted user claims
             String authHeader = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 if (jwtUtil.validateToken(token)) {
                     Claims claims = jwtUtil.getClaims(token);
-                    ServerHttpRequest mutatedRequest = request.mutate()
-                            .header("X-User-Id", jwtUtil.extractUserId(claims))
-                            .header("X-User-Role", jwtUtil.extractRole(claims))
-                            .header("X-User-Phone", jwtUtil.extractPhone(claims))
-                            .build();
+                    ServerHttpRequest mutatedRequest = mutateWithIdentity(
+                            request,
+                            jwtUtil.extractUserId(claims),
+                            jwtUtil.extractRole(claims),
+                            jwtUtil.extractPhone(claims)
+                    );
                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
                 }
             }
-            return chain.filter(exchange);
+            // Strip spoofable internal identity headers from unauthenticated client requests
+            ServerHttpRequest sanitizedRequest = request.mutate()
+                    .headers(headers -> {
+                        headers.remove("X-User-Id");
+                        headers.remove("X-User-Role");
+                        headers.remove("X-User-Phone");
+                    })
+                    .build();
+            return chain.filter(exchange.mutate().request(sanitizedRequest).build());
         }
 
         // 2. Protected endpoint: Require valid Bearer token
@@ -120,13 +137,37 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String role = jwtUtil.extractRole(claims);
         String phone = jwtUtil.extractPhone(claims);
 
-        ServerHttpRequest mutatedRequest = request.mutate()
-                .header("X-User-Id", userId)
-                .header("X-User-Role", role)
-                .header("X-User-Phone", phone)
-                .build();
+        if (isAdminPath(path)) {
+            if (!jwtUtil.hasAdminRole(claims)) {
+                log.warn("Forbidden access attempt to admin path {} by userId={}, role={}", path, userId, role);
+                return onError(exchange, HttpStatus.FORBIDDEN, "Forbidden: Admin privileges required");
+            }
+            if (!jwtUtil.isAdminRoleName(role)) {
+                role = "ADMIN";
+            }
+        }
 
+        ServerHttpRequest mutatedRequest = mutateWithIdentity(request, userId, role, phone);
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
+    }
+
+    private ServerHttpRequest mutateWithIdentity(ServerHttpRequest request, String userId, String role, String phone) {
+        return request.mutate()
+                .headers(headers -> {
+                    headers.set("X-User-Id", userId);
+                    headers.set("X-User-Role", role);
+                    headers.set("X-User-Phone", phone);
+                })
+                .build();
+    }
+
+    private boolean isAdminPath(String path) {
+        for (String pattern : ADMIN_ONLY_PATTERNS) {
+            if (pathMatcher.match(pattern, path)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isPublicPath(String path, HttpMethod method) {

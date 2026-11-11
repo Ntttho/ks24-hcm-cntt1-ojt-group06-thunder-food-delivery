@@ -2,6 +2,7 @@ package com.foodthunder.order.client;
 
 import com.foodthunder.order.dto.ApiResponse;
 import com.foodthunder.order.dto.client.RemoteProductDto;
+import com.foodthunder.order.dto.client.RemoteRestaurantAnalyticsCountsDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
@@ -45,6 +46,18 @@ public class RestaurantClientFallbackFactory implements FallbackFactory<Restaura
             public ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> getVoucherById(Integer id) {
                 log.error("Fallback triggered for getVoucherById with id: {}, cause: {}", id, cause.getMessage());
                 throw new ResourceNotFoundException("Không thể lấy thông tin voucher ID=" + id + " từ restaurant-service: " + cause.getMessage());
+            }
+
+            @Override
+            public ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> getRestaurantAnalyticsCounts() {
+                log.warn("Fallback triggered for getRestaurantAnalyticsCounts, cause: {}",
+                        cause != null ? cause.getMessage() : "unknown");
+                RemoteRestaurantAnalyticsCountsDto fallbackData = RemoteRestaurantAnalyticsCountsDto.builder()
+                        .totalRestaurantsCount(0L)
+                        .totalFoodItemsCount(0L)
+                        .fallback(true)
+                        .build();
+                return ResponseEntity.ok(ApiResponse.success("Fallback restaurant-service analytics counts", fallbackData));
             }
         };
     }

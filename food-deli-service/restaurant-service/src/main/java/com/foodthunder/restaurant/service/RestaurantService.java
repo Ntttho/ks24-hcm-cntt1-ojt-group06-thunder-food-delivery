@@ -2,6 +2,7 @@ package com.foodthunder.restaurant.service;
 
 import com.foodthunder.restaurant.dto.CreateRestaurantRequest;
 import com.foodthunder.restaurant.dto.PageResponse;
+import com.foodthunder.restaurant.dto.RestaurantAnalyticsCountsDto;
 import com.foodthunder.restaurant.dto.RestaurantChangeRequestDto;
 import com.foodthunder.restaurant.dto.RestaurantDetailDto;
 import com.foodthunder.restaurant.dto.RestaurantDto;
@@ -34,4 +35,6 @@ public interface RestaurantService {
     RestaurantChangeRequestDto approveChangeRequest(Integer id, Integer adminId);
 
     RestaurantChangeRequestDto rejectChangeRequest(Integer id, Integer adminId, String rejectReason);
+
+    RestaurantAnalyticsCountsDto getAnalyticsCounts();
 }

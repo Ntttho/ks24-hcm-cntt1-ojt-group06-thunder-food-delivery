@@ -2,6 +2,7 @@ package com.foodthunder.auth.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.auth.dto.UpdateProfileRequest;
+import com.foodthunder.auth.dto.UserAnalyticsCountsDto;
 import com.foodthunder.auth.dto.UserDto;
 import com.foodthunder.auth.security.JwtProvider;
 import com.foodthunder.auth.service.AuthService;
@@ -90,5 +91,39 @@ class UserControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.fullName").value("New Customer Name"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/admin/analytics-counts với ROLE_ADMIN trả về 200 OK")
+    void getAnalyticsCounts_asAdmin_returns200() throws Exception {
+        UserAnalyticsCountsDto counts = UserAnalyticsCountsDto.builder()
+                .totalUsersCount(1250L)
+                .totalMerchantsCount(32L)
+                .build();
+        when(authService.getAnalyticsCounts()).thenReturn(counts);
+
+        mockMvc.perform(get("/api/v1/users/admin/analytics-counts")
+                        .header("X-User-Role", "ROLE_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data.totalUsersCount").value(1250))
+                .andExpect(jsonPath("$.data.totalMerchantsCount").value(32));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/admin/analytics-counts với CUSTOMER trả về 403 Forbidden")
+    void getAnalyticsCounts_asCustomer_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/users/admin/analytics-counts")
+                        .header("X-User-Role", "CUSTOMER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/users/admin/analytics-counts thiếu role header trả về 401 Unauthorized")
+    void getAnalyticsCounts_missingRoleHeader_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/users/admin/analytics-counts"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
     }
 }

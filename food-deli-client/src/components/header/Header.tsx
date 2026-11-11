@@ -17,6 +17,7 @@ import {
   HistoryOutlined,
   StarOutlined,
   AuditOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -68,6 +69,9 @@ export const Header: React.FC = () => {
         break;
       case 'admin-portal':
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        break;
+      case 'admin-analytics':
+        navigate(APP_ROUTES.ADMIN_ANALYTICS);
         break;
       case 'admin-approvals':
         navigate(APP_ROUTES.ADMIN_APPROVALS);
@@ -131,6 +135,11 @@ export const Header: React.FC = () => {
           Trang Quản trị Hệ thống (Admin Portal)
         </span>
       ),
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-analytics',
+      icon: <BarChartOutlined className="text-emerald-600 text-base" />,
+      label: <span className="font-bold text-emerald-700">Thống kê & Tổng thu sàn</span>,
     });
     roleSpecificMenuItems.push({
       key: 'admin-approvals',
@@ -392,13 +401,22 @@ export const Header: React.FC = () => {
                   </Link>
                 )}
                 {isAdmin && (
-                  <Link
-                    to={APP_ROUTES.ADMIN_DASHBOARD}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
-                  >
-                    <DashboardOutlined /> Trang Quản trị (Admin Portal)
-                  </Link>
+                  <>
+                    <Link
+                      to={APP_ROUTES.ADMIN_ANALYTICS}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
+                    >
+                      <BarChartOutlined /> Thống kê & Tổng thu sàn
+                    </Link>
+                    <Link
+                      to={APP_ROUTES.ADMIN_DASHBOARD}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
+                    >
+                      <DashboardOutlined /> Trang Quản trị (Admin Portal)
+                    </Link>
+                  </>
                 )}
                 <Link
                   to={APP_ROUTES.PROFILE}
