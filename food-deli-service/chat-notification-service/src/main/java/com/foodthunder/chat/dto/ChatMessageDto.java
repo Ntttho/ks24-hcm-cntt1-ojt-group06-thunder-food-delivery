@@ -1,4 +1,4 @@
-package com.foodthunder.order.dto;
+package com.foodthunder.chat.dto;
 
 import lombok.*;
 

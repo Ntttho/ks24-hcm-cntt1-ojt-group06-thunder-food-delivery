@@ -54,8 +54,14 @@ spring:
           predicates:
             - Path=/api/v1/reviews/**
 
-        # 7. Realtime Chat & Notification Service (Hosted on order-service)
+        # 7. Realtime Chat & Notification WebSocket Hub Service
         - id: chat-notification-service-route
-          uri: lb://order-service
+          uri: lb://chat-notification-service
           predicates:
-            - Path=/api/v1/chat/**
+            - Path=/api/v1/chat/**,/api/v1/notifications/**
+
+        # 7b. Chat & Realtime WebSocket Route (STOMP Hub)
+        - id: chat-notification-service-ws-route
+          uri: lb:ws://chat-notification-service
+          predicates:
+            - Path=/ws,/ws/**,/ws-food-deli,/ws-food-deli/**

@@ -27,6 +27,7 @@
         <module>restaurant-service</module>
         <module>order-service</module>
         <module>review-service</module>
+        <module>chat-notification-service</module>
     </modules>
 
     <properties>

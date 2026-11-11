@@ -1,9 +1,10 @@
-package com.foodthunder.order.service;
+package com.foodthunder.chat.service.impl;
 
-import com.foodthunder.order.dto.ChatMessageDto;
-import com.foodthunder.order.dto.SendMessageRequest;
-import com.foodthunder.order.entity.ChatMessage;
-import com.foodthunder.order.repository.ChatMessageRepository;
+import com.foodthunder.chat.dto.ChatMessageDto;
+import com.foodthunder.chat.dto.SendMessageRequest;
+import com.foodthunder.chat.entity.ChatMessage;
+import com.foodthunder.chat.repository.ChatMessageRepository;
+import com.foodthunder.chat.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -13,9 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ChatServiceImpl implements ChatService {
 
     private final ChatMessageRepository chatMessageRepository;
@@ -25,6 +26,15 @@ public class ChatServiceImpl implements ChatService {
     @Transactional(readOnly = true)
     public List<ChatMessageDto> getOrderChatHistory(Long orderId) {
         return chatMessageRepository.findByOrderIdOrderByCreatedAtAsc(orderId)
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ChatMessageDto> getShopChatHistory(Long shopId) {
+        return chatMessageRepository.findByShopIdOrderByCreatedAtAsc(shopId)
                 .stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
@@ -50,11 +60,26 @@ public class ChatServiceImpl implements ChatService {
             String destination = "/topic/chat/" + request.getOrderId();
             messagingTemplate.convertAndSend(destination, dto);
             log.info("Broadcasted chat message {} to {}", saved.getId(), destination);
+
+            // Also broadcast to shop channel if shopId is provided
+            if (request.getShopId() != null) {
+                messagingTemplate.convertAndSend("/topic/shop/" + request.getShopId(), dto);
+            }
         } catch (Exception e) {
             log.warn("Failed to broadcast chat message via WebSocket: {}", e.getMessage());
         }
 
         return dto;
+    }
+
+    @Override
+    public void broadcastTopicMessage(String topic, Object payload) {
+        try {
+            messagingTemplate.convertAndSend(topic, payload);
+            log.info("Broadcasted generic event to topic: {}", topic);
+        } catch (Exception e) {
+            log.warn("Failed to broadcast to topic {}: {}", topic, e.getMessage());
+        }
     }
 
     private ChatMessageDto mapToDto(ChatMessage entity) {

@@ -1,4 +1,4 @@
-package com.foodthunder.order.entity;
+package com.foodthunder.chat.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,19 +19,19 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "order_id")
+    private Long orderId;
+
     @Column(name = "sender_id", nullable = false)
     private Long senderId;
 
     @Column(name = "shop_id")
     private Long shopId;
 
-    @Column(name = "order_id", nullable = false)
-    private Long orderId;
-
-    @Column(name = "message", length = 1000, nullable = false)
+    @Column(name = "message", nullable = false, length = 1000)
     private String message;
 
-    @Column(name = "sender_role", length = 20, nullable = false)
+    @Column(name = "sender_role", nullable = false, length = 20)
     private String senderRole;
 
     @Column(name = "is_read")
@@ -39,6 +39,6 @@ public class ChatMessage {
     private Boolean isRead = false;
 
     @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 }
