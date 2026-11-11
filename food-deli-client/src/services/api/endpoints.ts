@@ -101,4 +101,15 @@ export const API_ENDPOINTS = {
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
   },
+  // Admin Portal & Approvals (SP3-ADM-02)
+  ADMIN: {
+    CHANGE_REQUESTS: '/restaurants/change-requests',
+    CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
+    APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,
+    REJECT_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/reject`,
+    DRIVER_APPROVALS: '/drivers/approvals',
+    DRIVER_APPROVAL_DETAIL: (userId: number | string) => `/drivers/${userId}/approval`,
+    APPROVE_DRIVER: (userId: number | string) => `/drivers/${userId}/approve`,
+    REJECT_DRIVER: (userId: number | string) => `/drivers/${userId}/reject`,
+  },
 } as const;

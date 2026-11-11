@@ -10,5 +10,7 @@ import java.util.List;
 public interface RestaurantChangeRequestRepository extends JpaRepository<RestaurantChangeRequest, Integer> {
     List<RestaurantChangeRequest> findByRestaurantId(Integer restaurantId);
     List<RestaurantChangeRequest> findByRequestedBy(Integer requestedBy);
+    List<RestaurantChangeRequest> findAllByOrderByCreatedAtDesc();
+    List<RestaurantChangeRequest> findByStatusOrderByCreatedAtDesc(String status);
 }
 

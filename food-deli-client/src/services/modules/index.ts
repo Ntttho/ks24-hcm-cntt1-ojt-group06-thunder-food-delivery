@@ -8,3 +8,4 @@ export * from './cartApi';
 export * from './cloudinaryService';
 export * from './driverApi';
 export * from './revenueApi';
+export * from './adminApprovalApi';

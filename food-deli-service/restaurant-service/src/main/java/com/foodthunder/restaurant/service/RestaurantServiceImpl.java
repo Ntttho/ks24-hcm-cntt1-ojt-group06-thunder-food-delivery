@@ -300,4 +300,128 @@ public class RestaurantServiceImpl implements RestaurantService {
             log.warn("Lỗi khi ghi nhận restaurant_change_requests: {}", e.getMessage());
         }
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RestaurantChangeRequestDto> getChangeRequests(String status) {
+        List<RestaurantChangeRequest> list;
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            list = restaurantChangeRequestRepository.findByStatusOrderByCreatedAtDesc(status.trim().toUpperCase());
+        } else {
+            list = restaurantChangeRequestRepository.findAllByOrderByCreatedAtDesc();
+        }
+        return list.stream()
+                .map(this::mapToChangeRequestDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RestaurantChangeRequestDto getChangeRequestById(Integer id) {
+        RestaurantChangeRequest req = restaurantChangeRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thay đổi với ID: " + id));
+        return mapToChangeRequestDto(req);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantChangeRequestDto approveChangeRequest(Integer id, Integer adminId) {
+        RestaurantChangeRequest req = restaurantChangeRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thay đổi với ID: " + id));
+
+        req.setStatus("APPROVED");
+        req.setReviewedBy(adminId != null ? adminId : 1);
+        req.setReviewedAt(LocalDateTime.now());
+        req.setRejectReason(null);
+        RestaurantChangeRequest saved = restaurantChangeRequestRepository.save(req);
+
+        // Apply changes to Shop
+        shopRepository.findById(req.getRestaurantId()).ifPresent(shop -> {
+            shop.setApprovalStatus("APPROVED");
+            shop.setApprovedBy(adminId != null ? adminId : 1);
+            shop.setApprovedAt(LocalDateTime.now());
+            shop.setRejectReason(null);
+
+            try {
+                if (req.getPayload() != null && !req.getPayload().isBlank()) {
+                    Map<?, ?> data = objectMapper.readValue(req.getPayload(), Map.class);
+                    if (data.containsKey("name") && data.get("name") != null) {
+                        shop.setName(String.valueOf(data.get("name")));
+                    }
+                    if (data.containsKey("address") && data.get("address") != null) {
+                        shop.setAddress(String.valueOf(data.get("address")));
+                    }
+                    if (data.containsKey("imageUrl") && data.get("imageUrl") != null) {
+                        shop.setImageUrl(String.valueOf(data.get("imageUrl")));
+                    }
+                    if (data.containsKey("latitude") && data.get("latitude") != null) {
+                        shop.setLatitude(Double.valueOf(String.valueOf(data.get("latitude"))));
+                    }
+                    if (data.containsKey("longitude") && data.get("longitude") != null) {
+                        shop.setLongitude(Double.valueOf(String.valueOf(data.get("longitude"))));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Không thể parse payload khi phê duyệt shop: {}", e.getMessage());
+            }
+
+            shopRepository.save(shop);
+        });
+
+        return mapToChangeRequestDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public RestaurantChangeRequestDto rejectChangeRequest(Integer id, Integer adminId, String rejectReason) {
+        RestaurantChangeRequest req = restaurantChangeRequestRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy yêu cầu thay đổi với ID: " + id));
+
+        req.setStatus("REJECTED");
+        req.setReviewedBy(adminId != null ? adminId : 1);
+        req.setReviewedAt(LocalDateTime.now());
+        req.setRejectReason(rejectReason != null ? rejectReason : "Hồ sơ không đáp ứng tiêu chuẩn sàn");
+        RestaurantChangeRequest saved = restaurantChangeRequestRepository.save(req);
+
+        shopRepository.findById(req.getRestaurantId()).ifPresent(shop -> {
+            shop.setApprovalStatus("REJECTED");
+            shop.setRejectReason(rejectReason);
+            shopRepository.save(shop);
+        });
+
+        return mapToChangeRequestDto(saved);
+    }
+
+    private RestaurantChangeRequestDto mapToChangeRequestDto(RestaurantChangeRequest req) {
+        Map<String, Object> payloadData = null;
+        String restaurantName = null;
+        if (req.getPayload() != null && !req.getPayload().isBlank()) {
+            try {
+                payloadData = objectMapper.readValue(req.getPayload(), Map.class);
+                if (payloadData != null && payloadData.containsKey("name")) {
+                    restaurantName = String.valueOf(payloadData.get("name"));
+                }
+            } catch (Exception ignored) {}
+        }
+
+        if (restaurantName == null && req.getRestaurantId() != null) {
+            restaurantName = shopRepository.findById(req.getRestaurantId())
+                    .map(Shop::getName)
+                    .orElse("Quán ăn #" + req.getRestaurantId());
+        }
+
+        return RestaurantChangeRequestDto.builder()
+                .id(req.getId())
+                .restaurantId(req.getRestaurantId())
+                .restaurantName(restaurantName)
+                .requestedBy(req.getRequestedBy())
+                .payload(req.getPayload())
+                .payloadData(payloadData)
+                .status(req.getStatus())
+                .reviewedBy(req.getReviewedBy())
+                .reviewedAt(req.getReviewedAt())
+                .rejectReason(req.getRejectReason())
+                .createdAt(req.getCreatedAt())
+                .build();
+    }
 }

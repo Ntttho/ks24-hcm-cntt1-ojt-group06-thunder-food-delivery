@@ -22,6 +22,7 @@ import {
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
+  AdminApprovalPage,
   ShipperHubPage,
   ShipperHistoryPage,
   AdminRestaurantReviewsPage,
@@ -73,6 +74,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <AdminUserPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_APPROVALS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminApprovalPage />
           </ProtectedRoute>
         ),
       },

@@ -14,6 +14,7 @@ export const APP_ROUTES = {
   RESTAURANT_REVIEWS: '/restaurants/:id/reviews',
   USERS: '/users',
   ADMIN_USERS: '/admin/users',
+  ADMIN_APPROVALS: '/admin/approvals',
   CART: '/cart',
   CHECKOUT: '/checkout',
   ORDERS: '/orders',
