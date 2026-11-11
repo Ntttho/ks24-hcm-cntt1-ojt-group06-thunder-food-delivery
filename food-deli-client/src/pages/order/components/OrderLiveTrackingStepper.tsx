@@ -21,12 +21,12 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
     <div className="py-2">
       <div className="bg-orange-50/70 border border-orange-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
             <ClockCircleOutlined />
           </div>
           <div>
             <div className="text-xs font-bold text-orange-800 uppercase tracking-wider">
-              Trạng thái hiện tại
+              Trạng thái thời gian thực
             </div>
             <div className="font-bold text-gray-900 text-base">{statusText}</div>
           </div>
@@ -39,26 +39,32 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
         )}
       </div>
 
+      {/* Live Stepper 5 bước tự động nhảy trạng thái */}
       <Steps
         current={current}
         status={isError ? 'error' : undefined}
         responsive
+        className="font-medium"
         items={[
           {
-            title: 'Đặt đơn',
-            description: 'Đơn đã xác nhận',
+            title: 'Chờ nhận',
+            description: 'Đơn chờ tiếp nhận',
           },
           {
-            title: 'Quán chế biến',
-            description: 'Đang nấu món',
+            title: 'Đang nấu',
+            description: 'Quán đang chế biến',
           },
           {
-            title: 'Đang giao hàng',
-            description: 'Tài xế đang đến',
+            title: 'Tài xế nhận',
+            description: 'Shipper đã nhận đơn',
           },
           {
-            title: 'Giao thành công',
-            description: 'Thưởng thức món ngon',
+            title: 'Đang giao',
+            description: 'Giao hỏa tốc tới bạn',
+          },
+          {
+            title: 'Đã giao',
+            description: 'Giao hàng thành công',
           },
         ]}
       />

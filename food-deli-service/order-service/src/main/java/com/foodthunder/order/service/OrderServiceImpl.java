@@ -49,6 +49,9 @@ public class OrderServiceImpl implements OrderService {
     private final RestaurantClient restaurantClient;
     private final SimpMessagingTemplate messagingTemplate;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.foodthunder.order.client.NotificationClient notificationClient;
+
     public OrderServiceImpl(
             OrderRepository orderRepository,
             OrderStatusRepository orderStatusRepository,
@@ -677,9 +680,23 @@ public class OrderServiceImpl implements OrderService {
     private void broadcastOrderToMerchant(Order order) {
         try {
             OrderResponse response = mapToOrderResponse(order);
+            // 1. Broadcast to merchant topic
             String destination = "/topic/merchant/" + order.getRestaurantId() + "/orders";
             messagingTemplate.convertAndSend(destination, response);
-            log.info("Broadcasted realtime order {} to {}", order.getOrderCode(), destination);
+
+            // 2. Broadcast to customer live tracking topic: /topic/orders/{orderId}
+            String orderTrackingDestination = "/topic/orders/" + order.getId();
+            messagingTemplate.convertAndSend(orderTrackingDestination, response);
+
+            // 3. Forward to central WebSocket Hub (chat-notification-service)
+            if (notificationClient != null) {
+                try {
+                    notificationClient.broadcastEvent(new com.foodthunder.order.client.NotificationClient.BroadcastRequest(orderTrackingDestination, response));
+                    notificationClient.broadcastEvent(new com.foodthunder.order.client.NotificationClient.BroadcastRequest(destination, response));
+                } catch (Exception ignored) {}
+            }
+
+            log.info("Broadcasted realtime order {} to {} and {}", order.getOrderCode(), destination, orderTrackingDestination);
         } catch (Exception e) {
             log.warn("Failed to broadcast WebSocket order message: {}", e.getMessage());
         }

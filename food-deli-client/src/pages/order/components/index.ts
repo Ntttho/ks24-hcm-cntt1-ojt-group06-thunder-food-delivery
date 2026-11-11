@@ -6,3 +6,4 @@ export * from './OrderItemsBreakdown';
 export * from './RestaurantReviewModal';
 export * from './DriverReviewModal';
 export * from './OrderReviewModal';
+export * from './OrderChatDrawer';
