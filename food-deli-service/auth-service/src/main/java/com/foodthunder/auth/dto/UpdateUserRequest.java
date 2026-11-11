@@ -11,3 +11,4 @@ public record UpdateUserRequest(
         String role,
         String status
 ) {}
+

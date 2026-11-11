@@ -4,3 +4,4 @@ public record UpdateUserStatusRequest(
         String status, // "ACTIVE" or "LOCKED"
         Boolean isActive
 ) {}
+

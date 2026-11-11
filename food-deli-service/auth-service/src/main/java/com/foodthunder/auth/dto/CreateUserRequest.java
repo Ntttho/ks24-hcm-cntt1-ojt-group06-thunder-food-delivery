@@ -26,3 +26,4 @@ public record CreateUserRequest(
 
         String status
 ) {}
+
