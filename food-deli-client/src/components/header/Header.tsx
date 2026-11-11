@@ -16,6 +16,7 @@ import {
   HomeOutlined,
   HistoryOutlined,
   StarOutlined,
+  AuditOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -67,6 +68,9 @@ export const Header: React.FC = () => {
         break;
       case 'admin-portal':
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        break;
+      case 'admin-approvals':
+        navigate(APP_ROUTES.ADMIN_APPROVALS);
         break;
       case 'admin-restaurant-reviews':
         navigate(APP_ROUTES.ADMIN_RESTAURANT_REVIEWS);
@@ -127,6 +131,11 @@ export const Header: React.FC = () => {
           Trang Quản trị Hệ thống (Admin Portal)
         </span>
       ),
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-approvals',
+      icon: <AuditOutlined className="text-amber-500 text-base" />,
+      label: <span className="font-bold text-slate-700">Kiểm duyệt Quán & Tài xế</span>,
     });
     roleSpecificMenuItems.push({
       key: 'admin-restaurant-reviews',

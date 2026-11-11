@@ -223,4 +223,56 @@ public class RestaurantController {
         RestaurantDto updated = restaurantService.updateRating(id, ratingAvg);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đánh giá nhà hàng thành công", updated));
     }
+
+    /**
+     * SP3-ADM-02: Lấy danh sách yêu cầu thay đổi / đăng ký mở quán (restaurant_change_requests)
+     * GET /api/v1/restaurants/change-requests?status=PENDING
+     */
+    @GetMapping("/change-requests")
+    public ResponseEntity<ApiResponse<List<RestaurantChangeRequestDto>>> getChangeRequests(
+            @RequestParam(required = false) String status
+    ) {
+        List<RestaurantChangeRequestDto> list = restaurantService.getChangeRequests(status);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách yêu cầu phê duyệt quán ăn thành công", list));
+    }
+
+    /**
+     * SP3-ADM-02: Lấy chi tiết yêu cầu thay đổi / mở quán
+     * GET /api/v1/restaurants/change-requests/{id}
+     */
+    @GetMapping("/change-requests/{id}")
+    public ResponseEntity<ApiResponse<RestaurantChangeRequestDto>> getChangeRequestById(@PathVariable Integer id) {
+        RestaurantChangeRequestDto detail = restaurantService.getChangeRequestById(id);
+        return ResponseEntity.ok(ApiResponse.success("Lấy chi tiết yêu cầu thành công", detail));
+    }
+
+    /**
+     * SP3-ADM-02: Phê duyệt yêu cầu mở quán / thay đổi thông tin quán (APPROVED)
+     * PUT /api/v1/restaurants/change-requests/{id}/approve
+     */
+    @PutMapping("/change-requests/{id}/approve")
+    public ResponseEntity<ApiResponse<RestaurantChangeRequestDto>> approveChangeRequest(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer adminId
+    ) {
+        RestaurantChangeRequestDto approved = restaurantService.approveChangeRequest(id, adminId);
+        return ResponseEntity.ok(ApiResponse.success("Phê duyệt hồ sơ quán ăn thành công", approved));
+    }
+
+    /**
+     * SP3-ADM-02: Từ chối yêu cầu mở quán / thay đổi thông tin quán (REJECTED) kèm lý do
+     * PUT /api/v1/restaurants/change-requests/{id}/reject
+     */
+    @PutMapping("/change-requests/{id}/reject")
+    public ResponseEntity<ApiResponse<RestaurantChangeRequestDto>> rejectChangeRequest(
+            @PathVariable Integer id,
+            @RequestHeader(value = "X-User-Id", required = false) Integer adminId,
+            @RequestBody(required = false) ReviewApprovalRequest request
+    ) {
+        String reason = (request != null && request.getRejectReason() != null)
+                ? request.getRejectReason().trim()
+                : "Hồ sơ không đáp ứng điều kiện sàn";
+        RestaurantChangeRequestDto rejected = restaurantService.rejectChangeRequest(id, adminId, reason);
+        return ResponseEntity.ok(ApiResponse.success("Đã từ chối hồ sơ quán ăn thành công", rejected));
+    }
 }

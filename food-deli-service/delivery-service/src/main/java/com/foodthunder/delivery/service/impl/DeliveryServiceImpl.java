@@ -512,5 +512,91 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .penaltyReason(acceptanceRate < 80.0 ? "AR (" + acceptanceRate + "%) < 80%" : (cancellationRate > 10.0 ? "CR (" + cancellationRate + "%) > 10%" : null))
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DriverApprovalDto> getDriverApprovals(String status) {
+        List<DriverDetail> list;
+        if (status != null && !status.trim().isEmpty() && !"ALL".equalsIgnoreCase(status.trim())) {
+            list = driverDetailRepository.findByApprovalStatusOrderByUserIdDesc(status.trim().toUpperCase());
+        } else {
+            list = driverDetailRepository.findAllByOrderByUserIdDesc();
+        }
+        return list.stream()
+                .map(this::mapToDriverApprovalDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DriverApprovalDto getDriverApprovalDetail(Integer userId) {
+        DriverDetail detail = driverDetailRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài xế với ID: " + userId));
+        return mapToDriverApprovalDto(detail);
+    }
+
+    @Override
+    @Transactional
+    public DriverApprovalDto approveDriver(Integer userId) {
+        DriverDetail detail = driverDetailRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài xế với ID: " + userId));
+
+        detail.setApprovalStatus("APPROVED");
+        detail.setRejectReason(null);
+        DriverDetail saved = driverDetailRepository.save(detail);
+        log.info("Admin đã phê duyệt tài xế #{}", userId);
+        return mapToDriverApprovalDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DriverApprovalDto rejectDriver(Integer userId, String rejectReason) {
+        DriverDetail detail = driverDetailRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài xế với ID: " + userId));
+
+        detail.setApprovalStatus("REJECTED");
+        detail.setRejectReason(rejectReason != null ? rejectReason : "Hồ sơ không đáp ứng điều kiện sàn");
+        DriverDetail saved = driverDetailRepository.save(detail);
+        log.info("Admin đã từ chối tài xế #{}, lý do: {}", userId, rejectReason);
+        return mapToDriverApprovalDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public DriverApprovalDto registerOrUpdateDriver(Integer userId, com.foodthunder.delivery.dto.request.DriverRegistrationRequest request) {
+        DriverDetail detail = driverDetailRepository.findByUserId(userId)
+                .orElseGet(() -> DriverDetail.builder()
+                        .userId(userId)
+                        .approvalStatus("PENDING")
+                        .isOnline(false)
+                        .build());
+
+        if (request.getLicensePlate() != null && !request.getLicensePlate().isBlank()) {
+            detail.setLicensePlate(request.getLicensePlate().trim());
+        }
+        if (request.getIdCardNumber() != null && !request.getIdCardNumber().isBlank()) {
+            detail.setIdCardNumber(request.getIdCardNumber().trim());
+        }
+        if (request.getVehicleType() != null && !request.getVehicleType().isBlank()) {
+            detail.setVehicleType(request.getVehicleType().trim());
+        }
+        detail.setApprovalStatus("PENDING");
+        detail.setRejectReason(null);
+
+        DriverDetail saved = driverDetailRepository.save(detail);
+        return mapToDriverApprovalDto(saved);
+    }
+
+    private DriverApprovalDto mapToDriverApprovalDto(DriverDetail detail) {
+        return DriverApprovalDto.builder()
+                .userId(detail.getUserId())
+                .licensePlate(detail.getLicensePlate())
+                .idCardNumber(detail.getIdCardNumber())
+                .vehicleType(detail.getVehicleType() != null ? detail.getVehicleType() : "Xe máy (Motorbike)")
+                .approvalStatus(detail.getApprovalStatus() != null ? detail.getApprovalStatus() : "PENDING")
+                .rejectReason(detail.getRejectReason())
+                .isOnline(detail.getIsOnline())
+                .build();
+    }
 }
 

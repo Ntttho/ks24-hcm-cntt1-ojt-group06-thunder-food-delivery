@@ -65,5 +65,30 @@ public interface DeliveryService {
      * Thống kê hiệu suất và thu nhập của tài xế.
      */
     DriverMetricsResponse getDriverMetrics(Integer driverId);
+
+    /**
+     * SP3-ADM-02: Lấy danh sách hồ sơ tài xế chờ duyệt hoặc lọc theo trạng thái.
+     */
+    List<DriverApprovalDto> getDriverApprovals(String status);
+
+    /**
+     * SP3-ADM-02: Lấy chi tiết hồ sơ tài xế theo userId.
+     */
+    DriverApprovalDto getDriverApprovalDetail(Integer userId);
+
+    /**
+     * SP3-ADM-02: Phê duyệt hồ sơ tài xế (APPROVED).
+     */
+    DriverApprovalDto approveDriver(Integer userId);
+
+    /**
+     * SP3-ADM-02: Từ chối hồ sơ tài xế (REJECTED) kèm lý do.
+     */
+    DriverApprovalDto rejectDriver(Integer userId, String rejectReason);
+
+    /**
+     * Đăng ký hoặc cập nhật hồ sơ xe / CCCD cho tài xế.
+     */
+    DriverApprovalDto registerOrUpdateDriver(Integer userId, com.foodthunder.delivery.dto.request.DriverRegistrationRequest request);
 }
 
