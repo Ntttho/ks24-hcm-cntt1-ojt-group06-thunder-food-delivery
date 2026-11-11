@@ -9,6 +9,7 @@ import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.*;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ConflictException;
 import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.exception.ResourceNotFoundException;
 import com.foodthunder.order.exception.UnauthorizedException;
@@ -456,18 +457,25 @@ public class OrderServiceImpl implements OrderService {
         log.info("Request status transition for order {}: {} -> {} (user: {}, role: {})",
                 orderId, currentStatus, targetStatus, requestingUserId, requestingUserRole);
 
-        // 1. If same status, no-op return
+        // 1. Chặn Race Condition khi nhiều tài xế cùng bấm nhận 1 đơn hàng
+        if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus)
+                && order.getDriverId() != null
+                && (requestingUserId == null || !order.getDriverId().equals(requestingUserId))) {
+            throw new ConflictException("Đơn hàng này đã được một tài xế khác nhận trước. Vui lòng chọn đơn khác!");
+        }
+
+        // 2. If same status, no-op return (only valid for same driver on DRIVER_ACCEPTED)
         if (currentStatus.equals(targetStatus)) {
             return mapToOrderResponse(order);
         }
 
-        // 2. Validate state machine transition graph
+        // 3. Validate state machine transition graph
         Set<String> allowedNext = ALLOWED_TRANSITIONS.getOrDefault(currentStatus, Collections.emptySet());
         if (!allowedNext.contains(targetStatus)) {
             throw new BadRequestException("Không thể chuyển trạng thái đơn hàng từ '" + currentStatus + "' sang '" + targetStatus + "'");
         }
 
-        // 3. RBAC validation based on user role
+        // 4. RBAC validation based on user role
         if (requestingUserRole != null && !requestingUserRole.isBlank()) {
             String roleUpper = requestingUserRole.toUpperCase();
             if (roleUpper.contains("CUSTOMER")) {
@@ -484,6 +492,24 @@ public class OrderServiceImpl implements OrderService {
             } else if (roleUpper.contains("DRIVER")) {
                 if (OrderStatus.CANCELLED.equals(targetStatus)) {
                     throw new BadRequestException("Tài xế không thể hủy đơn trực tiếp, vui lòng thực hiện qua quy trình trả đơn");
+                }
+                if (OrderStatus.CONFIRMED.equals(targetStatus)
+                        || OrderStatus.PENDING.equals(targetStatus)
+                        || OrderStatus.AWAITING_PAYMENT.equals(targetStatus)
+                        || OrderStatus.TIMEOUT.equals(targetStatus)) {
+                    throw new ForbiddenException("Tài xế không có quyền chuyển đơn sang trạng thái '" + targetStatus + "'");
+                }
+                if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus) && requestingUserId == null) {
+                    throw new UnauthorizedException("Thiếu thông tin định danh tài xế (X-User-Id)");
+                }
+                if ((OrderStatus.PICKING_UP.equals(targetStatus)
+                        || OrderStatus.DELIVERING.equals(targetStatus)
+                        || OrderStatus.COMPLETED.equals(targetStatus)
+                        || OrderStatus.DRIVER_REJECTED.equals(targetStatus))
+                        && order.getDriverId() != null
+                        && requestingUserId != null
+                        && !order.getDriverId().equals(requestingUserId)) {
+                    throw new ForbiddenException("Bạn không phải tài xế phụ trách đơn hàng này");
                 }
             } else if (roleUpper.contains("MERCHANT")) {
                 if (!OrderStatus.CONFIRMED.equals(targetStatus) && !OrderStatus.CANCELLED.equals(targetStatus)) {
