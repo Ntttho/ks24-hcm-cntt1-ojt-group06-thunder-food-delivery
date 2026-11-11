@@ -18,6 +18,7 @@ export interface User {
   phoneNumber?: string;
   avatarUrl?: string;
   ratingAvg?: number;
+  licensePlate?: string;
   roles?: string[];
   role: UserRole;
   status?: string;

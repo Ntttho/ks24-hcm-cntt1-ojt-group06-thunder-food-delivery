@@ -35,3 +35,4 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(500, "Lỗi hệ thống: " + ex.getMessage()));
     }
 }
+

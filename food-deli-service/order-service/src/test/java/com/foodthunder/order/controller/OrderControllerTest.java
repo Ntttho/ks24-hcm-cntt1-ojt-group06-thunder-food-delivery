@@ -135,6 +135,46 @@ class OrderControllerTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/orders/review-contexts returns all order items to admins")
+    void testGetReviewOrderContexts_AdminGetsBatchContext() throws Exception {
+        when(orderService.getReviewOrderContexts(List.of(100L))).thenReturn(List.of(
+                ReviewOrderContextResponse.builder()
+                        .orderId(100L)
+                        .restaurantId(5)
+                        .items(List.of(
+                                ReviewOrderContextResponse.Item.builder()
+                                        .foodId(10)
+                                        .foodName("Cơm tấm")
+                                        .quantity(2)
+                                        .build(),
+                                ReviewOrderContextResponse.Item.builder()
+                                        .foodId(11)
+                                        .foodName("Canh chua")
+                                        .quantity(1)
+                                        .build()))
+                        .build()));
+
+        mockMvc.perform(post("/api/v1/orders/review-contexts")
+                        .header("X-User-Role", "ROLE_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderIds\":[100]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].orderId").value(100))
+                .andExpect(jsonPath("$.data[0].items.length()").value(2))
+                .andExpect(jsonPath("$.data[0].items[1].foodName").value("Canh chua"));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/orders/review-contexts rejects non-admin roles")
+    void testGetReviewOrderContexts_RequiresAdminRole() throws Exception {
+        mockMvc.perform(post("/api/v1/orders/review-contexts")
+                        .header("X-User-Role", "ROLE_CUSTOMER")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderIds\":[100]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("PUT /api/v1/orders/{id}/status trả về 200 OK khi cập nhật trạng thái hợp lệ")
     void testUpdateOrderStatusEndpoint_Success() throws Exception {
         UpdateOrderStatusRequest request = UpdateOrderStatusRequest.builder()

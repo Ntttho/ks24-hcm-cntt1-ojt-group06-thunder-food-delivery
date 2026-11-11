@@ -821,21 +821,27 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
 
 ### 13.1. Gửi đánh giá sau đơn hàng
 * **Endpoint:** `POST /api/v1/reviews`
-* **Quyền hạn:** `ROLE_CUSTOMER`, `ROLE_ADMIN`
-* **Request Body:**
-```json
-{
-  "orderId": 5001,
-  "targetType": "RESTAURANT",
-  "targetId": 10,
-  "rating": 5,
-  "comment": "Trà sữa đậm vị, trân châu dẻo thơm, đóng gói cẩn thận 10/10!"
-}
-```
+* **Quyền hạn:** `ROLE_CUSTOMER`
+* **Request Body:** Gồm `orderId`, `restaurantReview` (1–5 sao, nhận xét, món ăn, ảnh) và tùy chọn `driverReview`.
 
-### 13.2. Xem đánh giá & Tóm tắt sao của quán
-* **Endpoint:** `GET /api/v1/reviews/restaurants/summary?restaurantId=10`
-* **Endpoint:** `GET /api/v1/reviews/restaurants/{restaurantId}` (Danh sách bình luận).
+### 13.2. Xem đánh giá & Tóm tắt sao
+* `GET /api/v1/reviews/restaurants/{restaurantId}` — danh sách đánh giá nhà hàng.
+* `GET /api/v1/reviews/restaurants/{restaurantId}/summary` — thống kê đánh giá nhà hàng.
+* `GET /api/v1/reviews/admin?targetType=RESTAURANT|DRIVER&page=0&size=10` — danh sách dành cho Admin (`ROLE_ADMIN`).
+* `GET /api/v1/reviews/admin/{id}` — chi tiết đánh giá dành cho Admin.
+
+### 13.3. Xóa đánh giá & đồng bộ điểm trung bình
+* **Endpoint:** `DELETE /api/v1/reviews/admin/{id}`
+* **Quyền hạn:** `ROLE_ADMIN`
+* **Thành công:** HTTP 200, trả về `ApiResponse` với `data: null`; điểm trung bình của nhà hàng hoặc tài xế được tính lại từ các đánh giá còn lại.
+* **Lỗi:** HTTP 401/403 nếu thiếu quyền, HTTP 404 nếu không tìm thấy đánh giá.
+
+Đánh giá tài xế có thể bao gồm `quickTags`; các thẻ này được lưu và trả về cùng dữ liệu đánh giá.
+
+### 13.4. Cập nhật điểm trung bình nội bộ
+* `PUT /api/v1/restaurants/{id}/rating?ratingAvg={value}` — chỉ `ROLE_ADMIN`.
+* `PUT /api/v1/users/{id}/rating?ratingAvg={value}` — chỉ `ROLE_ADMIN`.
+* Đây là các API đồng bộ nội bộ được review-service gọi sau khi xóa đánh giá.
 
 ---
 

@@ -11,3 +11,4 @@ public interface ChatService {
     ChatMessageDto sendMessage(SendMessageRequest request);
     void broadcastTopicMessage(String topic, Object payload);
 }
+

@@ -13,3 +13,4 @@ public class ChatNotificationServiceApplication {
         SpringApplication.run(ChatNotificationServiceApplication.class, args);
     }
 }
+

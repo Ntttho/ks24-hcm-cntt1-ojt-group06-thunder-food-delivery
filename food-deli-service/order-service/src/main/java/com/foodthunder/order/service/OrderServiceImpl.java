@@ -365,6 +365,29 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ReviewOrderContextResponse> getReviewOrderContexts(List<Long> orderIds) {
+        List<Long> uniqueOrderIds = orderIds.stream().distinct().toList();
+        if (uniqueOrderIds.isEmpty()) {
+            return List.of();
+        }
+
+        return orderRepository.findAllWithItemsByIdIn(uniqueOrderIds).stream()
+                .map(order -> ReviewOrderContextResponse.builder()
+                        .orderId(order.getId())
+                        .restaurantId(order.getRestaurantId())
+                        .items(order.getItems().stream()
+                                .map(item -> ReviewOrderContextResponse.Item.builder()
+                                        .foodId(item.getFoodId())
+                                        .foodName(item.getFoodName())
+                                        .quantity(item.getQuantity())
+                                        .build())
+                                .toList())
+                        .build())
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getOrders(Integer restaurantId, Integer driverId, String statusCode, String keyword, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
 

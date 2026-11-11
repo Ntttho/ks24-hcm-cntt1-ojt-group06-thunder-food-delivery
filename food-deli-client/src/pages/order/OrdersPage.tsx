@@ -3,91 +3,15 @@ import { Button, Spin, Empty, Typography } from 'antd';
 import { ReloadOutlined, ShoppingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { orderApi } from '@/services/modules/orderApi';
+import { restaurantApi } from '@/services/modules/restaurantApi';
 import { CustomerOrderCard, OrderFilterBar } from './components';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
 
 const { Title, Text } = Typography;
 
-// Sample fallback orders if backend has not created orders yet for this user
-const DEMO_MY_ORDERS: CustomerOrder[] = [
-  {
-    id: 101,
-    orderCode: '#ORD-2026110301',
-    customerId: 1,
-    restaurantId: 1,
-    restaurantName: 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi',
-    receiverAddress: '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-    distanceKm: 2.3,
-    subtotalAmount: 147000,
-    shippingFee: 18000,
-    discountAmount: 15000,
-    totalAmount: 150000,
-    paymentMethod: 'COD',
-    statusCode: 'DELIVERING',
-    statusLabel: 'Đang giao hàng',
-    createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: 1,
-        foodId: 1,
-        foodName: 'Cơm Tấm Sườn Bì Chả Đặc Biệt',
-        quantity: 1,
-        priceAtOrder: 87000,
-        toppings: [
-          { id: 1, toppingId: 101, name: 'Ốp la lòng đào', quantity: 1, price: 8000 },
-          { id: 2, toppingId: 102, name: 'Thêm mỡ hành giòn', quantity: 1, price: 5000 },
-        ],
-      },
-      {
-        id: 2,
-        foodId: 2,
-        foodName: 'Canh Khổ Qua Nhồi Thịt',
-        quantity: 1,
-        priceAtOrder: 35000,
-      },
-      {
-        id: 3,
-        foodId: 3,
-        foodName: 'Trà Tắc Xí Muội Khổng Lồ',
-        quantity: 1,
-        priceAtOrder: 25000,
-      },
-    ],
-  },
-  {
-    id: 98,
-    orderCode: '#ORD-2026110288',
-    customerId: 1,
-    restaurantId: 2,
-    restaurantName: 'The Alley Tea House - Quận 3',
-    receiverAddress: '123 Cách Mạng Tháng 8, Phường 5, Quận 3, TP.HCM',
-    distanceKm: 1.5,
-    subtotalAmount: 110000,
-    shippingFee: 15000,
-    discountAmount: 0,
-    totalAmount: 125000,
-    paymentMethod: 'VNPAY',
-    statusCode: 'DELIVERED',
-    statusLabel: 'Giao thành công',
-    driverId: 2,
-    driverName: 'Nguyễn Văn Shipper - Giao Hàng Siêu Tốc',
-    driverPhone: '0912345678',
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    items: [
-      {
-        id: 4,
-        foodId: 10,
-        foodName: 'Sữa Tươi Trân Châu Đường Đen',
-        quantity: 2,
-        priceAtOrder: 55000,
-        toppings: [
-          { id: 3, toppingId: 201, name: 'Trân châu đường đen thêm', quantity: 1, price: 10000 },
-        ],
-      },
-    ],
-  },
-];
+// In-memory restaurant name cache across renders
+const restaurantNameCache = new Map<number, string>();
 
 export const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
@@ -100,7 +24,22 @@ export const OrdersPage: React.FC = () => {
   const fetchMyOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await orderApi.getMyOrders({ page: 0, size: 20 });
+      // 1. Preload restaurant directory in cache if empty
+      if (restaurantNameCache.size === 0) {
+        try {
+          const res = await restaurantApi.getAllRestaurantsNoPaging();
+          const shopList = Array.isArray(res?.data) ? res.data : [];
+          shopList.forEach((shop) => {
+            if (shop.id && shop.name) {
+              restaurantNameCache.set(Number(shop.id), shop.name);
+            }
+          });
+        } catch {
+          // ignore error to keep order loading uninterrupted
+        }
+      }
+
+      const response = await orderApi.getMyOrders({ page: 0, size: 50 });
       const apiData = response?.data;
       const list = Array.isArray(apiData)
         ? apiData
@@ -109,43 +48,83 @@ export const OrdersPage: React.FC = () => {
         : [];
 
       if (list && list.length > 0) {
-        const mappedOrders: CustomerOrder[] = list.map((item: any) => ({
-          id: item.id,
-          orderCode: item.orderCode || `#ORD-${item.id}`,
-          customerId: item.customerId,
-          customerName: item.customerName,
-          customerPhone: item.customerPhone,
-          restaurantId: item.restaurantId,
-          restaurantName: item.restaurantName || (item.restaurantId === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : `Quán ăn #${item.restaurantId}`),
-          driverId: item.driverId ? Number(item.driverId) : undefined,
-          driverName: item.driverName || (item.driverId ? `Tài xế đối tác #${item.driverId}` : undefined),
-          driverPhone: item.driverPhone,
-          receiverAddress: item.receiverAddress || 'Địa chỉ giao hàng mặc định',
-          distanceKm: item.distanceKm,
-          subtotalAmount: Number(item.subtotalAmount || 0),
-          shippingFee: Number(item.shippingFee || 0),
-          discountAmount: Number(item.discountAmount || 0),
-          totalAmount: Number(item.totalAmount || 0),
-          paymentMethod: item.paymentMethod || 'COD',
-          statusCode: item.statusCode || 'PENDING',
-          statusLabel: item.statusLabel || item.statusCode,
-          cancelReason: item.cancelReason,
-          createdAt: item.createdAt || new Date().toISOString(),
-          items: (item.items || []).map((it: any) => ({
-            id: it.id,
-            foodId: it.foodId,
-            foodName: it.foodName || 'Món ăn',
-            quantity: it.quantity || 1,
-            priceAtOrder: Number(it.priceAtOrder || 0),
-            toppings: (it.toppings || []).map((tp: any) => ({
-              id: tp.id,
-              toppingId: tp.toppingId,
-              name: tp.name || `Topping #${tp.toppingId}`,
-              quantity: tp.quantity || 1,
-              price: Number(tp.price || 0),
+        const mappedOrders: CustomerOrder[] = list.map((item: any) => {
+          const rId = item.restaurantId ? Number(item.restaurantId) : 1;
+          const resolvedShopName =
+            item.restaurantName ||
+            restaurantNameCache.get(rId) ||
+            (rId === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : `Quán ăn #${rId}`);
+
+          return {
+            id: item.id,
+            orderCode: item.orderCode || `#ORD-${item.id}`,
+            customerId: item.customerId,
+            customerName: item.customerName,
+            customerPhone: item.customerPhone,
+            restaurantId: rId,
+            restaurantName: resolvedShopName,
+            driverId: item.driverId ? Number(item.driverId) : undefined,
+            driverName: item.driverName || (item.driverId ? `Tài xế đối tác #${item.driverId}` : undefined),
+            driverPhone: item.driverPhone,
+            receiverAddress: item.receiverAddress || 'Địa chỉ giao hàng mặc định',
+            distanceKm: item.distanceKm,
+            subtotalAmount: Number(item.subtotalAmount || 0),
+            shippingFee: Number(item.shippingFee || 0),
+            discountAmount: Number(item.discountAmount || 0),
+            totalAmount: Number(item.totalAmount || 0),
+            paymentMethod: item.paymentMethod || 'COD',
+            statusCode: item.statusCode || 'PENDING',
+            statusLabel: item.statusLabel || item.statusCode,
+            cancelReason: item.cancelReason,
+            createdAt: item.createdAt || new Date().toISOString(),
+            items: (item.items || []).map((it: any) => ({
+              id: it.id,
+              foodId: it.foodId,
+              foodName: it.foodName || 'Món ăn',
+              quantity: it.quantity || 1,
+              priceAtOrder: Number(it.priceAtOrder || 0),
+              toppings: (it.toppings || []).map((tp: any) => ({
+                id: tp.id,
+                toppingId: tp.toppingId,
+                name: tp.name || `Topping #${tp.toppingId}`,
+                quantity: tp.quantity || 1,
+                price: Number(tp.price || 0),
+              })),
             })),
-          })),
-        }));
+          };
+        });
+
+        // Asynchronously enrich missing shop names if any
+        const missingShopIds = Array.from(
+          new Set(
+            mappedOrders
+              .filter((o) => (o.restaurantName || '').startsWith('Quán ăn #'))
+              .map((o) => o.restaurantId)
+          )
+        );
+
+        if (missingShopIds.length > 0) {
+          Promise.all(
+            missingShopIds.map(async (shopId) => {
+              try {
+                const shopRes = await restaurantApi.getById(shopId);
+                if (shopRes?.data?.name) {
+                  restaurantNameCache.set(shopId, shopRes.data.name);
+                }
+              } catch {
+                // ignore
+              }
+            })
+          ).then(() => {
+            setOrders((prev) =>
+              prev.map((o) => ({
+                ...o,
+                restaurantName: restaurantNameCache.get(o.restaurantId) || o.restaurantName,
+              }))
+            );
+          });
+        }
+
         setOrders(mappedOrders);
       } else {
         setOrders([]);
@@ -161,7 +140,7 @@ export const OrdersPage: React.FC = () => {
     fetchMyOrders();
   }, [fetchMyOrders]);
 
-  // Tab Filtering
+  // Tab Filtering & Search by Restaurant Name / Order Code / Dish Name
   const filteredOrders = useMemo(() => {
     let result = orders;
 
@@ -184,7 +163,8 @@ export const OrdersPage: React.FC = () => {
       result = result.filter(
         (o) =>
           o.orderCode.toLowerCase().includes(q) ||
-          (o.restaurantName && o.restaurantName.toLowerCase().includes(q))
+          (o.restaurantName && o.restaurantName.toLowerCase().includes(q)) ||
+          o.items.some((it) => it.foodName && it.foodName.toLowerCase().includes(q))
       );
     }
 

@@ -33,3 +33,4 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success("Phát sự kiện thành công", null));
     }
 }
+

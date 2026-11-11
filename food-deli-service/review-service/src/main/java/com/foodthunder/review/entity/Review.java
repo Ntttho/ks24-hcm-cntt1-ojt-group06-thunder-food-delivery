@@ -55,8 +55,10 @@ public class Review {
     @Column(name = "images_json", columnDefinition = "TEXT")
     private String imagesJson;
 
+    @Column(name = "quick_tags_json", columnDefinition = "TEXT")
+    private String quickTagsJson;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 }
-

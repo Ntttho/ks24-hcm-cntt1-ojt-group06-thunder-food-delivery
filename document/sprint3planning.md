@@ -8,28 +8,27 @@
 
 ---
 
-## 🎯 I. MỤC TIÊU CỐT LÕI CỦA SPRINT 3 (SPRINT 3 GOALS)
+## 🎯 I. MỤC TIÊU CỐT LÕI CỦA SPRINT 3 (SPRINT 3 GOALS - ĐÃ CHUẨN HÓA CHI TIẾT)
 
-Mục tiêu tối thượng của Sprint 3 là:
-1. **Hoàn thiện toàn bộ tất cả các module dành cho Tài xế (`driver` / `delivery-service`)**:
-   - Xây dựng hoàn chỉnh microservice `delivery-service` (Port 8084).
-   - Triển khai cơ chế **Khóa bi quan (`SELECT ... FOR UPDATE`)** xử lý triệt để bài toán tranh chấp đơn hàng (Race Condition) khi nhiều tài xế cùng bấm nhận 1 đơn tại cùng một thời điểm.
-   - Hiện thực hóa trọn vẹn quy trình giao hàng ảo hóa (Virtual Delivery Workflow): Nhận đơn $\rightarrow$ Lấy món $\rightarrow$ Đang giao $\rightarrow$ Giao thành công & Thu tiền COD.
-   - Lập trình bộ máy tính toán chỉ số hiệu suất tài xế: Tỷ lệ nhận cuốc (Acceptance Rate - AR) và Tỷ lệ hủy cuốc (Cancellation Rate - CR) trên cửa sổ trượt 100 đơn (Rolling Window).
-   - Xây dựng giao diện **Shipper Web Hub** tối ưu trên thiết bị di động: Radar quét đơn khả dụng, bảng điều khiển lộ trình giao hàng, thống kê ví thu nhập tài xế.
-2. **Hoàn thiện toàn bộ tất cả các module dành cho Quản trị viên (`admin` / Admin Portal)**:
-   - Quản trị tài khoản người dùng toàn sàn: Tìm kiếm, phân trang, đổi vai trò (Role), khóa / mở khóa tài khoản vi phạm.
-   - Phân hệ phê duyệt hồ sơ: Kiểm duyệt hồ sơ mở quán ăn mới và hồ sơ đăng ký tài xế mới gia nhập nền tảng.
-   - Cấu hình tham số toàn hệ thống: Biểu phí giao hàng mặc định, phí tính thêm mỗi km, tỷ lệ chiết khấu hoa hồng sàn.
-   - Quản trị toàn bộ đánh giá hệ thống: Xem, tìm kiếm, lọc theo đối tượng quán / xế, ẩn / xóa đánh giá vi phạm tiêu chuẩn cộng đồng.
-3. **Khắc phục dứt điểm toàn bộ các lỗi tồn đọng ở Merchant và Admin**:
-   - **Merchant:** Sửa lỗi chuyển đổi chi nhánh (Branch Switcher đa quán) không ăn khớp dữ liệu; sửa lỗi nút Bật/Tắt Còn hàng - Hết hàng của món ăn; ổn định chuông báo âm thanh WebSocket STOMP ("ding-dong"); hoàn thiện trang báo cáo doanh thu đa quán (`/merchant/analytics`).
-   - **Admin & Customer:** Bổ sung hiển thị trực quan Tag `<Tag color="default">Không có tài xế</Tag>` kèm Tooltip giải thích trên màn hình Lịch sử đơn hàng khi đơn hoàn tất mà không qua shipper, giải tỏa hoàn toàn thắc mắc của khách hàng về nút đánh giá tài xế.
-4. **Tích hợp Theo dõi Thời gian thực (Live Tracking) & Trò chuyện Trực tiếp (Chat)**:
-   - Màn hình `/orders/:id` tự động cập nhật tiến trình 5 bước qua WebSocket STOMP mà không cần tải lại trang.
-   - Widget Chat 2 chiều thời gian thực giữa Khách hàng $\leftrightarrow$ Quán ăn / Tài xế.
-5. **Đóng gói Docker Compose Production & Nghiệm thu toàn diện**:
-   - Toàn bộ 10 microservices, CSDL MySQL 8.0, Redis và Frontend Client khởi chạy hoàn hảo chỉ bằng 1 câu lệnh `docker compose up -d --build`.
+Mục tiêu Sprint 3 được định vị cụ thể gồm 3 phân hệ chính:
+1. **Phân hệ Quản trị viên (Admin Portal):**
+   - **Quản lý người dùng (CRUD Toàn Diện):** Xem danh sách phân trang, tìm kiếm, lọc role, Thêm mới tài khoản, Sửa thông tin & vai trò, Khóa/Mở khóa hoặc Xóa tài khoản.
+   - **Giao diện Quản lý Tổng thu & Chỉ số Hệ thống (Admin System Analytics Dashboard):**
+     - Sơ đồ/Biểu đồ biến động doanh thu toàn sàn tính theo tháng.
+     - Thống kê các chỉ số cốt lõi: Số lượng người dùng, Số lượng nhà hàng, Số lượng đối tác kinh doanh (Merchants), Tỷ lệ đơn thành công / tổng đơn đặt hàng, Số lượng món ăn toàn sàn.
+   - **Quản lý Đánh giá Review Xem & Xóa (Tách biệt 2 trang chuyên biệt):**
+     - Trang 1: Quản lý đánh giá Nhà hàng (`/admin/reviews/restaurants`): Xem chi tiết số sao, món ăn gắn kèm, hình ảnh và nút xóa đánh giá vi phạm.
+     - Trang 2: Quản lý đánh giá Tài xế (`/admin/reviews/drivers`): Xem chi tiết số sao, thẻ nhận xét nhanh (quick tags), thông tin tài xế và nút xóa đánh giá vi phạm.
+2. **Phân hệ Tài xế (Driver Hub - Giả Lập Tính Năng Hoàn Chỉnh):**
+   - **Quản lý lịch sử đơn hàng của tài xế:** Danh sách các cuốc xe đã hoàn tất, tiền ship thu về, tiền COD đã nộp.
+   - **Cơ chế nhận đơn 1-chạm & Ràng buộc Đơn duy nhất (Single Active Order):** Dừng hiển thị danh sách đơn mới trên radar khi tài xế đã và đang nhận 1 đơn hàng (`DRIVER_ACCEPTED`, `PICKING_UP`, `DELIVERING`). Chỉ mở lại radar khi đã bấm hoàn thành cuốc hiện tại.
+   - **Chỉnh sửa trạng thái đơn trực quan, dễ hiểu:** Các nút bấm/trượt chuyển mốc trạng thái tuần tự rõ ràng: *"Đến quán lấy món"* $\rightarrow$ *"Bắt đầu đi giao"* $\rightarrow$ *"Giao thành công & Thu tiền COD"*.
+   - **Tính năng Soạn tin nhắn Chat 2 chiều:** Tài xế chat trực tiếp với Khách hàng và Khách hàng chat trực tiếp với Tài xế trên màn hình đơn hàng.
+3. **Khắc phục dứt điểm toàn bộ lỗi tồn đọng của dự án:**
+   - Bổ sung Tag chú thích `<Tag color="default">Không có tài xế</Tag>` kèm Tooltip giải thích khi đơn hoàn tất mà không qua shipper, giải tỏa hoàn toàn thắc mắc về nút đánh giá tài xế.
+   - Sửa lỗi đa chi nhánh (Branch Switcher) trên Merchant Portal.
+   - Sửa lỗi nút Toggle Còn hàng / Hết hàng của món ăn.
+   - Tối ưu chuông báo âm thanh WebSocket STOMP ("ding-dong") cho Merchant.
 
 ---
 
@@ -393,112 +392,151 @@ CREATE TABLE `driver_offers` (
 
 ## 🛡️ V. CHI TIẾT MODULE 2: PHÂN HỆ QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN PORTAL)
 
-### 1. Phân Hệ Quản Lý Người Dùng Toàn Sàn (`/admin/users`)
+### 1. Phân Hệ Quản Lý Người Dùng Toàn Sàn (CRUD Toàn Diện - `/admin/users`)
 
-#### Chức năng:
-- Hiển thị danh sách toàn bộ tài khoản người dùng trong hệ thống (Khách hàng, Chủ quán, Tài xế, Quản trị viên).
-- Lọc theo Role, tìm kiếm theo Tên, Email hoặc Số điện thoại.
-- Thao tác khóa / mở khóa tài khoản: Khi khóa tài khoản, người dùng sẽ bị từ chối đăng nhập và vô hiệu hóa các token JWT đang phát hành.
+#### Chức năng nghiệp vụ:
+- **Xem danh sách (Read):** Hiển thị bảng người dùng phân trang, tìm kiếm theo Tên, Email, Số điện thoại và lọc theo vai trò (`ROLE_CUSTOMER`, `ROLE_MERCHANT`, `ROLE_DRIVER`, `ROLE_ADMIN`).
+- **Thêm mới tài khoản (Create):** Modal thêm người dùng mới với các trường: Họ và tên, Email, Số điện thoại, Mật khẩu ban đầu và Vai trò gán cho tài khoản.
+- **Chỉnh sửa thông tin (Update):** Modal sửa thông tin cá nhân và thay đổi/bổ sung vai trò quản trị/đối tác.
+- **Khóa / Mở khóa & Xóa (Delete / Status):** Thao tác khóa tài khoản vi phạm (ngăn đăng nhập, thu hồi quyền) hoặc xóa mềm tài khoản khỏi hệ thống.
 
-#### Chi tiết API:
-- `GET /api/v1/admin/users?page=0&size=10&role=ROLE_MERCHANT&keyword=pho`
-- `PUT /api/v1/admin/users/{userId}/toggle-status` (Body: `{"isActive": false, "reason": "Vi phạm chính sách"}`)
-
----
-
-### 2. Phân Hệ Phê Duyệt Hồ Sơ Đối Tác (`/admin/approvals`)
-
-#### Bảng 1: Phê duyệt Quán Ăn Mới (`restaurant_change_requests`)
-- Khi một chủ quán đăng ký quán mới hoặc sửa đổi thông tin pháp lý/địa chỉ quán, bản ghi được ghi nhận vào bảng `restaurant_change_requests` với trạng thái `PENDING`.
-- Admin xem xét: Tên quán, địa chỉ, ảnh mặt tiền, giờ hoạt động, giấy phép đăng ký kinh doanh.
-- API Thao tác:
-  - `GET /api/v1/admin/approvals/restaurants?status=PENDING`
-  - `POST /api/v1/admin/approvals/restaurants/{requestId}/action`
-    - Body duyệt: `{"decision": "APPROVED", "note": "Hồ sơ hợp lệ"}` $\rightarrow$ Quán ăn được tạo mới hoặc kích hoạt `is_active = 1` trong bảng `restaurants`.
-    - Body từ chối: `{"decision": "REJECTED", "note": "Ảnh chụp giấy tờ mờ, vui lòng gửi lại"}`.
-
-#### Bảng 2: Phê duyệt Hồ Sơ Tài Xế Mới (`driver_details`)
-- Khi người dùng đăng ký làm tài xế, hồ sơ được tạo với trạng thái `PENDING`.
-- Admin kiểm tra: Biển số xe, số CCCD, giấy phép lái xe, loại phương tiện.
-- API Thao tác:
-  - `GET /api/v1/admin/approvals/drivers?status=PENDING`
-  - `POST /api/v1/admin/approvals/drivers/{driverId}/action` (Body: `{"decision": "ACTIVE", "note": "Hồ sơ đạt yêu cầu"}`).
+#### Chi tiết API CRUD Người Dùng:
+- `GET /api/v1/users?page=0&size=10&role=ROLE_MERCHANT&search=pho`: Lấy danh sách phân trang.
+- `POST /api/v1/users`: Thêm người dùng mới (Body: `fullName`, `email`, `phone`, `password`, `roles`).
+- `PUT /api/v1/users/{id}`: Cập nhật thông tin và vai trò người dùng.
+- `PUT /api/v1/users/{id}/status`: Khóa hoặc mở khóa tài khoản (Body: `{"isActive": boolean, "reason": string}`).
+- `DELETE /api/v1/users/{id}`: Xóa người dùng.
 
 ---
 
-### 3. Cấu Hình Tham Số Toàn Sàn (`/admin/settings`)
+### 2. Giao Diện Quản Lý Tổng Thu & Chỉ Số Toàn Sàn (Admin Analytics Dashboard - `/admin/analytics`)
 
-#### Bảng CSDL `system_settings`:
-```sql
-CREATE TABLE `system_settings` (
-  `id` INT NOT NULL AUTO_INCREMENT,
-  `setting_key` VARCHAR(100) NOT NULL,
-  `setting_value` TEXT NOT NULL,
-  `description` VARCHAR(255) DEFAULT NULL,
-  `updated_by` INT DEFAULT NULL,
-  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `unique_setting_key` (`setting_key`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+#### Các chỉ số thống kê cốt lõi (Metric Cards):
+1. **Tổng doanh thu toàn sàn:** Tổng giá trị giao dịch của các đơn hàng thành công (`COMPLETED`) và biểu đồ cột/đường biến động doanh thu 12 tháng gần nhất trong năm.
+2. **Số lượng người dùng (Users Count):** Tổng số tài khoản khách hàng và thành viên đã đăng ký trong hệ thống.
+3. **Số lượng nhà hàng (Restaurants Count):** Tổng số chi nhánh quán ăn đang hoạt động (`is_active = 1`).
+4. **Đối tác hợp tác kinh doanh (Merchants Count):** Số lượng chủ quán đối tác sở hữu gian hàng trên hệ thống.
+5. **Số lượng đơn thành công / Tổng đơn đặt hàng:** Tỷ lệ phần trăm và số lượng cụ thể $\frac{\text{Đơn COMPLETED}}{\text{Tổng số đơn (PENDING + CONFIRMED + COMPLETED + CANCELLED)}} \times 100\%$.
+6. **Số lượng món ăn toàn sàn (Food Items Count):** Tổng số món ăn có trong thực đơn của tất cả các nhà hàng.
 
-INSERT INTO `system_settings` (`setting_key`, `setting_value`, `description`) VALUES
-('BASE_SHIPPING_FEE', '15000', 'Phí giao hàng cơ bản cho 2km đầu tiên (VNĐ)'),
-('PER_KM_SHIPPING_FEE', '5000', 'Phí giao hàng tính thêm cho mỗi km tiếp theo (VNĐ)'),
-('PLATFORM_COMMISSION_RATE', '20.0', 'Tỷ lệ hoa hồng chiết khấu sàn trên đơn món (%)'),
-('DRIVER_EARNING_RATE', '80.0', 'Tỷ lệ thu nhập tài xế nhận trên phí ship (%)'),
-('SEARCH_RADIUS_KM', '5.0', 'Bán kính tối đa điều phối tài xế (km)');
+#### API Thống kê Toàn Sàn:
+- `GET /api/v1/admin/analytics/summary`: Trả về toàn bộ các con số thống kê tổng hợp:
+```json
+{
+  "status": 200,
+  "message": "Lấy số liệu thống kê hệ thống thành công",
+  "data": {
+    "totalRevenue": 158420000.00,
+    "monthlyRevenue": [
+      { "month": "01/2026", "revenue": 10200000.00 },
+      { "month": "02/2026", "revenue": 12500000.00 },
+      { "month": "03/2026", "revenue": 15800000.00 },
+      { "month": "11/2026", "revenue": 24800000.00 }
+    ],
+    "totalUsersCount": 1250,
+    "totalRestaurantsCount": 48,
+    "totalMerchantsCount": 32,
+    "completedOrdersCount": 890,
+    "totalOrdersCount": 940,
+    "orderSuccessRate": 94.68,
+    "totalFoodItemsCount": 420
+  },
+  "timestamp": "2026-11-09T01:00:00.000Z"
+}
 ```
 
-#### API Cấu hình:
-- `GET /api/v1/admin/settings`: Lấy toàn bộ tham số.
-- `PUT /api/v1/admin/settings`: Cập nhật giá trị tham số (Headers: `X-User-Role: ROLE_ADMIN`).
+---
+
+### 3. Quản Trị Đánh Giá Hệ Thống: Xem & Xóa (Tách Biệt 2 Trang Chuyên Biệt)
+
+Để quản lý đánh giá một cách minh bạch, phân hệ Admin được tách thành 2 trang độc lập:
+
+#### 🔹 Trang 1: Quản lý Đánh giá Quán Ăn (`/admin/reviews/restaurants`)
+- **Chức năng:**
+  - Hiển thị danh sách các bài đánh giá dành cho Quán ăn (`target_type = 'RESTAURANT'`).
+  - Hiển thị chi tiết: Tên khách hàng, Tên quán ăn, Món ăn được gắn kèm (`food_item_id` / `foodName`), Số sao (1 - 5★), Nội dung nhận xét, Hình ảnh đính kèm, Thời gian đánh giá.
+  - Bộ lọc: Lọc theo Quán ăn, lọc theo Số sao (1 - 5★), tìm kiếm theo Mã đơn hàng hoặc Tên khách.
+  - **Thao tác Xóa Đánh Giá:** Nút bấm màu đỏ có modal xác nhận. Khi xóa, bản ghi đánh giá vi phạm bị xóa khỏi bảng `reviews` và hệ thống tự động tính lại điểm sao trung bình của quán.
+- **API Endpoints:**
+  - `GET /api/v1/reviews/admin?targetType=RESTAURANT&page=0&size=10&rating=1`
+  - `DELETE /api/v1/reviews/admin/{reviewId}` (Quyền `ROLE_ADMIN`).
+
+#### 🔹 Trang 2: Quản lý Đánh giá Tài Xế (`/admin/reviews/drivers`)
+- **Chức năng:**
+  - Hiển thị danh sách các bài đánh giá dành cho Tài xế (`target_type = 'DRIVER'`).
+  - Hiển thị chi tiết: Tên khách hàng, Tên tài xế, Biển số xe tài xế, Số sao (1 - 5★), Thẻ nhận xét nhanh (Quick Tags: *"Giao hàng siêu nhanh"*, *"Thân thiện lịch sự"*, *"Đúng giờ"*...), Nội dung góp ý, Thời gian đánh giá.
+  - Bộ lọc: Lọc theo Tài xế, lọc theo Số sao (1 - 5★), tìm kiếm theo Mã đơn hàng hoặc Tên tài xế.
+  - **Thao tác Xóa Đánh Giá:** Nút bấm Xóa đánh giá có modal xác nhận. Khi xóa, bản ghi bị xóa khỏi bảng `reviews` và hệ thống tự động tính lại điểm uy tín của tài xế.
+- **API Endpoints:**
+  - `GET /api/v1/reviews/admin?targetType=DRIVER&page=0&size=10&rating=1`
+  - `DELETE /api/v1/reviews/admin/{reviewId}` (Quyền `ROLE_ADMIN`).
 
 ---
 
-### 4. Quản Trị Toàn Bộ Đánh Giá Hệ Thống (`/admin/reviews`)
-
-#### Quyền hạn Quản trị:
-- Xem danh sách toàn bộ các đánh giá của khách hàng trong hệ thống (gồm cả đánh giá Nhà hàng và đánh giá Tài xế).
-- Tìm kiếm theo mã đơn hàng, tên khách hàng, tên quán ăn hoặc tên tài xế.
-- Lọc theo số sao (1★, 2★, 3★, 4★, 5★) và loại đối tượng (`RESTAURANT` hoặc `DRIVER`).
-- Quyền xóa hoặc ẩn đánh giá: Khi phát hiện đánh giá chứa từ ngữ xúc phạm hoặc hình ảnh vi phạm tiêu chuẩn cộng đồng, Admin có quyền bấm **"Ẩn đánh giá"** hoặc **"Xóa đánh giá"**.
-
-#### API Quản trị Đánh giá:
-- `GET /api/v1/reviews/admin?page=0&size=10&targetType=RESTAURANT&rating=1&search=te`
-- `DELETE /api/v1/reviews/admin/{reviewId}` (Headers: `X-User-Role: ROLE_ADMIN`).
+### 4. Cấu Hình Tham Số Toàn Sàn (`/admin/settings`)
+*(Cấu hình phí ship cơ bản, phí km phát sinh, tỷ lệ hoa hồng sàn như đặc tả ở mục trên)*.
 
 ---
 
-## 🔧 VI. CHI TIẾT MODULE 3: KHẮC PHỤC LỖI TỒN ĐỌNG Ở MERCHANT & ADMIN
+## 🛵 VI. CHI TIẾT MODULE 1 (CẬP NHẬT): PHÂN HỆ TÀI XẾ (DRIVER HUB GIẢ LẬP)
 
-### 1. Sửa Lỗi Đa Chi Nhánh (Multi-Shop Branch Switcher) Của Merchant
-- **Lỗi hiện tại:** Khi chủ quán sở hữu nhiều chi nhánh (`GET /api/v1/restaurants/mine`), việc bấm chọn quán khác trên dropdown không tự động cập nhật lại thực đơn và đơn hàng của chi nhánh đó, gây nhầm lẫn chi nhánh xử lý.
-- **Giải pháp xử lý:**
-  1. Trong Redux store `merchantSlice.ts`, khai báo state `selectedRestaurantId: number | null`.
-  2. Lưu giá trị `selectedRestaurantId` vào `localStorage` để giữ nguyên ngữ cảnh khi F5.
-  3. Khi người dùng thay đổi chi nhánh trên Dropdown:
-     - Dispatch `setSelectedRestaurantId(newId)`.
-     - Kích hoạt gọi lại đồng thời: `fetchOrdersByRestaurant(newId)` và `fetchMenuByRestaurant(newId)`.
+### 1. Quản Lý Lịch Sử Đơn Hàng Của Tài Xế (`/driver/history`)
+- Hiển thị toàn bộ các cuốc xe tài xế đã từng tiếp nhận và hoàn tất.
+- Thông tin mỗi cuốc: Mã đơn hàng, Tên quán ăn, Địa chỉ giao hàng, Phí giao hàng thu về, Hình thức thanh toán (Tiền mặt COD đã thu / VietQR chuyển khoản), Thời điểm hoàn thành.
+- Tổng kết thu nhập: Thẻ tổng kết số cuốc xe hoàn thành và tổng số tiền ship tích lũy trong ngày và trong tuần.
+- API: `GET /api/v1/delivery/driver/orders?driverId={id}&page=0&size=10`
 
 ---
 
-### 2. Sửa Lỗi Nút Toggle Trạng Thái Còn Hàng / Hết Hàng Của Món Ăn
-- **Lỗi hiện tại:** Trên bảng danh sách món ăn của Merchant (`/merchant/products`), bấm gạt switch Còn hàng / Hết hàng thỉnh thoảng bị reset về trạng thái cũ hoặc không lưu vào CSDL.
-- **Giải pháp xử lý:**
-  - Kết nối trực tiếp vào API `PUT /api/v1/products/{id}/status` với body `{"isAvailable": boolean}`.
-  - Áp dụng kỹ thuật Optimistic UI Update: Đổi state Switch ngay lập tức trên giao diện, nếu API trả về lỗi thì mới rollback lại trạng thái cũ kèm thông báo Toast cảnh báo.
+### 2. Radar Nhận Đơn & Ràng Buộc Đơn Duy Nhất (Single Active Order Constraint)
+- **Quy tắc vàng (Single Active Order):** Một tài xế tại một thời điểm **chỉ được nhận và xử lý tối đa 1 đơn hàng duy nhất**.
+- **Hành vi giao diện:**
+  - Khi tài xế **chưa nhận đơn nào** (trạng thái rảnh): Radar bật quét và hiển thị danh sách các đơn hàng mới đang chờ tài xế quanh khu vực kèm nút "NHẬN ĐƠN NGAY".
+  - Khi tài xế **vừa bấm nhận thành công 1 đơn** (đơn chuyển `DRIVER_ACCEPTED`, `PICKING_UP`, `DELIVERING`):
+    - Radar **DỪNG HIỂN THỊ TOÀN BỘ CÁC ĐƠN KHÁC**.
+    - Toàn bộ giao diện tự động khóa và chuyển sang chế độ **Bảng điều khiển cuốc xe đang giao (Active Delivery Dashboard)**.
+    - Tài xế không thể thấy hay nhận thêm bất kỳ đơn mới nào khác cho đến khi hoàn tất đơn hiện tại.
 
 ---
 
-### 3. Tối Ưu Hóa Chuông Báo Âm Thanh WebSocket STOMP Cho Merchant
-- **Lỗi hiện tại:** Do chính sách Autoplay Audio Policy của trình duyệt hiện đại (Chrome/Edge), âm thanh chuông "ding-dong" khi có đơn hàng mới thường bị trình duyệt chặn nếu người dùng chưa tương tác với trang web.
-- **Giải pháp xử lý:**
-  1. Khởi tạo một đối tượng `AudioContext` toàn cục ngay khi người dùng click lần đầu vào bất kỳ vị trí nào trên Dashboard Merchant:
-     ```typescript
-     window.addEventListener('click', () => {
-       if (audioContext.state === 'suspended') {
-         audioContext.resume();
-       }
+### 3. Chỉnh Sửa Trạng Thái Đơn Trực Quan, Dễ Hiểu
+Giao diện điều hướng lộ trình cuốc xe loại bỏ các thuật ngữ kỹ thuật phức tạp, thay bằng các nút bấm trạng thái hành động rõ ràng theo từng mốc:
+1. **Mốc 1 (Khi vừa nhận đơn - `DRIVER_ACCEPTED`):**
+   - Hiển thị thông tin Quán ăn (Tên quán, Địa chỉ, Số điện thoại quán, Nút mở Google Maps dẫn đường tới quán).
+   - Nút hành động trực quan màu cam: **"TÔI ĐÃ ĐẾN QUÁN LẤY MÓN"** $\rightarrow$ Click chuyển đơn sang `PICKING_UP` hoặc `DELIVERING`.
+2. **Mốc 2 (Khi đã lấy món - `DELIVERING`):**
+   - Hiển thị thông tin Khách hàng (Tên khách, Địa chỉ nhận hàng, Số điện thoại khách, Nút gọi điện thoại, Nút mở khung Chat trực tiếp với khách).
+   - Nút hành động trực quan màu xanh lá: **"GIAO THÀNH CÔNG & THU TIỀN COD"** $\rightarrow$ Click xác nhận đã giao đồ ăn tận tay khách và thu đủ số tiền mặt (nếu là đơn COD) $\rightarrow$ Chuyển đơn sang `COMPLETED`.
+   - Sau khi hoàn tất, hệ thống tự động đưa tài xế trở về màn hình Radar để tiếp tục quét tìm các đơn mới.
+
+---
+
+### 4. Tính Năng Soạn Tin Nhắn Chat 2 Chiều Giữa Khách Hàng Và Tài Xế
+- **Giao diện Chat Khách $\leftrightarrow$ Xế:**
+  - Trên màn hình Khách hàng (`/orders/:id`): Có nút bấm hình bong bóng chat "Chat với tài xế".
+  - Trên màn hình Tài xế (`ActiveDeliveryView`): Có nút bấm "Nhắn tin cho khách".
+  - Khi bấm, mở cửa sổ hộp thoại Chat nổi (Floating Chat Modal) hỗ trợ:
+    - Soạn thảo và gửi tin nhắn tức thì qua WebSocket STOMP.
+    - Các mẫu tin nhắn nhanh (Quick replies): *"Tôi đang trên đường giao tới bạn"*, *"Tôi đã tới trước cửa nhà/tòa nhà"*, *"Xin lỗi bạn đường hơi kẹt xe"*.
+    - Lưu trữ lịch sử tin nhắn vào CSDL bảng `chat_messages`.
+
+---
+
+## 🔧 VII. CHI TIẾT MODULE 3: KHẮC PHỤC LỖI TỒN ĐỌNG CỦA DỰ ÁN
+
+### 1. Bổ Sung Tag Chú Thích "Không Có Tài Xế" Cho Đơn Hoàn Tất
+- **Vấn đề:** Khi đơn hàng hoàn tất mà không có shipper nhận đơn (`driverId == null`), nút "Đánh giá tài xế" bị ẩn khiến người dùng thắc mắc.
+- **Giải pháp:** Tại `CustomerOrderCard.tsx` và `OrderDetailPage.tsx`, khi `isCompleted` mà `!order.driverId`, hiển thị thẻ Tag xám:
+  `<Tag color="default"><InfoCircleOutlined /> Không có tài xế</Tag>` kèm Tooltip *"Đơn hàng này không có tài xế giao nên không cần đánh giá tài xế"*, giải tỏa hoàn toàn thắc mắc của người dùng.
+
+### 2. Sửa Lỗi Đa Chi Nhánh (Branch Switcher) Của Merchant
+- Cố định lưu trữ `selectedRestaurantId` vào localStorage và Redux Toolkit, tự động đồng bộ lại danh sách đơn và thực đơn khi đổi quán.
+
+### 3. Sửa Lỗi Nút Toggle Trạng Thái Còn Hàng / Hết Hàng Của Món Ăn
+- Kết nối trực tiếp vào API `PUT /api/v1/products/{id}/status`, áp dụng Optimistic UI update.
+
+### 4. Tối Ưu Hóa Chuông Báo Âm Thanh WebSocket STOMP Cho Merchant
+- Unlock `AudioContext` ngay từ tương tác đầu tiên của người dùng, bổ sung Banner notification trượt cảnh báo đơn mới.
      }, { once: true });
      ```
   2. Bổ sung chuông báo thị giác: Ngoài âm thanh, hiển thị Banner thông báo trượt từ trên xuống (Ant Design `notification.open`) với nút bấm trực tiếp vào đơn hàng vừa nhận.
@@ -597,7 +635,7 @@ CREATE TABLE `chat_messages` (
 
 ---
 
-## 🧪 IX. KẾ HOẠCH KIỂM THỬ TỰ ĐỘNG & TIÊU CHÍ NGHIỆM THU (TEST MATRIX & DoD)
+<!-- ## 🧪 IX. KẾ HOẠCH KIỂM THỬ TỰ ĐỘNG & TIÊU CHÍ NGHIỆM THU (TEST MATRIX & DoD)
 
 ### 1. Ma Trận Kịch Bản Kiểm Thử (Test Cases)
 
@@ -612,7 +650,7 @@ CREATE TABLE `chat_messages` (
 | **TC-ADM-03** | `review-service` | Admin xóa đánh giá có nội dung xấu | Review ID hợp lệ, caller có `ROLE_ADMIN` | Đánh giá bị xóa khỏi CSDL, trả về 200 OK |
 | **TC-MERCH-01**| Frontend Merchant | Đổi chi nhánh trên Branch Switcher | Chọn quán ăn #2 từ dropdown | State đổi sang quán #2, fetch lại menu và order của quán #2 |
 | **TC-MERCH-02**| Frontend Merchant | Toggle Còn hàng / Hết hàng món ăn | Gạt Switch món ID #51 sang false | Gọi API `PUT`, cập nhật `is_available = 0` vào MySQL |
-| **TC-CUST-01** | Frontend Customer | Hiển thị tag đơn hoàn tất không có tài xế | Đơn `COMPLETED`, `driverId = null` | Hiển thị nút "Đánh giá quán" và Tag "Không có tài xế" (có tooltip) |
+| **TC-CUST-01** | Frontend Customer | Hiển thị tag đơn hoàn tất không có tài xế | Đơn `COMPLETED`, `driverId = null` | Hiển thị nút "Đánh giá quán" và Tag "Không có tài xế" (có tooltip) | -->
 
 ---
 

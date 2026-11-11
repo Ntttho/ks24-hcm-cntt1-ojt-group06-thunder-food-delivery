@@ -1,0 +1,2 @@
+include:
+  - path: food-deli-service/docker-compose.yml

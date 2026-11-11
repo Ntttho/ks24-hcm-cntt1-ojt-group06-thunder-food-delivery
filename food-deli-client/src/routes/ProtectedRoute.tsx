@@ -30,9 +30,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 1. Phải đăng nhập: Khách vãng lai chưa đăng nhập bị chuyển hướng đến /login
+  // 1. Phải đăng nhập: Khách vãng lai chưa đăng nhập bị chuyển hướng đến /login (hoặc /admin/login nếu truy cập /admin)
   if (!isAuthenticated) {
-    return <Navigate to={APP_ROUTES.LOGIN} state={{ from: location }} replace />;
+    const isAccessingAdmin = location.pathname.startsWith('/admin');
+    const defaultLoginTarget = isAccessingAdmin ? APP_ROUTES.ADMIN_LOGIN : APP_ROUTES.LOGIN;
+    return <Navigate to={redirectTo || defaultLoginTarget} state={{ from: location }} replace />;
   }
 
   // 2. Kiểm tra phân quyền RBAC: Bắt buộc role của người dùng phải thuộc allowedRoles
@@ -54,12 +56,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       }
 
       if (showForbiddenResult) {
+        const isDriverArea = normalizedAllowed.includes('ROLE_DRIVER') || normalizedAllowed.includes('ROLE_SHIPPER');
+        const forbiddenMessage = isDriverArea
+          ? 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Cổng làm việc này chỉ dành riêng cho Đối tác Tài xế (Driver / Shipper).'
+          : 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Khu vực này chỉ dành riêng cho Đối tác Quán ăn (Merchant) hoặc Quản trị viên (Admin).';
+
         return (
           <div className="min-h-[70vh] flex items-center justify-center p-6 bg-slate-50">
             <Result
               status="403"
               title="403 - Quyền truy cập bị từ chối"
-              subTitle="Tài khoản của bạn không có quyền truy cập vào phân hệ này. Khu vực này chỉ dành riêng cho Đối tác Quán ăn (Merchant) hoặc Quản trị viên (Admin)."
+              subTitle={forbiddenMessage}
               extra={
                 <Link to={APP_ROUTES.HOME}>
                   <Button type="primary" className="bg-orange-500 hover:bg-orange-600 font-bold rounded-xl shadow-xs">

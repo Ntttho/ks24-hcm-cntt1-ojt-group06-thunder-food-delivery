@@ -11,3 +11,4 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findByOrderIdOrderByCreatedAtAsc(Long orderId);
     List<ChatMessage> findByShopIdOrderByCreatedAtAsc(Long shopId);
 }
+

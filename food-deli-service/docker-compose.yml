@@ -1,5 +1,5 @@
 services:
-  # 0. MySQL Database
+  # 0. MySQL Database (Toi uu Performance Schema & Buffer Pool)
   mysql:
     image: mysql:8.0
     container_name: ft-mysql
@@ -13,6 +13,11 @@ services:
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
+      --performance-schema=OFF
+      --innodb-buffer-pool-size=128M
+      --innodb-log-buffer-size=16M
+      --max-connections=100
+    mem_limit: 384m
     volumes:
       - mysql_data:/var/lib/mysql
       - ../database/seed_all.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -32,7 +37,8 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
+    mem_limit: 96m
     volumes:
       - redis_data:/data
     networks:
@@ -55,6 +61,8 @@ services:
       - "8761:8761"
     environment:
       - EUREKA_INSTANCE_HOSTNAME=discovery-service
+      - JAVA_TOOL_OPTIONS=-Xms96m -Xmx160m -XX:+UseSerialGC
+    mem_limit: 220m
     networks:
       - foodthunder-network
     healthcheck:
@@ -80,6 +88,8 @@ services:
       - SPRING_PROFILES_ACTIVE=native
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - JAVA_TOOL_OPTIONS=-Xms96m -Xmx160m -XX:+UseSerialGC
+    mem_limit: 220m
     networks:
       - foodthunder-network
     healthcheck:
@@ -108,6 +118,8 @@ services:
       - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx192m -XX:+UseSerialGC
+    mem_limit: 260m
     networks:
       - foodthunder-network
     healthcheck:
@@ -142,6 +154,8 @@ services:
       - MYSQL_USER=root
       - MYSQL_PASSWORD=root
       - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m -XX:+UseSerialGC
+    mem_limit: 340m
     networks:
       - foodthunder-network
     healthcheck:
@@ -169,6 +183,8 @@ services:
         condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_NAME=grabfood_db
@@ -176,6 +192,9 @@ services:
       - DB_PASSWORD=root
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m -XX:+UseSerialGC
+    mem_limit: 340m
     networks:
       - foodthunder-network
     healthcheck:
@@ -201,8 +220,12 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_NAME=grabfood_db
@@ -210,10 +233,49 @@ services:
       - DB_PASSWORD=root
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config-server:8888
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx280m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC
+    mem_limit: 380m
     networks:
       - foodthunder-network
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+
+  # 6.1 Delivery & Shipper Hub Microservice (Port 8084)
+  delivery-service:
+    build:
+      context: ./delivery-service
+      dockerfile: Dockerfile
+    container_name: ft-delivery-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    environment:
+      - EUREKA_HOST=discovery-service
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
+      - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=grabfood_db
+      - DB_USERNAME=root
+      - DB_PASSWORD=root
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx220m -XX:+UseSerialGC
+    mem_limit: 300m
+    networks:
+      - foodthunder-network
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8084/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -236,6 +298,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      - EUREKA_HOST=discovery-service
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - DB_HOST=mysql
@@ -244,6 +307,8 @@ services:
       - DB_USERNAME=root
       - DB_PASSWORD=root
       - JWT_SECRET=${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx220m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC
+    mem_limit: 300m
     networks:
       - foodthunder-network
     healthcheck:
@@ -269,8 +334,6 @@ services:
         condition: service_healthy
       mysql:
         condition: service_healthy
-      order-service:
-        condition: service_healthy
     environment:
       - EUREKA_HOST=discovery-service
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
@@ -281,14 +344,32 @@ services:
       - DB_NAME=grabfood_db
       - DB_USERNAME=root
       - DB_PASSWORD=root
+      - JAVA_TOOL_OPTIONS=-Xms128m -Xmx220m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -XX:+UseSerialGC
+    mem_limit: 300m
     networks:
       - foodthunder-network
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8086/actuator/health || exit 1" ]
       interval: 10s
       timeout: 5s
-      retries: 6
-      start_period: 30s
+      retries: 8
+      start_period: 60s
+
+  # 9. Frontend React/Vite Web Client (Port 3000)
+  web-client:
+    build:
+      context: ../food-deli-client
+      dockerfile: Dockerfile
+    container_name: ft-web-client
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3001}:3000"
+    mem_limit: 64m
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - foodthunder-network
 
   # 9. Realtime Chat & Notification WebSocket Hub Microservice (Port 8087)
   chat-notification-service:

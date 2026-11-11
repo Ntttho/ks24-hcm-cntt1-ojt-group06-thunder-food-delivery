@@ -32,7 +32,7 @@ export const OrderFilterBar: React.FC<OrderFilterBarProps> = ({
 
       <div className="w-full md:w-72">
         <Input
-          placeholder="Tìm theo mã đơn hoặc quán..."
+          placeholder="Tìm theo tên quán, mã đơn, món ăn..."
           prefix={<SearchOutlined className="text-gray-400" />}
           value={searchCode}
           onChange={(e) => onChangeSearch(e.target.value)}

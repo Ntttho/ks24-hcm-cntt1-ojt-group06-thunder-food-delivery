@@ -109,9 +109,11 @@ export const MerchantLayout: React.FC = () => {
   };
 
   const selectedKey = useMemo(() => {
+    if (location.pathname.includes('/merchant/revenue') || location.pathname.includes('/merchant/analytics')) return '/merchant/revenue';
     if (location.pathname.includes('/merchant/toppings')) return '/merchant/toppings';
     if (location.pathname.includes('/merchant/categories')) return '/merchant/categories';
     if (location.pathname.includes('/merchant/vouchers')) return '/merchant/vouchers';
+    if (location.pathname.includes('/merchant/reviews')) return '/merchant/reviews';
     if (location.pathname.includes('/merchant/menu')) return '/merchant/menu';
     return '/merchant';
   }, [location.pathname]);

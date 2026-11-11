@@ -24,3 +24,4 @@ public interface NotificationClient {
     @PostMapping("/broadcast")
     ApiResponse<Void> broadcastEvent(@RequestBody BroadcastRequest request);
 }
+
