@@ -702,3 +702,4 @@ export const AdminApprovalPage: React.FC = () => {
 };
 
 export default AdminApprovalPage;
+

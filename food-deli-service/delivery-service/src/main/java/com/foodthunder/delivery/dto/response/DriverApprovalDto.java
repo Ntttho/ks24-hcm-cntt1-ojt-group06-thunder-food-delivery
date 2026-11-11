@@ -18,3 +18,4 @@ public class DriverApprovalDto {
     private String rejectReason;
     private Boolean isOnline;
 }
+

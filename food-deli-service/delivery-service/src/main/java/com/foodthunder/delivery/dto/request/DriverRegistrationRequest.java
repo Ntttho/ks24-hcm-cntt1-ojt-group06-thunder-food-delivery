@@ -14,3 +14,4 @@ public class DriverRegistrationRequest {
     private String idCardNumber;
     private String vehicleType;
 }
+

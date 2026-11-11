@@ -216,3 +216,4 @@ export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeReques
     </Modal>
   );
 };
+

@@ -25,3 +25,4 @@ public class RestaurantChangeRequestDto {
     private String rejectReason;
     private LocalDateTime createdAt;
 }
+
