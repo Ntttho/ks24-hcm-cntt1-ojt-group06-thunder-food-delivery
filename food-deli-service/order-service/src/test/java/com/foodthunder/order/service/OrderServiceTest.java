@@ -10,6 +10,7 @@ import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ConflictException;
 import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
@@ -517,5 +518,89 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(request, 1))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không thể áp dụng voucher");
+    }
+
+    @Test
+    @DisplayName("Ném lỗi ConflictException (409) khi tài xế khác bấm nhận đơn đã có tài xế nhận trước")
+    void testUpdateOrderStatus_SecondDriverAcceptSameOrder_ThrowsConflict() {
+        Order order = Order.builder()
+                .id(10L)
+                .orderCode("ORD-010")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(order));
+
+        UpdateOrderStatusRequest acceptRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.DRIVER_ACCEPTED)
+                .reason("Tài xế #4 nhận đơn")
+                .build();
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(10L, acceptRequest, 4, "ROLE_DRIVER"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("đã được một tài xế khác nhận trước");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ném lỗi ForbiddenException khi tài xế không phụ trách đơn cố cập nhật tiến trình giao")
+    void testUpdateOrderStatus_OtherDriverUpdatesStep_ThrowsForbidden() {
+        Order order = Order.builder()
+                .id(11L)
+                .orderCode("ORD-011")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(order));
+
+        UpdateOrderStatusRequest pickupRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.PICKING_UP)
+                .build();
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(11L, pickupRequest, 4, "ROLE_DRIVER"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("không phải tài xế phụ trách");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Tài xế phụ trách có thể trả đơn (DRIVER_REJECTED) kèm lý do và giữ driverId để lưu lịch sử")
+    void testUpdateOrderStatus_DriverRejectsAcceptedOrder_Success() {
+        OrderStatus driverRejectedStatus = OrderStatus.builder()
+                .id(3)
+                .code(OrderStatus.DRIVER_REJECTED)
+                .label("Tài xế từ chối")
+                .build();
+
+        Order order = Order.builder()
+                .id(12L)
+                .orderCode("ORD-012")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(order));
+        when(orderStatusRepository.findByCode(OrderStatus.DRIVER_REJECTED)).thenReturn(Optional.of(driverRejectedStatus));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        UpdateOrderStatusRequest rejectRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.DRIVER_REJECTED)
+                .reason("Xe hỏng giữa đường")
+                .build();
+
+        OrderResponse res = orderService.updateOrderStatus(12L, rejectRequest, 2, "ROLE_DRIVER");
+
+        assertThat(res.getStatusCode()).isEqualTo(OrderStatus.DRIVER_REJECTED);
+        assertThat(res.getDriverId()).isEqualTo(2);
     }
 }

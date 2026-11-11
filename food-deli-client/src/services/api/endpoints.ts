@@ -13,7 +13,6 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     DETAIL: (id: number | string) => `/users/${id}`,
-    STATUS: (id: number | string) => `/users/${id}/status`,
     ALL: '/users/all',
   },
   // Customer User Addresses (Sổ địa chỉ)
@@ -65,13 +64,6 @@ export const API_ENDPOINTS = {
     DETAIL: (id: number | string) => `/orders/${id}`,
     CANCEL: (id: number | string) => `/orders/${id}/cancel`,
     STATUS: (id: number | string) => `/orders/${id}/status`,
-  },
-  // Revenue & Analytics (Merchant Dashboard)
-  REVENUE: {
-    SUMMARY: '/orders/revenue/summary',
-    CHART: '/orders/revenue/chart',
-    TOP_FOODS: '/orders/revenue/top-foods',
-    BRANCHES: '/orders/revenue/branches',
   },
   // Delivery & Shipper Service
   DELIVERY: {
