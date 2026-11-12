@@ -42,7 +42,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     long countByDeletedAtIsNull();
 
     @Query("""
-        SELECT COUNT(DISTINCT u.id) FROM User u
+        SELECT COUNT(DISTINCT u.id)
+        FROM User u
         JOIN u.roles r
         WHERE u.deletedAt IS NULL
           AND UPPER(r.name) IN ('MERCHANT', 'ROLE_MERCHANT')

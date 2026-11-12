@@ -43,7 +43,7 @@ export const MerchantShopDropdown: React.FC<MerchantShopDropdownProps> = ({
             <span className="font-bold text-gray-800 text-xs truncate">{shop.name}</span>
             <span className="text-[11px] text-gray-400 truncate">{shop.address}</span>
           </div>
-          {activeRestaurant?.id === shop.id && (
+          {Number(activeRestaurant?.id) === Number(shop.id) && (
             <CheckOutlined className="text-orange-500 font-extrabold ml-2 shrink-0" />
           )}
         </div>

@@ -5,168 +5,173 @@ import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.ApiResponse;
 import com.foodthunder.order.dto.analytics.AdminAnalyticsSummaryResponse;
 import com.foodthunder.order.dto.analytics.MonthlyRevenuePointDto;
-import com.foodthunder.order.dto.analytics.TopRestaurantRevenueDto;
-import com.foodthunder.order.dto.client.RemoteRestaurantDto;
-import com.foodthunder.order.dto.client.RemoteRestaurantStatsDto;
-import com.foodthunder.order.dto.client.RemoteUserStatsDto;
-import com.foodthunder.order.entity.Order;
-import com.foodthunder.order.entity.OrderStatus;
-import com.foodthunder.order.repository.OrderRepository;
+import com.foodthunder.order.dto.client.RemoteRestaurantAnalyticsCountsDto;
+import com.foodthunder.order.dto.client.RemoteUserAnalyticsCountsDto;
+import com.foodthunder.order.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.Year;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminAnalyticsServiceImpl implements AdminAnalyticsService {
 
-    private final OrderRepository orderRepository;
+    private static final int MIN_SUPPORTED_YEAR = 2020;
+    private static final int MAX_SUPPORTED_YEAR = 2100;
+
+    private final OrderAnalyticsQueryHelper orderAnalyticsQueryHelper;
     private final AuthClient authClient;
     private final RestaurantClient restaurantClient;
 
     @Override
-    @Transactional(readOnly = true)
-    public AdminAnalyticsSummaryResponse getAnalyticsSummary(Integer yearParam) {
-        int year = (yearParam != null && yearParam >= 2000 && yearParam <= 2100)
-                ? yearParam : LocalDate.now().getYear();
+    public AdminAnalyticsSummaryResponse getPlatformAnalyticsSummary(Integer year) {
+        int targetYear = (year != null) ? year : Year.now().getValue();
+        if (targetYear < MIN_SUPPORTED_YEAR || targetYear > MAX_SUPPORTED_YEAR) {
+            throw new BadRequestException("Năm thống kê phải nằm trong khoảng " + MIN_SUPPORTED_YEAR + " - " + MAX_SUPPORTED_YEAR);
+        }
 
-        LocalDateTime start = LocalDate.of(year, 1, 1).atStartOfDay();
-        LocalDateTime end = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
+        LocalDateTime startOfYear = LocalDateTime.of(targetYear, 1, 1, 0, 0, 0);
+        LocalDateTime startOfNextYear = LocalDateTime.of(targetYear + 1, 1, 1, 0, 0, 0);
+        OrderAnalyticsQueryHelper.LocalOrderMetrics localMetrics =
+                orderAnalyticsQueryHelper.loadLocalMetrics(startOfYear, startOfNextYear);
 
-        List<Order> orders = orderRepository.findByCreatedAtBetween(start, end);
+        BigDecimal totalRevenue = defaultZero(localMetrics.totalRevenue());
+        long totalOrdersCount = localMetrics.totalOrdersCount();
+        long completedOrdersCount = localMetrics.completedOrdersCount();
+        double orderSuccessRate = totalOrdersCount > 0
+                ? Math.round((completedOrdersCount * 100.0 / totalOrdersCount) * 100.0) / 100.0
+                : 0.0;
 
-        BigDecimal[] monthRevenues = new BigDecimal[12];
-        long[] monthCounts = new long[12];
-        Arrays.fill(monthRevenues, BigDecimal.ZERO);
+        List<Object[]> monthlyRows = localMetrics.monthlyRows();
 
-        long totalOrders = orders.size();
-        long completedOrders = 0L;
-        long cancelledOrders = 0L;
-        BigDecimal totalGmv = BigDecimal.ZERO;
-
-        Map<Integer, BigDecimal> revenueByRestaurant = new HashMap<>();
-        Map<Integer, Long> countByRestaurant = new HashMap<>();
-
-        for (Order order : orders) {
-            String statusCode = order.getStatus() != null ? order.getStatus().getCode() : null;
-            if (OrderStatus.COMPLETED.equalsIgnoreCase(statusCode)) {
-                completedOrders++;
-                BigDecimal amount = order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO;
-                totalGmv = totalGmv.add(amount);
-
-                if (order.getCreatedAt() != null) {
-                    int monthIdx = order.getCreatedAt().getMonthValue() - 1;
-                    if (monthIdx >= 0 && monthIdx < 12) {
-                        monthRevenues[monthIdx] = monthRevenues[monthIdx].add(amount);
-                        monthCounts[monthIdx]++;
-                    }
+        Map<Integer, BigDecimal> revenueByMonth = new HashMap<>();
+        Map<Integer, Long> completedCountByMonth = new HashMap<>();
+        if (monthlyRows != null) {
+            for (Object[] row : monthlyRows) {
+                if (row == null || row.length < 3 || row[0] == null) {
+                    continue;
                 }
-
-                if (order.getRestaurantId() != null) {
-                    revenueByRestaurant.merge(order.getRestaurantId(), amount, BigDecimal::add);
-                    countByRestaurant.merge(order.getRestaurantId(), 1L, Long::sum);
-                }
-            } else if (OrderStatus.CANCELLED.equalsIgnoreCase(statusCode)) {
-                cancelledOrders++;
+                int monthNum = ((Number) row[0]).intValue();
+                BigDecimal monthRevenue = toBigDecimal(row[1]);
+                long monthCount = ((Number) row[2]).longValue();
+                revenueByMonth.put(monthNum, monthRevenue);
+                completedCountByMonth.put(monthNum, monthCount);
             }
         }
 
-        double completionRate = totalOrders > 0
-                ? Math.round((completedOrders * 10000.0) / totalOrders) / 100.0
-                : 0.0;
-
         List<MonthlyRevenuePointDto> monthlyRevenue = new ArrayList<>(12);
-        for (int i = 0; i < 12; i++) {
-            int month = i + 1;
+        BigDecimal yearlyRevenue = BigDecimal.ZERO;
+        for (int month = 1; month <= 12; month++) {
+            BigDecimal monthRev = revenueByMonth.getOrDefault(month, BigDecimal.ZERO);
+            long monthCompleted = completedCountByMonth.getOrDefault(month, 0L);
+            yearlyRevenue = yearlyRevenue.add(monthRev);
+
             monthlyRevenue.add(MonthlyRevenuePointDto.builder()
-                    .month(month)
+                    .month(String.format("%02d/%d", month, targetYear))
                     .label("T" + month)
-                    .revenue(monthRevenues[i])
-                    .orderCount(monthCounts[i])
+                    .revenue(monthRev)
+                    .completedOrdersCount(monthCompleted)
                     .build());
         }
 
-        RemoteUserStatsDto userStats = fetchUserStats();
-        RemoteRestaurantStatsDto restaurantStats = fetchRestaurantStats();
-        Map<Integer, String> restaurantNames = fetchRestaurantNameMap();
-
-        List<TopRestaurantRevenueDto> topRestaurants = revenueByRestaurant.entrySet().stream()
-                .sorted(Map.Entry.<Integer, BigDecimal>comparingByValue().reversed())
-                .limit(5)
-                .map(entry -> TopRestaurantRevenueDto.builder()
-                        .restaurantId(entry.getKey())
-                        .restaurantName(restaurantNames.getOrDefault(entry.getKey(), "Quán #" + entry.getKey()))
-                        .completedOrders(countByRestaurant.getOrDefault(entry.getKey(), 0L))
-                        .revenue(entry.getValue())
-                        .build())
-                .collect(Collectors.toList());
+        List<String> warnings = new ArrayList<>();
+        RemoteUserAnalyticsCountsDto userCounts = fetchUserCounts(warnings);
+        RemoteRestaurantAnalyticsCountsDto restaurantCounts = fetchRestaurantCounts(warnings);
 
         return AdminAnalyticsSummaryResponse.builder()
-                .year(year)
-                .totalUsers(userStats.getTotalUsers())
-                .totalMerchants(userStats.getTotalMerchants())
-                .totalRestaurants(restaurantStats.getTotalRestaurants())
-                .totalFoodItems(restaurantStats.getTotalFoodItems())
-                .totalOrders(totalOrders)
-                .completedOrders(completedOrders)
-                .cancelledOrders(cancelledOrders)
-                .completionRate(completionRate)
-                .totalGmv(totalGmv)
+                .year(targetYear)
+                .totalRevenue(totalRevenue)
+                .yearlyRevenue(yearlyRevenue)
                 .monthlyRevenue(monthlyRevenue)
-                .topRestaurants(topRestaurants)
+                .totalUsersCount(userCounts.getTotalUsersCount())
+                .totalRestaurantsCount(restaurantCounts.getTotalRestaurantsCount())
+                .totalMerchantsCount(userCounts.getTotalMerchantsCount())
+                .completedOrdersCount(completedOrdersCount)
+                .totalOrdersCount(totalOrdersCount)
+                .orderSuccessRate(orderSuccessRate)
+                .totalFoodItemsCount(restaurantCounts.getTotalFoodItemsCount())
+                .partialData(!warnings.isEmpty())
+                .warnings(warnings)
                 .build();
     }
 
-    private RemoteUserStatsDto fetchUserStats() {
+    private RemoteUserAnalyticsCountsDto fetchUserCounts(List<String> warnings) {
         try {
-            ResponseEntity<ApiResponse<RemoteUserStatsDto>> res = authClient.getUserStatsSummary();
-            if (res != null && res.getBody() != null && res.getBody().getData() != null) {
-                return res.getBody().getData();
+            ResponseEntity<ApiResponse<RemoteUserAnalyticsCountsDto>> response = authClient.getUserAnalyticsCounts();
+            RemoteUserAnalyticsCountsDto data = (response != null && response.getBody() != null)
+                    ? response.getBody().getData()
+                    : null;
+            if (data == null || data.isFallback()) {
+                warnings.add("Không thể đồng bộ đầy đủ số liệu người dùng & đối tác từ auth-service");
+                return RemoteUserAnalyticsCountsDto.builder()
+                        .totalUsersCount(0L)
+                        .totalMerchantsCount(0L)
+                        .fallback(true)
+                        .build();
             }
+            return data;
         } catch (Exception ex) {
-            log.warn("Could not fetch user stats from auth-service: {}", ex.getMessage());
+            log.warn("Error fetching analytics counts from auth-service: {}", ex.getMessage());
+            warnings.add("Không thể kết nối auth-service để lấy số liệu người dùng & đối tác");
+            return RemoteUserAnalyticsCountsDto.builder()
+                    .totalUsersCount(0L)
+                    .totalMerchantsCount(0L)
+                    .fallback(true)
+                    .build();
         }
-        return RemoteUserStatsDto.builder().totalUsers(0L).totalMerchants(0L).build();
     }
 
-    private RemoteRestaurantStatsDto fetchRestaurantStats() {
+    private RemoteRestaurantAnalyticsCountsDto fetchRestaurantCounts(List<String> warnings) {
         try {
-            ResponseEntity<ApiResponse<RemoteRestaurantStatsDto>> res = restaurantClient.getRestaurantStatsSummary();
-            if (res != null && res.getBody() != null && res.getBody().getData() != null) {
-                return res.getBody().getData();
+            ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> response = restaurantClient.getRestaurantAnalyticsCounts();
+            RemoteRestaurantAnalyticsCountsDto data = (response != null && response.getBody() != null)
+                    ? response.getBody().getData()
+                    : null;
+            if (data == null || data.isFallback()) {
+                warnings.add("Không thể đồng bộ đầy đủ số liệu nhà hàng & món ăn từ restaurant-service");
+                return RemoteRestaurantAnalyticsCountsDto.builder()
+                        .totalRestaurantsCount(0L)
+                        .totalFoodItemsCount(0L)
+                        .fallback(true)
+                        .build();
             }
+            return data;
         } catch (Exception ex) {
-            log.warn("Could not fetch restaurant stats from restaurant-service: {}", ex.getMessage());
+            log.warn("Error fetching analytics counts from restaurant-service: {}", ex.getMessage());
+            warnings.add("Không thể kết nối restaurant-service để lấy số liệu nhà hàng & món ăn");
+            return RemoteRestaurantAnalyticsCountsDto.builder()
+                    .totalRestaurantsCount(0L)
+                    .totalFoodItemsCount(0L)
+                    .fallback(true)
+                    .build();
         }
-        return RemoteRestaurantStatsDto.builder().totalRestaurants(0L).totalFoodItems(0L).build();
     }
 
-    private Map<Integer, String> fetchRestaurantNameMap() {
-        try {
-            ResponseEntity<ApiResponse<List<RemoteRestaurantDto>>> res = restaurantClient.getAllRestaurants();
-            if (res != null && res.getBody() != null && res.getBody().getData() != null) {
-                Map<Integer, String> map = new HashMap<>();
-                for (RemoteRestaurantDto r : res.getBody().getData()) {
-                    if (r.getId() != null && r.getName() != null) {
-                        map.put(r.getId(), r.getName());
-                    }
-                }
-                return map;
-            }
-        } catch (Exception ex) {
-            log.warn("Could not fetch restaurant list from restaurant-service: {}", ex.getMessage());
+    private BigDecimal defaultZero(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private BigDecimal toBigDecimal(Object val) {
+        if (val == null) {
+            return BigDecimal.ZERO;
         }
-        return Collections.emptyMap();
+        if (val instanceof BigDecimal bd) {
+            return bd;
+        }
+        if (val instanceof Number num) {
+            return BigDecimal.valueOf(num.doubleValue());
+        }
+        return new BigDecimal(val.toString());
     }
 }
 

@@ -346,7 +346,7 @@ export const CheckoutPage: React.FC = () => {
   return (
     <div className="bg-gray-50 flex flex-col min-h-screen font-sans">
       {/* 1. Top Header with Hover Animation & Click Home */}
-      <CheckoutHeader shopName={currentShopName} distance="1.8 km" />
+      <CheckoutHeader shopName={currentShopName} distance={`${checkoutDistanceKm} km`} />
 
       {/* Main Body */}
       <main className="flex-1 w-full pt-16 pb-36">

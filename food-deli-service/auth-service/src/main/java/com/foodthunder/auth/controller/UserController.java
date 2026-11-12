@@ -76,6 +76,19 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", authService.getUserStatsSummary()));
     }
 
+    /**
+     * SP3-ADM-05: Lấy thống kê số lượng người dùng và đối tác kinh doanh (Merchants) cho Admin Analytics
+     * GET /api/v1/users/admin/analytics-counts
+     */
+    @GetMapping("/admin/analytics-counts")
+    public ResponseEntity<ApiResponse<UserAnalyticsCountsDto>> getAnalyticsCounts(
+            @RequestHeader(value = "X-User-Role", required = false) String roleHeader
+    ) {
+        RoleGuard.requireAdmin(roleHeader, "Chỉ Admin mới được truy cập số liệu thống kê người dùng");
+        UserAnalyticsCountsDto counts = authService.getAnalyticsCounts();
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", counts));
+    }
+
     @PutMapping("/{id}/rating")
     public ResponseEntity<ApiResponse<UserDto>> updateRating(
             @PathVariable Long id,
@@ -154,5 +167,4 @@ public class UserController {
         }
         throw new UnauthorizedException("User is not authenticated");
     }
-
 }

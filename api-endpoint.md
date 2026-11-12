@@ -890,14 +890,14 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
 * `PUT /api/v1/admin/vouchers/{id}` & `DELETE /api/v1/admin/vouchers/{id}`.
 
 ### 15.2. Quản lý Tham số Hệ thống (System Settings)
-* `GET /api/v1/admin/settings` — Danh sách cấu hình.
-* `POST /api/v1/admin/settings` — Tạo tham số cấu hình:
+* `GET /api/v1/admin/system-settings` — Admin lấy phí ship mặc định, phí ship/km và tỷ lệ hoa hồng.
+* `PUT /api/v1/admin/system-settings` — Admin cập nhật đồng thời các cấu hình:
 ```json
 {
-  "configKey": "DEFAULT_COMMISSION_PERCENT",
-  "configValue": "15",
-  "description": "Tỷ lệ hoa hồng sàn thu trên mỗi đơn hàng (%)"
+  "defaultShippingFee": 10000,
+  "shippingFeePerKilometer": 5000,
+  "platformCommissionRate": 15
 }
 ```
-* `PUT /api/v1/admin/settings/{id}` — Cập nhật cấu hình.
-* `DELETE /api/v1/admin/settings/{id}` — Xóa cấu hình.
+* `GET /api/v1/system-settings/shipping` — Ứng dụng checkout đọc cấu hình phí giao hàng hiện tại.
+* Các giá trị, kiểu `NUMBER`, thời điểm cập nhật và lịch sử tỷ lệ hoa hồng được lưu trong JSON `config_value` của bảng `system_settings`; không cần thay đổi schema.

@@ -20,5 +20,5 @@ public class RemoteOrderCostConfigDto {
     private Double vatRate;
     private Boolean vatIncluded;
     private Double platformCommissionPercent;
+    private boolean fallback;
 }
-

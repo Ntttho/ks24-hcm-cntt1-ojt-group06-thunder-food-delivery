@@ -13,8 +13,8 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     DETAIL: (id: number | string) => `/users/${id}`,
-    ALL: '/users/all',
     STATUS: (id: number | string) => `/users/${id}/status`,
+    ALL: '/users/all',
   },
   // Customer User Addresses (Sổ địa chỉ)
   ADDRESSES: {
@@ -72,6 +72,9 @@ export const API_ENDPOINTS = {
     TOP_FOODS: '/orders/revenue/top-foods',
     BRANCHES: '/orders/revenue/branches',
   },
+  SYSTEM_SETTINGS: {
+    SHIPPING: '/system-settings/shipping',
+  },
   // Delivery & Shipper Service
   DELIVERY: {
     AVAILABLE_ORDERS: '/delivery/available',
@@ -100,8 +103,11 @@ export const API_ENDPOINTS = {
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
   },
-  // Admin Portal & Approvals (SP3-ADM-02)
+  // Admin Portal & Approvals (SP3-ADM-02, SP3-ADM-03 & SP3-ADM-05)
   ADMIN: {
+    ANALYTICS_SUMMARY: '/admin/analytics/summary',
+    SYSTEM_SETTINGS: '/admin/system-settings',
+    SETTINGS: '/admin/settings',
     CHANGE_REQUESTS: '/restaurants/change-requests',
     CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
     APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,
@@ -110,8 +116,6 @@ export const API_ENDPOINTS = {
     DRIVER_APPROVAL_DETAIL: (userId: number | string) => `/drivers/${userId}/approval`,
     APPROVE_DRIVER: (userId: number | string) => `/drivers/${userId}/approve`,
     REJECT_DRIVER: (userId: number | string) => `/drivers/${userId}/reject`,
-    SETTINGS: '/admin/settings',
-    ANALYTICS_SUMMARY: '/admin/analytics/summary',
   },
   // Public Platform Settings (Order Fees & Shipping)
   SETTINGS: {

@@ -355,6 +355,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public UserAnalyticsCountsDto getAnalyticsCounts() {
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long totalMerchants = userRepository.countActiveMerchants();
+        return UserAnalyticsCountsDto.builder()
+                .totalUsersCount(totalUsers)
+                .totalMerchantsCount(totalMerchants)
+                .build();
+    }
+
+    @Override
     @Transactional
     public UserDto updateRating(Long userId, BigDecimal ratingAvg) {
         if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0

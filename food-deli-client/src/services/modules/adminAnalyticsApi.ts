@@ -2,37 +2,31 @@ import { apiClient, API_ENDPOINTS } from '@/services/api';
 import type { ApiResponse } from '@/types';
 
 export interface MonthlyRevenuePoint {
-  month: number;
-  label: string;
+  month: string;
+  label?: string;
   revenue: number;
-  orderCount: number;
-}
-
-export interface TopRestaurantRevenue {
-  restaurantId: number;
-  restaurantName: string;
-  completedOrders: number;
-  revenue: number;
+  completedOrdersCount?: number;
 }
 
 export interface AdminAnalyticsSummary {
-  year: number;
-  totalUsers: number;
-  totalMerchants: number;
-  totalRestaurants: number;
-  totalFoodItems: number;
-  totalOrders: number;
-  completedOrders: number;
-  cancelledOrders: number;
-  completionRate: number;
-  totalGmv: number;
+  year?: number;
+  totalRevenue: number;
+  yearlyRevenue?: number;
   monthlyRevenue: MonthlyRevenuePoint[];
-  topRestaurants: TopRestaurantRevenue[];
+  totalUsersCount: number;
+  totalRestaurantsCount: number;
+  totalMerchantsCount: number;
+  completedOrdersCount: number;
+  totalOrdersCount: number;
+  orderSuccessRate: number;
+  totalFoodItemsCount: number;
+  partialData?: boolean;
+  warnings?: string[];
 }
 
 export const adminAnalyticsApi = {
   /**
-   * Admin: Lấy báo cáo phân tích nền tảng & biểu đồ GMV 12 tháng
+   * Lấy báo cáo thống kê tổng thu toàn sàn và 5 chỉ số KPI hệ thống realtime.
    * GET /api/v1/admin/analytics/summary?year=2026
    */
   getSummary: async (year?: number): Promise<ApiResponse<AdminAnalyticsSummary>> => {

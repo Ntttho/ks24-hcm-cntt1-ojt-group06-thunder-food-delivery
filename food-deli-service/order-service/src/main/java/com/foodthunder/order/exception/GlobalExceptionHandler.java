@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -82,6 +83,14 @@ public class GlobalExceptionHandler {
                         .message("Dữ liệu đầu vào không hợp lệ")
                         .data(errors)
                         .build());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Invalid parameter type for '{}': {}", ex.getName(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(HttpStatus.BAD_REQUEST.value(),
+                        "Tham số '" + ex.getName() + "' không đúng định dạng"));
     }
 
     @ExceptionHandler(FeignException.class)

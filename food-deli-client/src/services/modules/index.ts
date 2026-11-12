@@ -10,4 +10,5 @@ export * from './driverApi';
 export * from './revenueApi';
 export * from './adminApprovalApi';
 export * from './adminSettingsApi';
+export * from './systemSettingsApi';
 export * from './adminAnalyticsApi';

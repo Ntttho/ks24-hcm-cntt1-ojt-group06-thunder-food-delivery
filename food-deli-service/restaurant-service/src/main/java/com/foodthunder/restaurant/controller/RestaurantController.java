@@ -210,18 +210,22 @@ public class RestaurantController {
             @RequestParam BigDecimal ratingAvg,
             @RequestHeader(value = "X-User-Role", required = false) String roleHeader
     ) {
-        if (roleHeader == null || roleHeader.isBlank()) {
-            throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
-        }
-        Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .collect(Collectors.toSet());
-        if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
-            throw new ForbiddenException("Chỉ Admin mới được cập nhật điểm đánh giá");
-        }
+        requireAdminRole(roleHeader, "Chỉ Admin mới được cập nhật điểm đánh giá");
         RestaurantDto updated = restaurantService.updateRating(id, ratingAvg);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đánh giá nhà hàng thành công", updated));
+    }
+
+    /**
+     * SP3-ADM-05: Lấy thống kê số lượng nhà hàng đang hoạt động và món ăn toàn sàn cho Admin Analytics
+     * GET /api/v1/restaurants/admin/analytics-counts
+     */
+    @GetMapping("/admin/analytics-counts")
+    public ResponseEntity<ApiResponse<RestaurantAnalyticsCountsDto>> getAnalyticsCounts(
+            @RequestHeader(value = "X-User-Role", required = false) String roleHeader
+    ) {
+        requireAdminRole(roleHeader, "Chỉ Admin mới được truy cập số liệu thống kê nhà hàng");
+        RestaurantAnalyticsCountsDto counts = restaurantService.getAnalyticsCounts();
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê nhà hàng thành công", counts));
     }
 
     /**
@@ -283,5 +287,18 @@ public class RestaurantController {
     @GetMapping("/stats/summary")
     public ResponseEntity<ApiResponse<RestaurantStatsSummaryDto>> getRestaurantStatsSummary() {
         return ResponseEntity.ok(ApiResponse.success("Lấy thống kê quán ăn thành công", restaurantService.getStatsSummary()));
+    }
+
+    private void requireAdminRole(String roleHeader, String deniedMessage) {
+        if (roleHeader == null || roleHeader.isBlank()) {
+            throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
+        }
+        Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .collect(Collectors.toSet());
+        if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
+            throw new ForbiddenException(deniedMessage);
+        }
     }
 }

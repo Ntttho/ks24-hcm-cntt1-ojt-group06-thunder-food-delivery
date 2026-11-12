@@ -28,7 +28,7 @@ spring:
         - id: order-service-route
           uri: lb://order-service
           predicates:
-            - Path=/api/v1/orders/**,/api/v1/orders,/api/v1/cart/**,/api/v1/cart,/api/v1/admin/analytics/**
+            - Path=/api/v1/orders/**,/api/v1/orders,/api/v1/cart/**,/api/v1/cart,/api/v1/admin/analytics/**,/api/v1/admin/system-settings/**,/api/v1/system-settings/**
 
         # 3b. Order WebSocket Route (STOMP Real-time)
         - id: order-service-ws-route

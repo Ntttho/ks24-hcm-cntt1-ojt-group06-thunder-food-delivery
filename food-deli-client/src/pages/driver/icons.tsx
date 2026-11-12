@@ -359,4 +359,99 @@ export const CreditCard: React.FC<IconProps> = ({ className = 'w-4 h-4', ...prop
   </svg>
 );
 
+export const MessageCircle: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+  </svg>
+);
+
+export const Send: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="m22 2-7 20-4-9-9-4Z" />
+    <path d="M22 2 11 13" />
+  </svg>
+);
+
+export const ExternalLink: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="M15 3h6v6" />
+    <path d="M10 14 21 3" />
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </svg>
+);
+
+export const X: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);
+
+export const ChevronDown: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+export const ChevronUp: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <polyline points="18 15 12 9 6 15" />
+  </svg>
+);
+
+
 

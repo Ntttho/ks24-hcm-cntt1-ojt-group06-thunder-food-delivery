@@ -2,6 +2,7 @@ package com.foodthunder.order.client;
 
 import com.foodthunder.order.dto.ApiResponse;
 import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
+import com.foodthunder.order.dto.client.RemoteUserAnalyticsCountsDto;
 import com.foodthunder.order.dto.client.RemoteUserStatsDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
@@ -15,5 +16,7 @@ public interface AuthClient {
 
     @GetMapping("/api/v1/users/stats/summary")
     ResponseEntity<ApiResponse<RemoteUserStatsDto>> getUserStatsSummary();
-}
 
+    @GetMapping("/api/v1/users/admin/analytics-counts")
+    ResponseEntity<ApiResponse<RemoteUserAnalyticsCountsDto>> getUserAnalyticsCounts();
+}

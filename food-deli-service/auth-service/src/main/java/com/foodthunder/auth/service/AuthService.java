@@ -22,4 +22,5 @@ public interface AuthService {
     UserDto updateUserStatus(Long id, UpdateUserStatusRequest request);
     void deleteUser(Long id);
     UserStatsSummaryDto getUserStatsSummary();
+    UserAnalyticsCountsDto getAnalyticsCounts();
 }
