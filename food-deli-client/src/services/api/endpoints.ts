@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
     LIST: '/users',
     DETAIL: (id: number | string) => `/users/${id}`,
     ALL: '/users/all',
+    STATUS: (id: number | string) => `/users/${id}/status`,
   },
   // Customer User Addresses (Sổ địa chỉ)
   ADDRESSES: {
@@ -64,6 +65,12 @@ export const API_ENDPOINTS = {
     DETAIL: (id: number | string) => `/orders/${id}`,
     CANCEL: (id: number | string) => `/orders/${id}/cancel`,
     STATUS: (id: number | string) => `/orders/${id}/status`,
+  },
+  REVENUE: {
+    SUMMARY: '/orders/revenue/summary',
+    CHART: '/orders/revenue/chart',
+    TOP_FOODS: '/orders/revenue/top-foods',
+    BRANCHES: '/orders/revenue/branches',
   },
   // Delivery & Shipper Service
   DELIVERY: {
