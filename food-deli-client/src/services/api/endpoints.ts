@@ -13,6 +13,7 @@ export const API_ENDPOINTS = {
   USERS: {
     LIST: '/users',
     DETAIL: (id: number | string) => `/users/${id}`,
+    STATUS: (id: number | string) => `/users/${id}/status`,
     ALL: '/users/all',
   },
   // Customer User Addresses (Sổ địa chỉ)
@@ -92,6 +93,13 @@ export const API_ENDPOINTS = {
     SEPAY_GENERATE: '/payments/sepay/generate',
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
+  },
+  // Revenue Analytics
+  REVENUE: {
+    SUMMARY: '/revenue/summary',
+    CHART: '/revenue/chart',
+    TOP_FOODS: '/revenue/top-foods',
+    BRANCHES: '/revenue/branches',
   },
   // Admin Portal & Approvals (SP3-ADM-02)
   ADMIN: {

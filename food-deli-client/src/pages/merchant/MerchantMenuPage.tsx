@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Card,
@@ -41,50 +41,6 @@ import { ProductFormModal, AssignToppingModal } from './components';
 
 const { Title, Text } = Typography;
 
-// Mock Fallback Products (Matching seed_all.sql for Restaurant #1 Hạnh Dũng)
-const FALLBACK_PRODUCTS: ProductItem[] = [
-  // {
-  //   id: 1,
-  //   categoryId: 1,
-  //   categoryName: 'Món chính',
-  //   name: 'Cơm Tấm Chay',
-  //   price: 45000,
-  //   isAvailable: true,
-  //   defaultQuantity: 40,
-  //   currentQuantity: 38,
-  //   toppingIds: [1, 2, 3],
-  //   imageUrl: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=500&auto=format&fit=crop&q=60',
-  // },
-  // {
-  //   id: 2,
-  //   categoryId: 2,
-  //   categoryName: 'Nước uống',
-  //   name: 'Trà Đá',
-  //   price: 5000,
-  //   isAvailable: true,
-  //   defaultQuantity: 120,
-  //   currentQuantity: 120,
-  //   toppingIds: [4, 5, 6, 7],
-  //   imageUrl: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=60',
-  // },
-  // {
-  //   id: 3,
-  //   categoryId: 1,
-  //   categoryName: 'Món chính',
-  //   name: 'Hủ Tiếu Nam Vang Chay',
-  //   price: 55000,
-  //   isAvailable: true,
-  //   defaultQuantity: 35,
-  //   currentQuantity: 35,
-  //   toppingIds: [1, 3],
-  //   imageUrl: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=500&auto=format&fit=crop&q=60',
-  // },
-];
-
-const FALLBACK_CATEGORIES: MenuCategoryItem[] = [
-  { id: 1, name: 'Món chính', restaurantId: 1 },
-  { id: 2, name: 'Nước uống', restaurantId: 1 },
-];
 
 export const MerchantMenuPage: React.FC = () => {
   const { user } = useAuth();
@@ -112,17 +68,20 @@ export const MerchantMenuPage: React.FC = () => {
   const [isAssignToppingOpen, setIsAssignToppingOpen] = useState<boolean>(false);
   const [selectedProductForTopping, setSelectedProductForTopping] = useState<ProductItem | null>(null);
 
+  // Track product IDs currently toggling status
+  const [togglingIds, setTogglingIds] = useState<Set<number>>(new Set());
+
   // Load categories
   const loadCategories = useCallback(async () => {
     try {
       const catRes = await restaurantApi.getCategories(currentRestaurantId);
-      if (catRes && catRes.data && catRes.data.length > 0) {
+      if (catRes && catRes.data && Array.isArray(catRes.data)) {
         setCategories(catRes.data);
       } else {
-        setCategories(FALLBACK_CATEGORIES);
+        setCategories([]);
       }
     } catch {
-      setCategories(FALLBACK_CATEGORIES);
+      setCategories([]);
     }
   }, [currentRestaurantId]);
 
@@ -147,16 +106,16 @@ export const MerchantMenuPage: React.FC = () => {
             setProducts(paginated.content);
             setTotalElements(paginated.totalElements ?? paginated.content.length);
           } else {
-            setProducts(FALLBACK_PRODUCTS);
-            setTotalElements(FALLBACK_PRODUCTS.length);
+            setProducts([]);
+            setTotalElements(0);
           }
         } else {
-          setProducts(FALLBACK_PRODUCTS);
-          setTotalElements(FALLBACK_PRODUCTS.length);
+          setProducts([]);
+          setTotalElements(0);
         }
       } catch {
-        setProducts(FALLBACK_PRODUCTS);
-        setTotalElements(FALLBACK_PRODUCTS.length);
+        setProducts([]);
+        setTotalElements(0);
       } finally {
         setLoading(false);
       }
@@ -164,18 +123,38 @@ export const MerchantMenuPage: React.FC = () => {
     [currentRestaurantId]
   );
 
-  useEffect(() => {
-    loadCategories();
-  }, [loadCategories]);
+  // Branch switcher listener: reset filters & pagination, immediately fetch new restaurant's menu
+  const prevRestaurantIdRef = useRef(currentRestaurantId);
+  const isFirstRender = useRef(true);
 
-  // Debounced search / category filter effect (Chỉ kích hoạt khi từ khóa hoặc danh mục thay đổi)
   useEffect(() => {
+    // Reset category filter & search text & page
+    setSelectedCategory(null);
+    setSearchText('');
+    setPage(0);
+    setProducts([]);
+    loadCategories();
+    fetchProducts(0, pageSize, '', null);
+  }, [currentRestaurantId, loadCategories, fetchProducts]);
+
+  // Debounced search / category filter effect for same branch
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    // Skip if branch just changed (already handled immediately by currentRestaurantId effect)
+    if (prevRestaurantIdRef.current !== currentRestaurantId) {
+      prevRestaurantIdRef.current = currentRestaurantId;
+      return;
+    }
+
     const timer = setTimeout(() => {
       setPage(0);
       fetchProducts(0, pageSize, searchText, selectedCategory);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchText, selectedCategory, currentRestaurantId, pageSize, fetchProducts]);
+  }, [searchText, selectedCategory, pageSize]);
 
   const handlePageChange = (newPage: number, newPageSize: number) => {
     const zeroBased = newPage - 1;
@@ -184,24 +163,47 @@ export const MerchantMenuPage: React.FC = () => {
     fetchProducts(zeroBased, newPageSize, searchText, selectedCategory);
   };
 
-  // Toggle isAvailable switch
+  // Toggle isAvailable switch (Optimistic UI update, instant DB persistence via PUT)
   const handleToggleStatus = async (product: ProductItem, checked: boolean) => {
+    const productId = product.id;
+    if (togglingIds.has(productId)) return;
+
+    // 1. Instant optimistic update so user feels 0 lag
+    const prevStatus = product.isAvailable;
+    setProducts((prev) =>
+      prev.map((item) =>
+        item.id === productId ? { ...item, isAvailable: checked } : item
+      )
+    );
+    setTogglingIds((prev) => new Set(prev).add(productId));
+
     try {
-      await restaurantApi.updateProductStatus(product.id, checked);
+      const res = await restaurantApi.updateProductStatus(productId, checked);
+      const newStatus = res?.data?.isAvailable ?? checked;
+      setProducts((prev) =>
+        prev.map((item) =>
+          item.id === productId ? { ...item, isAvailable: newStatus } : item
+        )
+      );
       message.success(
-        `Đã chuyển trạng thái món "${product.name}" sang: ${checked ? 'Còn hàng' : 'Tạm hết hàng'}`
+        `Đã chuyển trạng thái món "${product.name}" sang: ${newStatus ? 'Còn hàng' : 'Tạm hết hàng'}`
       );
+    } catch (error: any) {
+      // Rollback on failure
       setProducts((prev) =>
         prev.map((item) =>
-          item.id === product.id ? { ...item, isAvailable: checked } : item
+          item.id === productId ? { ...item, isAvailable: prevStatus } : item
         )
       );
-    } catch {
-      setProducts((prev) =>
-        prev.map((item) =>
-          item.id === product.id ? { ...item, isAvailable: checked } : item
-        )
+      message.error(
+        error?.response?.data?.message || 'Không thể cập nhật trạng thái món ăn. Vui lòng thử lại.'
       );
+    } finally {
+      setTogglingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
     }
   };
 
@@ -425,20 +427,25 @@ export const MerchantMenuPage: React.FC = () => {
       dataIndex: 'isAvailable',
       key: 'isAvailable',
       width: 140,
-      render: (isAvailable: boolean, record) => (
-        <Space size="middle">
-          <Switch
-            checked={isAvailable}
-            onChange={(checked) => handleToggleStatus(record, checked)}
-            checkedChildren="Còn"
-            unCheckedChildren="Hết"
-            style={{ backgroundColor: isAvailable ? '#10b981' : undefined }}
-          />
-          <span className={`text-xs font-semibold ${isAvailable ? 'text-emerald-600' : 'text-slate-400'}`}>
-            {isAvailable ? 'Còn hàng' : 'Tạm hết'}
-          </span>
-        </Space>
-      ),
+      render: (isAvailable: boolean, record) => {
+        const isToggling = togglingIds.has(record.id);
+        return (
+          <Space size="middle">
+            <Switch
+              checked={Boolean(isAvailable)}
+              loading={isToggling}
+              disabled={isToggling}
+              onChange={(checked) => handleToggleStatus(record, checked)}
+              checkedChildren="Còn"
+              unCheckedChildren="Hết"
+              style={{ backgroundColor: isAvailable ? '#10b981' : undefined }}
+            />
+            <span className={`text-xs font-semibold ${isAvailable ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {isAvailable ? 'Còn hàng' : 'Tạm hết'}
+            </span>
+          </Space>
+        );
+      },
     },
     {
       title: 'Thao tác',
