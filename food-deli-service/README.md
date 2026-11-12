@@ -62,41 +62,10 @@ Using the included Maven Wrapper:
 ### Chạy qua Docker Compose:
 
 ```bash
-# Bước 1: Build các file JAR trước (bắt buộc vì Dockerfile dùng COPY target/*.jar)
-.\mvnw.cmd clean package -DskipTests
-
-# Bước 2: Khởi động toàn bộ container
-docker compose up --build
+docker compose up -d --build
 ```
 
----
-
-## 💡 Lưu Ý Quan Trọng Khi Chạy Docker (Docker Tips)
-
-> [!IMPORTANT]
-> **1. Bắt buộc build file JAR trước khi build Docker Image**
-> - Các file `Dockerfile` của từng service (`auth-service`, `api-gateway`, `discovery-service`, ...) sử dụng câu lệnh:
->   ```dockerfile
->   COPY target/*.jar app.jar
->   ```
-> - Nếu bạn chạy `docker compose up --build` mà thư mục `target/` chưa có file `.jar`, Docker sẽ báo lỗi `COPY failed: no source files were specified`. Hãy luôn chạy `mvn clean package -DskipTests` hoặc `.\mvnw.cmd clean package -DskipTests` trước.
-
-> [!TIP]
-> **2. Kết nối Database MySQL từ bên trong Docker Container**
-> - Mặc định trong `application.yml`, các service kết nối đến DB qua `localhost:3306`.
-> - Khi chạy service trong Docker container, `localhost` trỏ vào chính container đó chứ không phải máy tính của bạn.
-> - Nếu MySQL chạy trực tiếp trên máy host của bạn, hãy truyền biến môi trường:
->   - `MYSQL_HOST=host.docker.internal` (dành cho Windows / Mac)
->   - Hoặc chỉnh trực tiếp trong file `docker-compose.yml`:
->     ```yaml
->     environment:
->       - MYSQL_HOST=host.docker.internal
->       - MYSQL_PORT=3306
->       - MYSQL_USER=root
->       - MYSQL_PASSWORD=root
->     extra_hosts:
->       - "host.docker.internal:host-gateway"
->     ```
+Lệnh trên build các image từ mã nguồn, khởi chạy database và toàn bộ services. Từ thư mục gốc repository, frontend được mở tại `http://<server-ip>:3001`; API Gateway tại `http://<server-ip>:8080`. Đặt `MYSQL_ROOT_PASSWORD` và `JWT_SECRET` trong file `.env` tại thư mục gốc để thay giá trị mặc định trước khi triển khai public.
 
 ---
 
@@ -133,4 +102,3 @@ DBeaver là công cụ giao diện trực quan miễn phí để quản trị My
 3. File SQL sẽ hiển thị trong trình soạn thảo của DBeaver. Nhấn tổ hợp phím **`Alt + X`** (hoặc bấm biểu tượng **Execute SQL Script** trên thanh công cụ bên trái) để chạy toàn bộ kịch bản.
 4. Quá trình chạy sẽ tự động tạo cơ sở dữ liệu `grabfood_db`, toàn bộ bảng và dữ liệu mẫu đầy đủ (users, shops, products, vouchers, categories,...).
 5. Sau khi hoàn tất, click chuột phải vào Connection ở cây thư mục bên trái $\rightarrow$ chọn **Refresh** (`F5`) để xem cơ sở dữ liệu `grabfood_db`.
-

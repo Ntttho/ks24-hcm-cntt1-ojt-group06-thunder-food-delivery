@@ -140,17 +140,25 @@ export const MerchantDashboardPage: React.FC = () => {
 
   // Debounce search effect (400ms)
   const isFirstSearch = useRef(true);
+  const prevRestaurantIdRef = useRef(currentRestaurantId);
+
   useEffect(() => {
     if (isFirstSearch.current) {
       isFirstSearch.current = false;
       return;
     }
+    // Skip if branch just switched (already fetched directly in currentRestaurantId effect)
+    if (prevRestaurantIdRef.current !== currentRestaurantId) {
+      prevRestaurantIdRef.current = currentRestaurantId;
+      return;
+    }
+
     const timer = setTimeout(() => {
       setPage(0);
       fetchOrders(false, 0, pageSize, searchText, activeTab);
     }, 400);
     return () => clearTimeout(timer);
-  }, [searchText, pageSize, activeTab, fetchOrders]);
+  }, [searchText, pageSize, activeTab]);
 
   // Switch tab handler
   const handleTabChange = (newTab: string) => {
@@ -159,8 +167,13 @@ export const MerchantDashboardPage: React.FC = () => {
     fetchOrders(false, 0, pageSize, searchText, newTab);
   };
 
-  // Initial load, WebSocket connection & Polling setup
+  // Initial load, branch switcher re-load, WebSocket connection & Polling setup
   useEffect(() => {
+    // Reset page and known orders when branch changes
+    setOrders([]);
+    setPage(0);
+    knownOrderIdsRef.current = new Set();
+
     fetchOrders(false, 0, pageSize, searchText, activeTab);
     fetchCounts();
 
@@ -174,6 +187,11 @@ export const MerchantDashboardPage: React.FC = () => {
 
     // 3. Subscribe to Realtime Incoming Order Notification
     const unsubOrder = merchantWebSocket.subscribeOrderNotification((incomingOrder) => {
+      // Discard order if it does not belong to the currently viewed restaurant branch
+      if (incomingOrder.restaurantId && Number(incomingOrder.restaurantId) !== Number(currentRestaurantId)) {
+        return;
+      }
+
       setOrders((prev) => {
         const exists = prev.some((o) => o.id === incomingOrder.id);
         if (exists) {
