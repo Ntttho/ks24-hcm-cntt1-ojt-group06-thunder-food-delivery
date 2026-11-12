@@ -1,6 +1,7 @@
 import { apiClient, API_ENDPOINTS } from '@/services/api';
 import type { ApiResponse, PaginatedData } from '@/types';
 import { restaurantApi } from './restaurantApi';
+import { userApi } from './userApi';
 import { storage } from '@/utils/storage';
 
 export interface DriverOrderItem {
@@ -14,13 +15,19 @@ export interface DriverOrder {
   id: number;
   orderCode: string;
   driverId?: number | null;
+  customerId?: number;
   restaurantId?: number;
+  restaurantOwnerId?: number;
   restaurantName: string;
   restaurantAddress: string;
   restaurantPhone: string;
+  restaurantLat?: number | null;
+  restaurantLng?: number | null;
   receiverName: string;
   receiverPhone: string;
   receiverAddress: string;
+  receiverLat?: number | null;
+  receiverLng?: number | null;
   distanceKm: number;
   shippingFee: number;
   codAmount: number; // Tiền mặt COD cần thu từ khách (0 nếu đã thanh toán online)
@@ -164,6 +171,8 @@ interface BackendOrderDto {
   restaurantId: number;
   driverId?: number | null;
   receiverAddress?: string | null;
+  receiverLat?: number | null;
+  receiverLng?: number | null;
   distanceKm?: number | null;
   shippingFee?: number | null;
   totalAmount?: number | null;
@@ -193,8 +202,12 @@ interface BackendReviewSummaryDto {
 }
 
 interface RestaurantDirectoryInfo {
+  ownerId?: number;
   name: string;
   address: string;
+  phone?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 const ACTIVE_DELIVERY_STATUSES = new Set(['DRIVER_ACCEPTED', 'PICKING_UP', 'DELIVERING']);
@@ -212,6 +225,24 @@ let restaurantDirectoryCache: {
   map: Map<number, RestaurantDirectoryInfo>;
   expiresAt: number;
 } | null = null;
+
+// Cache SĐT chủ quán theo ownerId (dùng để hiển thị nút Gọi quán)
+const ownerPhoneCache = new Map<number, string>();
+
+const resolveOwnerPhone = async (ownerId?: number): Promise<string> => {
+  if (!ownerId || ownerId <= 0) return '';
+  if (ownerPhoneCache.has(ownerId)) {
+    return ownerPhoneCache.get(ownerId) || '';
+  }
+  try {
+    const res = await userApi.getUserById(ownerId);
+    const phone = (res?.data?.phone || res?.data?.phoneNumber || '').trim();
+    ownerPhoneCache.set(ownerId, phone);
+    return phone;
+  } catch {
+    return '';
+  }
+};
 
 const isHistoryOrderStatus = (statusCode?: string | null): boolean => {
   const code = (statusCode || '').trim().toUpperCase();
@@ -299,7 +330,8 @@ const extractOrderList = (
 };
 
 const fetchRestaurantDirectoryMap = async (
-  restaurantIds: number[]
+  restaurantIds: number[],
+  resolveOwnerPhones = false
 ): Promise<Map<number, RestaurantDirectoryInfo>> => {
   const now = Date.now();
   const map = new Map<number, RestaurantDirectoryInfo>(
@@ -315,8 +347,12 @@ const fetchRestaurantDirectoryMap = async (
       shops.forEach((shop) => {
         if (shop.id) {
           map.set(Number(shop.id), {
+            ownerId: shop.ownerId,
             name: shop.name,
             address: shop.address || 'Chưa cập nhật địa chỉ quán',
+            phone: shop.phoneNumber?.trim() || '',
+            latitude: typeof shop.latitude === 'number' ? shop.latitude : null,
+            longitude: typeof shop.longitude === 'number' ? shop.longitude : null,
           });
         }
       });
@@ -339,14 +375,37 @@ const fetchRestaurantDirectoryMap = async (
           const detailRes = await restaurantApi.getById(id);
           if (detailRes?.data?.name) {
             const info: RestaurantDirectoryInfo = {
+              ownerId: detailRes.data.ownerId,
               name: detailRes.data.name,
               address: detailRes.data.address || 'Chưa cập nhật địa chỉ quán',
+              phone: detailRes.data.phoneNumber?.trim() || '',
+              latitude:
+                typeof detailRes.data.latitude === 'number' ? detailRes.data.latitude : null,
+              longitude:
+                typeof detailRes.data.longitude === 'number' ? detailRes.data.longitude : null,
             };
             map.set(id, info);
             restaurantDirectoryCache?.map.set(id, info);
           }
         } catch {
           // Bỏ qua nếu quán không còn tồn tại
+        }
+      })
+    );
+  }
+
+  if (resolveOwnerPhones) {
+    const uniqueIds = Array.from(new Set(restaurantIds)).filter((id) => id > 0);
+    await Promise.all(
+      uniqueIds.map(async (id) => {
+        const info = map.get(id);
+        if (info && !info.phone && info.ownerId) {
+          const phone = await resolveOwnerPhone(info.ownerId);
+          if (phone) {
+            const enriched = { ...info, phone };
+            map.set(id, enriched);
+            restaurantDirectoryCache?.map.set(id, enriched);
+          }
         }
       })
     );
@@ -396,14 +455,20 @@ const mapOrderToDriverOrder = (
     id: order.id,
     orderCode: order.orderCode || `ORD-${order.id}`,
     driverId: order.driverId ?? null,
+    customerId: order.customerId,
     restaurantId: order.restaurantId,
+    restaurantOwnerId: shop?.ownerId,
     restaurantName: shop?.name || `Quán ăn #${order.restaurantId}`,
     restaurantAddress: shop?.address || 'Chưa cập nhật địa chỉ quán',
-    restaurantPhone: '',
+    restaurantPhone: shop?.phone || '',
+    restaurantLat: shop?.latitude ?? null,
+    restaurantLng: shop?.longitude ?? null,
     receiverName:
       order.customerName?.trim() || (order.customerId ? `Khách hàng #${order.customerId}` : 'Khách hàng'),
     receiverPhone: order.customerPhone?.trim() || '',
     receiverAddress: order.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
+    receiverLat: order.receiverLat ?? null,
+    receiverLng: order.receiverLng ?? null,
     distanceKm: Number(order.distanceKm || 0),
     shippingFee,
     codAmount,
@@ -631,7 +696,7 @@ export const driverApi = {
     if (!active) {
       return null;
     }
-    const shopMap = await fetchRestaurantDirectoryMap([active.restaurantId]);
+    const shopMap = await fetchRestaurantDirectoryMap([active.restaurantId], true);
     return mapOrderToDriverOrder(active, shopMap);
   },
 
@@ -656,7 +721,7 @@ export const driverApi = {
       throw new Error('Đơn hàng này đã được một tài xế khác nhận trước. Vui lòng chọn đơn khác!');
     }
 
-    const shopMap = await fetchRestaurantDirectoryMap([accepted.restaurantId]);
+    const shopMap = await fetchRestaurantDirectoryMap([accepted.restaurantId], true);
     return mapOrderToDriverOrder(accepted, shopMap);
   },
 
@@ -685,8 +750,34 @@ export const driverApi = {
       throw new Error(res?.message || 'Không thể cập nhật trạng thái đơn hàng.');
     }
 
-    const shopMap = await fetchRestaurantDirectoryMap([updated.restaurantId]);
+    const shopMap = await fetchRestaurantDirectoryMap([updated.restaurantId], true);
     return mapOrderToDriverOrder(updated, shopMap);
+  },
+
+  // 3b. Mốc 1 một chạm: "TÔI ĐÃ ĐẾN QUÁN LẤY MÓN" -> chuyển qua PICKING_UP (nếu cần) rồi DELIVERING
+  confirmPickupAndStartDelivery: async (
+    orderId: number | string,
+    currentStatus?: string
+  ): Promise<DriverOrder> => {
+    const normalized = (currentStatus || '').trim().toUpperCase();
+    if (normalized === 'PICKING_UP') {
+      return driverApi.updateStatus(orderId, 'DELIVERING');
+    }
+    if (normalized === 'DELIVERING') {
+      const active = await driverApi.getActiveOrder();
+      if (active && Number(active.id) === Number(orderId)) {
+        return active;
+      }
+    }
+
+    const pickingUpOrder = await driverApi.updateStatus(orderId, 'PICKING_UP');
+    try {
+      return await driverApi.updateStatus(orderId, 'DELIVERING');
+    } catch (error) {
+      const enrichedError = error as Error & { partialOrder?: DriverOrder };
+      enrichedError.partialOrder = pickingUpOrder;
+      throw enrichedError;
+    }
   },
 
   // 4. Lấy thông tin ví & các chuyến gần đây từ lịch sử đơn thật của tài xế
@@ -732,8 +823,8 @@ export const driverApi = {
       const rawReviews = Array.isArray(listData?.content)
         ? listData.content
         : Array.isArray(summary?.recentReviews)
-        ? summary.recentReviews
-        : [];
+          ? summary.recentReviews
+          : [];
 
       const averageRating = Number(summary?.averageRating || 0);
       const totalReviews = Number(summary?.totalReviews ?? rawReviews.length ?? 0);
