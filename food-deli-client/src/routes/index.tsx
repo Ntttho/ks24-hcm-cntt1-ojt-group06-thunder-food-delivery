@@ -23,6 +23,7 @@ import {
   OrderDetailPage,
   AdminUserPage,
   AdminApprovalPage,
+  AdminAnalyticsPage,
   ShipperHubPage,
   ShipperHistoryPage,
   AdminRestaurantReviewsPage,
@@ -62,10 +63,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: APP_ROUTES.ADMIN_DASHBOARD,
+        path: APP_ROUTES.ADMIN_ANALYTICS,
         element: (
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminUserPage />
+            <AdminAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/admin/dashboard',
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminAnalyticsPage />
           </ProtectedRoute>
         ),
       },

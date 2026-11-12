@@ -73,6 +73,19 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin người dùng thành công", userDto));
     }
 
+    /**
+     * SP3-ADM-05: Lấy thống kê số lượng người dùng và đối tác kinh doanh (Merchants) cho Admin Analytics
+     * GET /api/v1/users/admin/analytics-counts
+     */
+    @GetMapping("/admin/analytics-counts")
+    public ResponseEntity<ApiResponse<UserAnalyticsCountsDto>> getAnalyticsCounts(
+            @RequestHeader(value = "X-User-Role", required = false) String roleHeader
+    ) {
+        requireAdminRole(roleHeader, "Chỉ Admin mới được truy cập số liệu thống kê người dùng");
+        UserAnalyticsCountsDto counts = authService.getAnalyticsCounts();
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", counts));
+    }
+
     @PutMapping("/{id}/rating")
     public ResponseEntity<ApiResponse<UserDto>> updateRating(
             @PathVariable Long id,
@@ -153,6 +166,10 @@ public class UserController {
     }
 
     private void requireAdminRole(String roleHeader) {
+        requireAdminRole(roleHeader, "Chỉ Admin mới được cập nhật điểm đánh giá");
+    }
+
+    private void requireAdminRole(String roleHeader, String deniedMessage) {
         if (roleHeader == null || roleHeader.isBlank()) {
             throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
         }
@@ -161,7 +178,7 @@ public class UserController {
                 .map(String::toUpperCase)
                 .collect(java.util.stream.Collectors.toSet());
         if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
-            throw new AccessDeniedException("Chỉ Admin mới được cập nhật điểm đánh giá");
+            throw new AccessDeniedException(deniedMessage);
         }
     }
 }

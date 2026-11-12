@@ -2,6 +2,7 @@ package com.foodthunder.order.client;
 
 import com.foodthunder.order.dto.ApiResponse;
 import com.foodthunder.order.dto.client.RemoteProductDto;
+import com.foodthunder.order.dto.client.RemoteRestaurantAnalyticsCountsDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
@@ -26,4 +27,7 @@ public interface RestaurantClient {
 
     @GetMapping("/api/v1/vouchers/{id}")
     ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> getVoucherById(@PathVariable("id") Integer id);
+
+    @GetMapping("/api/v1/restaurants/admin/analytics-counts")
+    ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> getRestaurantAnalyticsCounts();
 }

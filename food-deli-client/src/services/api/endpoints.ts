@@ -101,6 +101,7 @@ export const API_ENDPOINTS = {
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
   },
+  // Admin Portal & Approvals (SP3-ADM-02 & SP3-ADM-05)
   // Revenue Analytics
   REVENUE: {
     SUMMARY: '/revenue/summary',
@@ -110,6 +111,7 @@ export const API_ENDPOINTS = {
   },
   // Admin Portal & Approvals (SP3-ADM-02)
   ADMIN: {
+    ANALYTICS_SUMMARY: '/admin/analytics/summary',
     CHANGE_REQUESTS: '/restaurants/change-requests',
     CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
     APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,

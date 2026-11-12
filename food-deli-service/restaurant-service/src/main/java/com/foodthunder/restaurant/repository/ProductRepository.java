@@ -22,6 +22,10 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     List<Product> findByCategoryRestaurantIdAndDeletedAtIsNull(Integer restaurantId);
 
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.deletedAt IS NULL AND p.category IS NOT NULL " +
+           "AND p.category.restaurant.deletedAt IS NULL AND p.category.restaurant.approvalStatus = 'APPROVED'")
+    long countActiveFoodItems();
+
     @Query("SELECT p FROM Product p WHERE (:restaurantId IS NULL OR p.category.restaurant.id = :restaurantId) AND p.deletedAt IS NULL " +
            "AND (:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND (:categoryId IS NULL OR p.category.id = :categoryId) " +
