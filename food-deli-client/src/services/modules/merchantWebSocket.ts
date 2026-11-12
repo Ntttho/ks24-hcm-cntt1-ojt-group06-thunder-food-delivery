@@ -62,7 +62,12 @@ class MerchantWebSocketService {
     }
 
     if (this.restaurantId !== restaurantId) {
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
       this.reconnectAttempts = 0;
+      this.wsFallbackMode = false;
     }
     this.restaurantId = restaurantId;
     this.isExplicitlyClosed = false;

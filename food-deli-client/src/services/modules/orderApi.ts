@@ -163,7 +163,7 @@ export const orderApi = {
         timestamp: new Date().toISOString(),
       };
     } catch {
-      const fallbackList = getFallbackOrders(requestParams.status).data || [];
+      const fallbackList = getFallbackOrders(requestParams.status, requestParams.restaurantId).data || [];
       return {
         status: 200,
         message: 'Fallback Data',
@@ -455,11 +455,13 @@ function saveMockOrders(orders: MerchantOrder[]): void {
   }
 }
 
-function getFallbackOrders(status?: string): ApiResponse<MerchantOrder[]> {
+function getFallbackOrders(status?: string, restaurantId?: number | string): ApiResponse<MerchantOrder[]> {
   const all = loadMockOrders();
-  const filtered = status && status !== 'ALL'
-    ? all.filter((o) => o.statusCode === status)
-    : all;
+  const filtered = all.filter((o) => {
+    const matchStatus = !status || status === 'ALL' || o.statusCode === status;
+    const matchRestaurant = !restaurantId || Number(o.restaurantId) === Number(restaurantId);
+    return matchStatus && matchRestaurant;
+  });
   return {
     status: 200,
     message: 'Success (Data loaded)',
