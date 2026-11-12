@@ -24,6 +24,7 @@ import {
   AdminUserPage,
   AdminApprovalPage,
   AdminAnalyticsPage,
+  AdminSystemSettingsPage,
   ShipperHubPage,
   ShipperHistoryPage,
   AdminRestaurantReviewsPage,
@@ -67,6 +68,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <AdminAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_SETTINGS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminSystemSettingsPage />
           </ProtectedRoute>
         ),
       },

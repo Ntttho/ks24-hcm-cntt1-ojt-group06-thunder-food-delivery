@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { Alert, Button, message, Spin } from 'antd';
 import { orderApi, type CreateOrderPayload } from '@/services/modules/orderApi';
 import { addressApi } from '@/services/modules/addressApi';
 import { paymentApi, type SepayGenerateResponse } from '@/services/modules/paymentApi';
 import { type VoucherItem } from '@/services/modules/restaurantApi';
+import { systemSettingsApi, type ShippingSettings } from '@/services/modules/systemSettingsApi';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
@@ -33,6 +34,9 @@ export const CheckoutPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { user } = useAuth();
   const cart = useAppSelector((state) => state.cart);
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
+  const [shippingSettingsLoading, setShippingSettingsLoading] = useState(true);
+  const [shippingSettingsError, setShippingSettingsError] = useState<string | null>(null);
 
   // If cart empty, redirect
   useEffect(() => {
@@ -79,6 +83,30 @@ export const CheckoutPage: React.FC = () => {
       setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  const loadShippingSettings = async () => {
+    setShippingSettingsLoading(true);
+    setShippingSettingsError(null);
+    try {
+      const response = await systemSettingsApi.getShippingSettings();
+      if (!response.data) {
+        throw new Error('Máy chủ không trả về cấu hình phí giao hàng.');
+      }
+      setShippingSettings(response.data);
+    } catch (error: unknown) {
+      const responseMessage =
+        error && typeof error === 'object' && 'response' in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setShippingSettingsError(responseMessage || (error instanceof Error ? error.message : 'Không thể tải phí giao hàng.'));
+    } finally {
+      setShippingSettingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadShippingSettings();
   }, []);
 
   const formatTimer = (seconds: number) => {
@@ -173,9 +201,11 @@ export const CheckoutPage: React.FC = () => {
     }, 0);
   }, [selectedItems]);
 
-  const baseShippingFee = selectedItems.length > 0 ? 18000 : 0;
-  const prioritySurcharge = deliverySpeed === 'priority' ? 5000 : 0;
-  const shippingFee = baseShippingFee + prioritySurcharge;
+  const deliveryDistanceKm = 1.8;
+  const baseShippingFee = selectedItems.length > 0 && shippingSettings
+    ? shippingSettings.defaultShippingFee + deliveryDistanceKm * shippingSettings.shippingFeePerKilometer
+    : 0;
+  const shippingFee = baseShippingFee;
   const serviceFee = selectedItems.length > 0 ? 3000 : 0;
 
   // Single Voucher Calculation
@@ -213,6 +243,10 @@ export const CheckoutPage: React.FC = () => {
   };
 
   const handlePlaceOrder = async () => {
+    if (!shippingSettings) {
+      message.error('Không thể đặt hàng khi chưa tải được cấu hình phí giao hàng.');
+      return;
+    }
     if (selectedItems.length === 0) {
       message.warning('Vui lòng tích chọn ít nhất 1 món ăn để thanh toán!');
       navigate(APP_ROUTES.CART);
@@ -236,7 +270,7 @@ export const CheckoutPage: React.FC = () => {
         receiverAddress: selectedAddress?.fullAddress || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
         receiverLat: 10.795,
         receiverLng: 106.721,
-        distanceKm: 1.8,
+        distanceKm: deliveryDistanceKm,
         voucherId: appliedVoucher?.id || undefined,
         note: fullNote,
         items: selectedItems.map((it) => ({
@@ -246,6 +280,29 @@ export const CheckoutPage: React.FC = () => {
         })),
         paymentMethod: paymentMethod.id === 'vietqr' ? 'WALLET' : 'COD',
       };
+
+      if (shippingSettingsLoading) {
+        return (
+          <div className="flex min-h-screen items-center justify-center bg-gray-50">
+            <Spin size="large" tip="Đang tải phí giao hàng..." />
+          </div>
+        );
+      }
+
+      if (shippingSettingsError || !shippingSettings) {
+        return (
+          <div className="mx-auto flex min-h-screen max-w-xl items-center bg-gray-50 p-4">
+            <Alert
+              className="w-full"
+              type="error"
+              showIcon
+              message="Không thể tính phí giao hàng"
+              description={shippingSettingsError || 'Cấu hình phí giao hàng hiện không khả dụng.'}
+              action={<Button onClick={() => void loadShippingSettings()}>Thử lại</Button>}
+            />
+          </div>
+        );
+      }
 
       const res = await orderApi.create(createPayload);
       const createdData = res?.data;
@@ -300,7 +357,7 @@ export const CheckoutPage: React.FC = () => {
   return (
     <div className="bg-gray-50 flex flex-col min-h-screen font-sans">
       {/* 1. Top Header with Hover Animation & Click Home */}
-      <CheckoutHeader shopName={currentShopName} distance="1.8 km" />
+      <CheckoutHeader shopName={currentShopName} distance={`${deliveryDistanceKm} km`} />
 
       {/* Main Body */}
       <main className="flex-1 w-full pt-16 pb-36">
@@ -326,7 +383,7 @@ export const CheckoutPage: React.FC = () => {
             <CheckoutDeliverySpeed
               deliverySpeed={deliverySpeed}
               onSelectDeliverySpeed={setDeliverySpeed}
-              distance="1.8 km"
+              distance={`${deliveryDistanceKm} km`}
             />
 
             {/* 5. Order Summary Card (Real items from Redux) */}

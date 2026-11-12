@@ -15,6 +15,7 @@ import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
+import com.foodthunder.order.dto.settings.ShippingSettingsResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ class OrderServiceTest {
     @Mock
     private RestaurantClient restaurantClient;
 
+    @Mock
+    private SystemSettingsService systemSettingsService;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -63,6 +67,12 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(systemSettingsService.getShippingSettings()).thenReturn(
+                ShippingSettingsResponse.builder()
+                        .defaultShippingFee(BigDecimal.valueOf(15000))
+                        .shippingFeePerKilometer(BigDecimal.valueOf(5000))
+                        .build()
+        );
         awaitingPaymentStatus = OrderStatus.builder().id(0).code(OrderStatus.AWAITING_PAYMENT).label("Chờ thanh toán VNPay").build();
         pendingStatus = OrderStatus.builder().id(1).code(OrderStatus.PENDING).label("Chờ xác nhận").build();
         confirmedStatus = OrderStatus.builder().id(4).code(OrderStatus.CONFIRMED).label("Đã xác nhận").build();
@@ -138,10 +148,10 @@ class OrderServiceTest {
         assertThat(response.getRestaurantId()).isEqualTo(10);
         // Subtotal: (45000 * 2) + (10000 * 1 * 2) = 110,000
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(110000));
-        // Distance 3.2km: base 15,000 + ceil(1.2)*5,000 = 25,000
-        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(25000));
-        // Total: 110,000 + 25,000 = 135,000
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(135000));
+        // Distance 3.2km: base 15,000 + (3.2 * 5,000) = 31,000
+        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(31000));
+        // Total: 110,000 + 31,000 = 141,000
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(141000));
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getFoodName()).isEqualTo("Trà Sữa Ô Long");
         assertThat(response.getItems().get(0).getToppings()).hasSize(1);
@@ -188,7 +198,7 @@ class OrderServiceTest {
         assertThat(response.getId()).isEqualTo(6001L);
         assertThat(response.getStatusCode()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
         assertThat(response.getPaymentMethod()).isEqualTo("VNPAY");
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(60000)); // 45k + 15k ship
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(70000)); // 45k + 25k ship
     }
 
     @Test
@@ -474,7 +484,7 @@ class OrderServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
         assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(95000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(105000));
         assertThat(response.getVoucherId()).isEqualTo(99);
     }
 

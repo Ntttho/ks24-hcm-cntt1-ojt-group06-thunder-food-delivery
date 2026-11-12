@@ -18,6 +18,7 @@ import {
   StarOutlined,
   AuditOutlined,
   BarChartOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -72,6 +73,9 @@ export const Header: React.FC = () => {
         break;
       case 'admin-analytics':
         navigate(APP_ROUTES.ADMIN_ANALYTICS);
+        break;
+      case 'admin-settings':
+        navigate(APP_ROUTES.ADMIN_SETTINGS);
         break;
       case 'admin-approvals':
         navigate(APP_ROUTES.ADMIN_APPROVALS);
@@ -140,6 +144,11 @@ export const Header: React.FC = () => {
       key: 'admin-analytics',
       icon: <BarChartOutlined className="text-emerald-600 text-base" />,
       label: <span className="font-bold text-emerald-700">Thống kê & Tổng thu sàn</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-settings',
+      icon: <SettingOutlined className="text-orange-500 text-base" />,
+      label: <span className="font-bold text-slate-700">Cấu hình hệ thống</span>,
     });
     roleSpecificMenuItems.push({
       key: 'admin-approvals',

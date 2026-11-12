@@ -284,10 +284,10 @@ export const MerchantRevenuePage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. 4 Core KPI Stat Cards with Gradient */}
+      {/* 2. Revenue, commission and settlement KPI cards */}
       <Row gutter={[16, 16]}>
         {/* Total Revenue */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card className="rounded-2xl border-orange-200/80 bg-linear-to-br from-amber-50 to-orange-100/60 shadow-xs hover:shadow-md transition-all">
             <Statistic
               title={<span className="text-xs font-bold text-amber-900 uppercase tracking-wider">Tổng Doanh Thu Thu Về</span>}
@@ -303,7 +303,7 @@ export const MerchantRevenuePage: React.FC = () => {
         </Col>
 
         {/* Successful Orders */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card className="rounded-2xl border-emerald-200/80 bg-linear-to-br from-emerald-50 to-teal-100/60 shadow-xs hover:shadow-md transition-all">
             <Statistic
               title={<span className="text-xs font-bold text-emerald-900 uppercase tracking-wider">Đơn Hàng Hoàn Thành</span>}
@@ -320,7 +320,7 @@ export const MerchantRevenuePage: React.FC = () => {
         </Col>
 
         {/* Average Order Value (AOV) */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card className="rounded-2xl border-blue-200/80 bg-linear-to-br from-blue-50 to-indigo-100/60 shadow-xs hover:shadow-md transition-all">
             <Statistic
               title={<span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Giá Trị TB / Đơn (AOV)</span>}
@@ -336,7 +336,7 @@ export const MerchantRevenuePage: React.FC = () => {
         </Col>
 
         {/* Completion Rate */}
-        <Col xs={24} sm={12} lg={6}>
+        <Col xs={24} sm={12} lg={8}>
           <Card className="rounded-2xl border-purple-200/80 bg-linear-to-br from-purple-50 to-fuchsia-100/60 shadow-xs hover:shadow-md transition-all">
             <Statistic
               title={<span className="text-xs font-bold text-purple-900 uppercase tracking-wider">Tỉ Lệ Hoàn Tất Đơn</span>}
@@ -348,6 +348,32 @@ export const MerchantRevenuePage: React.FC = () => {
             <div className="mt-2.5 pt-2 border-t border-purple-200/60 flex items-center justify-between text-[11px] text-purple-800">
               <span>Số đơn bị hủy / từ chối:</span>
               <span className="font-bold text-rose-600">{summary?.cancelledOrders ?? 0} đơn</span>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={8}>
+          <Card className="rounded-2xl border-rose-200/80 bg-linear-to-br from-rose-50 to-pink-100/60 shadow-xs hover:shadow-md transition-all">
+            <Statistic
+              title={<span className="text-xs font-bold text-rose-900 uppercase tracking-wider">Hoa hồng nền tảng</span>}
+              value={summary ? formatCurrency(summary.platformCommission) : '0 ₫'}
+              valueStyle={{ color: '#be123c', fontWeight: 800, fontSize: '1.45rem' }}
+            />
+            <div className="mt-2.5 border-t border-rose-200/60 pt-2 text-[11px] text-rose-800">
+              Tính theo tỷ lệ áp dụng tại thời điểm tạo đơn
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} sm={12} lg={8}>
+          <Card className="rounded-2xl border-teal-200/80 bg-linear-to-br from-teal-50 to-emerald-100/60 shadow-xs hover:shadow-md transition-all">
+            <Statistic
+              title={<span className="text-xs font-bold text-teal-900 uppercase tracking-wider">Khoản nhà hàng nhận</span>}
+              value={summary ? formatCurrency(summary.restaurantPayout) : '0 ₫'}
+              valueStyle={{ color: '#0f766e', fontWeight: 800, fontSize: '1.45rem' }}
+            />
+            <div className="mt-2.5 border-t border-teal-200/60 pt-2 text-[11px] text-teal-800">
+              Giá trị món sau khi trừ hoa hồng nền tảng
             </div>
           </Card>
         </Col>
@@ -632,4 +658,3 @@ export const MerchantRevenuePage: React.FC = () => {
 };
 
 export default MerchantRevenuePage;
-

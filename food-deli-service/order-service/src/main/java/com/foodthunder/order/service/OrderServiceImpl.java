@@ -49,6 +49,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final RestaurantClient restaurantClient;
     private final SimpMessagingTemplate messagingTemplate;
+    private final SystemSettingsService systemSettingsService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.foodthunder.order.client.NotificationClient notificationClient;
@@ -58,13 +59,15 @@ public class OrderServiceImpl implements OrderService {
             OrderStatusRepository orderStatusRepository,
             OrderStatusLogRepository orderStatusLogRepository,
             RestaurantClient restaurantClient,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            SystemSettingsService systemSettingsService
     ) {
         this.orderRepository = orderRepository;
         this.orderStatusRepository = orderStatusRepository;
         this.orderStatusLogRepository = orderStatusLogRepository;
         this.restaurantClient = restaurantClient;
         this.messagingTemplate = messagingTemplate;
+        this.systemSettingsService = systemSettingsService;
     }
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
@@ -549,13 +552,10 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private BigDecimal calculateShippingFee(Double distanceKm) {
-        BigDecimal baseFee = BigDecimal.valueOf(15000); // 15,000 VND for <= 2.0 km
-        if (distanceKm <= 2.0) {
-            return baseFee;
-        }
-        double extraKm = Math.ceil(distanceKm - 2.0);
-        BigDecimal extraFee = BigDecimal.valueOf(extraKm * 5000); // 5,000 VND per extra km
-        return baseFee.add(extraFee);
+        var settings = systemSettingsService.getShippingSettings();
+        return settings.getDefaultShippingFee().add(
+                settings.getShippingFeePerKilometer().multiply(BigDecimal.valueOf(distanceKm))
+        );
     }
 
     private OrderStatus getOrCreateStatus(String code, String defaultLabel, String defaultDescription, int sortOrder) {

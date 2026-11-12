@@ -6,6 +6,7 @@ import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.repository.OrderItemRepository;
 import com.foodthunder.order.repository.OrderRepository;
+import com.foodthunder.order.service.SystemSettingsService;
 import com.foodthunder.order.service.revenue.MerchantRevenueServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -38,6 +40,9 @@ class MerchantRevenueServiceTest {
 
     @Mock
     private RestaurantClient restaurantClient;
+
+    @Mock
+    private SystemSettingsService systemSettingsService;
 
     @InjectMocks
     private MerchantRevenueServiceImpl revenueService;
@@ -59,6 +64,7 @@ class MerchantRevenueServiceTest {
                 .id(1L)
                 .restaurantId(1)
                 .status(completedStatus)
+                .subtotalAmount(new BigDecimal("100000"))
                 .totalAmount(new BigDecimal("100000"))
                 .discountAmount(new BigDecimal("10000"))
                 .createdAt(LocalDateTime.now().minusDays(1))
@@ -68,6 +74,7 @@ class MerchantRevenueServiceTest {
                 .id(2L)
                 .restaurantId(1)
                 .status(completedStatus)
+                .subtotalAmount(new BigDecimal("200000"))
                 .totalAmount(new BigDecimal("200000"))
                 .discountAmount(BigDecimal.ZERO)
                 .createdAt(LocalDateTime.now().minusDays(2))
@@ -84,6 +91,10 @@ class MerchantRevenueServiceTest {
 
         when(orderRepository.findByRestaurantIdAndCreatedAtBetween(eq(1), any(), any()))
                 .thenReturn(Arrays.asList(order1, order2, order3));
+        when(systemSettingsService.commissionRatesAt(anyCollection())).thenReturn(Map.of(
+                order1.getCreatedAt(), new BigDecimal("10"),
+                order2.getCreatedAt(), new BigDecimal("10")
+        ));
 
         // Act
         MerchantRevenueSummaryResponse summary = revenueService.getRevenueSummary(
@@ -99,6 +110,8 @@ class MerchantRevenueServiceTest {
         assertThat(summary.getCancelledOrders()).isEqualTo(1L);
         assertThat(summary.getAverageOrderValue()).isEqualByComparingTo(new BigDecimal("150000"));
         assertThat(summary.getTotalDiscount()).isEqualByComparingTo(new BigDecimal("10000"));
+        assertThat(summary.getPlatformCommission()).isEqualByComparingTo(new BigDecimal("30000"));
+        assertThat(summary.getRestaurantPayout()).isEqualByComparingTo(new BigDecimal("270000"));
         assertThat(summary.getCompletionRate()).isEqualTo(66.7);
     }
 
@@ -193,4 +206,3 @@ class MerchantRevenueServiceTest {
         assertThat(branches.get(1).getContributionPercentage()).isEqualTo(25.0);
     }
 }
-
