@@ -3,6 +3,7 @@ package com.foodthunder.order.client;
 import com.foodthunder.order.dto.ApiResponse;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
+import com.foodthunder.order.dto.client.RemoteRestaurantStatsDto;
 import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import org.springframework.cloud.openfeign.FeignClient;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 @FeignClient(name = "restaurant-service", fallbackFactory = RestaurantClientFallbackFactory.class)
 public interface RestaurantClient {
 
@@ -20,6 +23,12 @@ public interface RestaurantClient {
 
     @GetMapping("/api/v1/restaurants/{id}")
     ResponseEntity<ApiResponse<RemoteRestaurantDto>> getRestaurantDetail(@PathVariable("id") Integer id);
+
+    @GetMapping("/api/v1/restaurants/all")
+    ResponseEntity<ApiResponse<List<RemoteRestaurantDto>>> getAllRestaurants();
+
+    @GetMapping("/api/v1/restaurants/stats/summary")
+    ResponseEntity<ApiResponse<RemoteRestaurantStatsDto>> getRestaurantStatsSummary();
 
     @PostMapping("/api/v1/vouchers/validate")
     ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> validateVoucher(@RequestBody RemoteValidateVoucherRequest request);

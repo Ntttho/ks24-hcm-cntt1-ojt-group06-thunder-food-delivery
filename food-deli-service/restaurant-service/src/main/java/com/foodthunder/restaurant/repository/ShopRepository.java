@@ -36,4 +36,6 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
         @Param("isOpen") Boolean isOpen,
         Pageable pageable
     );
+
+    long countByDeletedAtIsNull();
 }

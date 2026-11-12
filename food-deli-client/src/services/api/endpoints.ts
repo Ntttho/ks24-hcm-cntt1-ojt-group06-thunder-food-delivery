@@ -110,5 +110,12 @@ export const API_ENDPOINTS = {
     DRIVER_APPROVAL_DETAIL: (userId: number | string) => `/drivers/${userId}/approval`,
     APPROVE_DRIVER: (userId: number | string) => `/drivers/${userId}/approve`,
     REJECT_DRIVER: (userId: number | string) => `/drivers/${userId}/reject`,
+    SETTINGS: '/admin/settings',
+    ANALYTICS_SUMMARY: '/admin/analytics/summary',
+  },
+  // Public Platform Settings (Order Fees & Shipping)
+  SETTINGS: {
+    ORDER_FEES: '/settings/order-fees',
+    SHIPPING: '/settings/shipping',
   },
 } as const;

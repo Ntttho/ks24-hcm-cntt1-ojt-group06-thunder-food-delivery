@@ -27,6 +27,8 @@ import {
   ShipperHistoryPage,
   AdminRestaurantReviewsPage,
   AdminDriverReviewsPage,
+  AdminSettingsPage,
+  AdminAnalyticsPage,
 } from '@/pages';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { APP_ROUTES, ROLES } from '@/constants';
@@ -98,6 +100,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <AdminDriverReviewsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_SETTINGS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminSettingsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: APP_ROUTES.ADMIN_ANALYTICS,
+        element: (
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <AdminAnalyticsPage />
           </ProtectedRoute>
         ),
       },

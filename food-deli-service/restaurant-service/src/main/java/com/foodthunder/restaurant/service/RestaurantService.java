@@ -34,4 +34,6 @@ public interface RestaurantService {
     RestaurantChangeRequestDto approveChangeRequest(Integer id, Integer adminId);
 
     RestaurantChangeRequestDto rejectChangeRequest(Integer id, Integer adminId, String rejectReason);
+
+    com.foodthunder.restaurant.dto.RestaurantStatsSummaryDto getStatsSummary();
 }

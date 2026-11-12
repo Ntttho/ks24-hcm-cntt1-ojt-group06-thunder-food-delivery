@@ -603,4 +603,66 @@ class OrderServiceTest {
         assertThat(res.getStatusCode()).isEqualTo(OrderStatus.DRIVER_REJECTED);
         assertThat(res.getDriverId()).isEqualTo(2);
     }
+
+    @Test
+    @DisplayName("Áp dụng đúng cấu hình chi phí đơn hàng động (priority + serviceFee + VAT chưa gồm) từ auth-service")
+    void testCreateOrder_AppliesDynamicOrderCostConfig() {
+        com.foodthunder.order.client.AuthClient mockAuthClient = mock(com.foodthunder.order.client.AuthClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", mockAuthClient);
+
+        try {
+            com.foodthunder.order.dto.client.RemoteOrderCostConfigDto cfg = com.foodthunder.order.dto.client.RemoteOrderCostConfigDto.builder()
+                    .baseKm(2.0)
+                    .baseFee(BigDecimal.valueOf(20000))
+                    .extraPerKm(BigDecimal.valueOf(6000))
+                    .priorityFee(BigDecimal.valueOf(7000))
+                    .serviceFee(BigDecimal.valueOf(4000))
+                    .vatRate(0.10)
+                    .vatIncluded(false)
+                    .build();
+
+            when(mockAuthClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(cfg)));
+
+            RemoteProductDto productDto = RemoteProductDto.builder()
+                    .id(101)
+                    .name("Phở Bò")
+                    .price(BigDecimal.valueOf(50000))
+                    .restaurantId(10)
+                    .isAvailable(true)
+                    .build();
+
+            CreateOrderRequest request = CreateOrderRequest.builder()
+                    .restaurantId(10)
+                    .receiverAddress("123 Cầu Giấy")
+                    .distanceKm(3.0)
+                    .deliverySpeed("priority")
+                    .idempotencyKey("KEY-DYNAMIC-01")
+                    .paymentMethod("COD")
+                    .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(2).build()))
+                    .build();
+
+            when(orderRepository.findByIdempotencyKey("KEY-DYNAMIC-01")).thenReturn(Optional.empty());
+            when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+            when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+            when(orderStatusRepository.findByCode(OrderStatus.PENDING)).thenReturn(Optional.of(pendingStatus));
+            when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
+                Order o = i.getArgument(0);
+                o.setId(9001L);
+                return o;
+            });
+
+            OrderResponse response = orderService.createOrder(request, 1);
+
+            // Subtotal: 100,000
+            // Shipping: 20,000 + ceil(3.0 - 2.0) * 6,000 + 7,000 (priority) = 33,000
+            // TaxAmount: 4,000 (serviceFee) + 10% * 100,000 (VAT) = 14,000
+            // Total: 100,000 + 33,000 + 14,000 = 147,000
+            assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
+            assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(33000));
+            assertThat(response.getTaxAmount()).isEqualByComparingTo(BigDecimal.valueOf(14000));
+            assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(147000));
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", null);
+        }
+    }
 }

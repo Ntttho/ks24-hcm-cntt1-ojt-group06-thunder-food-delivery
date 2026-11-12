@@ -13,3 +13,5 @@ export * from './admin/AdminApprovalPage';
 export * from './driver/ShipperHubPage';
 export * from './driver/ShipperHistoryPage';
 export * from './admin/AdminReviewManagementPage';
+export * from './admin/AdminSettingsPage';
+export * from './admin/AdminAnalyticsPage';

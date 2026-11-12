@@ -275,4 +275,13 @@ public class RestaurantController {
         RestaurantChangeRequestDto rejected = restaurantService.rejectChangeRequest(id, adminId, reason);
         return ResponseEntity.ok(ApiResponse.success("Đã từ chối hồ sơ quán ăn thành công", rejected));
     }
+
+    /**
+     * SP3-ADM-05: Thống kê tóm tắt số lượng quán ăn và món ăn toàn sàn cho Admin Analytics
+     * GET /api/v1/restaurants/stats/summary
+     */
+    @GetMapping("/stats/summary")
+    public ResponseEntity<ApiResponse<RestaurantStatsSummaryDto>> getRestaurantStatsSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê quán ăn thành công", restaurantService.getStatsSummary()));
+    }
 }

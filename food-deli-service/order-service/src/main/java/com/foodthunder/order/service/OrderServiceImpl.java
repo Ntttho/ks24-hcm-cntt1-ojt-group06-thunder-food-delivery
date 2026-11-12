@@ -1,7 +1,9 @@
 package com.foodthunder.order.service;
 
+import com.foodthunder.order.client.AuthClient;
 import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.*;
+import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
@@ -52,6 +54,9 @@ public class OrderServiceImpl implements OrderService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.foodthunder.order.client.NotificationClient notificationClient;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AuthClient authClient;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
@@ -199,13 +204,23 @@ public class OrderServiceImpl implements OrderService {
             orderItems.add(orderItem);
         }
 
-        // 4. Calculate shipping fee based on distance
+        // 4. Calculate shipping fee, service fee & VAT dynamically from auth-service Admin Settings
+        RemoteOrderCostConfigDto costConfig = fetchOrderCostConfig();
         Double distanceKm = request.getDistanceKm();
         if (distanceKm == null || distanceKm <= 0) {
-            distanceKm = 2.0;
+            distanceKm = costConfig.getBaseKm() != null && costConfig.getBaseKm() > 0
+                    ? costConfig.getBaseKm() : 2.0;
         }
-        BigDecimal shippingFee = calculateShippingFee(distanceKm);
-        BigDecimal taxAmount = BigDecimal.ZERO;
+        BigDecimal shippingFee = calculateShippingFee(distanceKm, request.getDeliverySpeed(), costConfig);
+        BigDecimal serviceFee = costConfig.getServiceFee() != null && costConfig.getServiceFee().compareTo(BigDecimal.ZERO) > 0
+                ? costConfig.getServiceFee() : BigDecimal.ZERO;
+        BigDecimal vatAmount = BigDecimal.ZERO;
+        if (Boolean.FALSE.equals(costConfig.getVatIncluded())
+                && costConfig.getVatRate() != null && costConfig.getVatRate() > 0) {
+            vatAmount = subtotal.multiply(BigDecimal.valueOf(costConfig.getVatRate()))
+                    .setScale(0, java.math.RoundingMode.HALF_UP);
+        }
+        BigDecimal taxAmount = serviceFee.add(vatAmount);
         BigDecimal discountAmount = BigDecimal.ZERO;
         Integer appliedVoucherId = request.getVoucherId();
 
@@ -548,14 +563,50 @@ public class OrderServiceImpl implements OrderService {
         return mapToOrderResponse(updatedOrder);
     }
 
-    private BigDecimal calculateShippingFee(Double distanceKm) {
-        BigDecimal baseFee = BigDecimal.valueOf(15000); // 15,000 VND for <= 2.0 km
-        if (distanceKm <= 2.0) {
-            return baseFee;
+    private RemoteOrderCostConfigDto defaultOrderCostConfig() {
+        return RemoteOrderCostConfigDto.builder()
+                .baseKm(2.0)
+                .baseFee(BigDecimal.valueOf(15000))
+                .extraPerKm(BigDecimal.valueOf(5000))
+                .priorityFee(BigDecimal.valueOf(5000))
+                .serviceFee(BigDecimal.ZERO)
+                .vatRate(0.08)
+                .vatIncluded(true)
+                .platformCommissionPercent(15.0)
+                .build();
+    }
+
+    private RemoteOrderCostConfigDto fetchOrderCostConfig() {
+        if (authClient == null) {
+            return defaultOrderCostConfig();
         }
-        double extraKm = Math.ceil(distanceKm - 2.0);
-        BigDecimal extraFee = BigDecimal.valueOf(extraKm * 5000); // 5,000 VND per extra km
-        return baseFee.add(extraFee);
+        try {
+            ResponseEntity<ApiResponse<RemoteOrderCostConfigDto>> res = authClient.getOrderFeeConfig();
+            if (res != null && res.getBody() != null && res.getBody().getData() != null) {
+                return res.getBody().getData();
+            }
+        } catch (Exception ex) {
+            log.warn("Could not fetch order cost config from auth-service, using defaults: {}", ex.getMessage());
+        }
+        return defaultOrderCostConfig();
+    }
+
+    private BigDecimal calculateShippingFee(Double distanceKm, String deliverySpeed, RemoteOrderCostConfigDto cfg) {
+        double baseKm = (cfg.getBaseKm() != null && cfg.getBaseKm() > 0) ? cfg.getBaseKm() : 2.0;
+        BigDecimal baseFee = cfg.getBaseFee() != null ? cfg.getBaseFee() : BigDecimal.valueOf(15000);
+        BigDecimal extraPerKm = cfg.getExtraPerKm() != null ? cfg.getExtraPerKm() : BigDecimal.valueOf(5000);
+
+        BigDecimal total = baseFee;
+        if (distanceKm > baseKm) {
+            double extraKm = Math.ceil(distanceKm - baseKm);
+            total = total.add(extraPerKm.multiply(BigDecimal.valueOf(extraKm)));
+        }
+        if ("priority".equalsIgnoreCase(deliverySpeed)
+                && cfg.getPriorityFee() != null
+                && cfg.getPriorityFee().compareTo(BigDecimal.ZERO) > 0) {
+            total = total.add(cfg.getPriorityFee());
+        }
+        return total;
     }
 
     private OrderStatus getOrCreateStatus(String code, String defaultLabel, String defaultDescription, int sortOrder) {

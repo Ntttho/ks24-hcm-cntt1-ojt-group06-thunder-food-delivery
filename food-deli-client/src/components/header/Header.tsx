@@ -17,6 +17,8 @@ import {
   HistoryOutlined,
   StarOutlined,
   AuditOutlined,
+  SettingOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -71,6 +73,12 @@ export const Header: React.FC = () => {
         break;
       case 'admin-approvals':
         navigate(APP_ROUTES.ADMIN_APPROVALS);
+        break;
+      case 'admin-analytics':
+        navigate(APP_ROUTES.ADMIN_ANALYTICS);
+        break;
+      case 'admin-settings':
+        navigate(APP_ROUTES.ADMIN_SETTINGS);
         break;
       case 'admin-restaurant-reviews':
         navigate(APP_ROUTES.ADMIN_RESTAURANT_REVIEWS);
@@ -136,6 +144,16 @@ export const Header: React.FC = () => {
       key: 'admin-approvals',
       icon: <AuditOutlined className="text-amber-500 text-base" />,
       label: <span className="font-bold text-slate-700">Kiểm duyệt Quán & Tài xế</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-analytics',
+      icon: <BarChartOutlined className="text-indigo-600 text-base" />,
+      label: <span className="font-bold text-slate-700">Phân tích &amp; Thống kê sàn</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-settings',
+      icon: <SettingOutlined className="text-orange-600 text-base" />,
+      label: <span className="font-bold text-slate-700">Cấu hình Hệ thống &amp; Phí Order</span>,
     });
     roleSpecificMenuItems.push({
       key: 'admin-restaurant-reviews',

@@ -20,6 +20,8 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     long countByCategoryIdAndDeletedAtIsNull(Integer categoryId);
 
+    long countByDeletedAtIsNull();
+
     List<Product> findByCategoryRestaurantIdAndDeletedAtIsNull(Integer restaurantId);
 
     @Query("SELECT p FROM Product p WHERE (:restaurantId IS NULL OR p.category.restaurant.id = :restaurantId) AND p.deletedAt IS NULL " +

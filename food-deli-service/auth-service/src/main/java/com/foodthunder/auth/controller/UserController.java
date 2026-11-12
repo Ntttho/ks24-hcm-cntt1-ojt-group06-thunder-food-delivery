@@ -2,20 +2,18 @@ package com.foodthunder.auth.controller;
 
 import com.foodthunder.auth.dto.*;
 import com.foodthunder.auth.exception.UnauthorizedException;
+import com.foodthunder.auth.security.RoleGuard;
 import com.foodthunder.auth.security.UserPrincipal;
 import com.foodthunder.auth.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Set;
 import java.util.List;
 
 @Slf4j
@@ -73,13 +71,18 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin người dùng thành công", userDto));
     }
 
+    @GetMapping("/stats/summary")
+    public ResponseEntity<ApiResponse<UserStatsSummaryDto>> getUserStatsSummary() {
+        return ResponseEntity.ok(ApiResponse.success("Lấy thống kê người dùng thành công", authService.getUserStatsSummary()));
+    }
+
     @PutMapping("/{id}/rating")
     public ResponseEntity<ApiResponse<UserDto>> updateRating(
             @PathVariable Long id,
             @RequestParam BigDecimal ratingAvg,
             @RequestHeader(value = "X-User-Role", required = false) String roleHeader
     ) {
-        requireAdminRole(roleHeader);
+        RoleGuard.requireAdmin(roleHeader, "Chỉ Admin mới được cập nhật điểm đánh giá");
         UserDto updatedUser = authService.updateRating(id, ratingAvg);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật điểm đánh giá tài xế thành công", updatedUser));
     }
@@ -152,16 +155,4 @@ public class UserController {
         throw new UnauthorizedException("User is not authenticated");
     }
 
-    private void requireAdminRole(String roleHeader) {
-        if (roleHeader == null || roleHeader.isBlank()) {
-            throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");
-        }
-        Set<String> roles = Arrays.stream(roleHeader.split("[,\\s]+"))
-                .map(String::trim)
-                .map(String::toUpperCase)
-                .collect(java.util.stream.Collectors.toSet());
-        if (!roles.contains("ROLE_ADMIN") && !roles.contains("ADMIN")) {
-            throw new AccessDeniedException("Chỉ Admin mới được cập nhật điểm đánh giá");
-        }
-    }
 }

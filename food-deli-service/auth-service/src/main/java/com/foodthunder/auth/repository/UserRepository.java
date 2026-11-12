@@ -38,4 +38,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     default Page<User> searchUsers(String search, String role, Pageable pageable) {
         return searchUsers(search, role, null, pageable);
     }
+
+    long countByDeletedAtIsNull();
+
+    @Query("""
+        SELECT COUNT(DISTINCT u.id) FROM User u
+        JOIN u.roles r
+        WHERE u.deletedAt IS NULL
+          AND UPPER(r.name) IN ('MERCHANT', 'ROLE_MERCHANT')
+    """)
+    long countActiveMerchants();
 }

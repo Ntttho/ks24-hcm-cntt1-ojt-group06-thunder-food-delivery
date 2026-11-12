@@ -35,6 +35,9 @@ public class CreateOrderRequest {
 
     private Double distanceKm;
 
+    @Builder.Default
+    private String deliverySpeed = "standard";
+
     private String idempotencyKey;
 
     @Builder.Default

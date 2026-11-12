@@ -4,6 +4,8 @@ interface CheckoutPriceSummaryProps {
   itemsSubtotal: number;
   shippingFee: number;
   serviceFee: number;
+  vatAmount?: number;
+  vatIncluded?: boolean;
   totalDiscount: number;
   originalTotal: number;
   finalTotal: number;
@@ -15,6 +17,8 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   itemsSubtotal,
   shippingFee,
   serviceFee,
+  vatAmount = 0,
+  vatIncluded = true,
   totalDiscount,
   originalTotal,
   finalTotal,
@@ -28,7 +32,7 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
           Chi tiết hóa đơn
         </span>
         <span className="text-xs text-gray-400 font-medium">
-          Đã bao gồm VAT
+          {vatIncluded ? 'Đã bao gồm VAT' : 'Chưa bao gồm VAT'}
         </span>
       </div>
 
@@ -51,6 +55,15 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
           <span>Phí dịch vụ &amp; đóng gói</span>
           <span className="text-gray-900 font-semibold">
             {serviceFee.toLocaleString('vi-VN')}đ
+          </span>
+        </div>
+      )}
+
+      {!vatIncluded && vatAmount > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span>Thuế VAT</span>
+          <span className="text-gray-900 font-semibold">
+            {vatAmount.toLocaleString('vi-VN')}đ
           </span>
         </div>
       )}

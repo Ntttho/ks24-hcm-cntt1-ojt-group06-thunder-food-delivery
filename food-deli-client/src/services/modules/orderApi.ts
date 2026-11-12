@@ -27,6 +27,7 @@ export interface CreateOrderPayload {
   receiverLat?: number;
   receiverLng?: number;
   distanceKm?: number;
+  deliverySpeed?: 'priority' | 'standard' | 'schedule';
   voucherId?: number;
   idempotencyKey?: string;
   items: CreateOrderItemPayload[];

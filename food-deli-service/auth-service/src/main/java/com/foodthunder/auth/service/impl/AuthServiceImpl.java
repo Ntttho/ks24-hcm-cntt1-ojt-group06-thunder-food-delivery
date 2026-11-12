@@ -398,4 +398,15 @@ public class AuthServiceImpl implements AuthService {
                 .deletedAt(user.getDeletedAt())
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserStatsSummaryDto getUserStatsSummary() {
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long totalMerchants = userRepository.countActiveMerchants();
+        return UserStatsSummaryDto.builder()
+                .totalUsers(totalUsers)
+                .totalMerchants(totalMerchants)
+                .build();
+    }
 }

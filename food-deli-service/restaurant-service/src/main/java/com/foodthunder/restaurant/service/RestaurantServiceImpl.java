@@ -424,4 +424,15 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .createdAt(req.getCreatedAt())
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RestaurantStatsSummaryDto getStatsSummary() {
+        long totalRestaurants = shopRepository.countByDeletedAtIsNull();
+        long totalFoodItems = productRepository.countByDeletedAtIsNull();
+        return RestaurantStatsSummaryDto.builder()
+                .totalRestaurants(totalRestaurants)
+                .totalFoodItems(totalFoodItems)
+                .build();
+    }
 }
