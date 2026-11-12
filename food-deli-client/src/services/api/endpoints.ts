@@ -15,7 +15,6 @@ export const API_ENDPOINTS = {
     DETAIL: (id: number | string) => `/users/${id}`,
     STATUS: (id: number | string) => `/users/${id}/status`,
     ALL: '/users/all',
-    STATUS: (id: number | string) => `/users/${id}/status`,
   },
   // Customer User Addresses (Sổ địa chỉ)
   ADDRESSES: {
@@ -73,6 +72,9 @@ export const API_ENDPOINTS = {
     TOP_FOODS: '/orders/revenue/top-foods',
     BRANCHES: '/orders/revenue/branches',
   },
+  SYSTEM_SETTINGS: {
+    SHIPPING: '/system-settings/shipping',
+  },
   // Delivery & Shipper Service
   DELIVERY: {
     AVAILABLE_ORDERS: '/delivery/available',
@@ -103,15 +105,10 @@ export const API_ENDPOINTS = {
   },
   // Admin Portal & Approvals (SP3-ADM-02 & SP3-ADM-05)
   // Revenue Analytics
-  REVENUE: {
-    SUMMARY: '/revenue/summary',
-    CHART: '/revenue/chart',
-    TOP_FOODS: '/revenue/top-foods',
-    BRANCHES: '/revenue/branches',
-  },
   // Admin Portal & Approvals (SP3-ADM-02)
   ADMIN: {
     ANALYTICS_SUMMARY: '/admin/analytics/summary',
+    SYSTEM_SETTINGS: '/admin/system-settings',
     CHANGE_REQUESTS: '/restaurants/change-requests',
     CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
     APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,

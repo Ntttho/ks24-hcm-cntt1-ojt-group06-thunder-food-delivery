@@ -8,6 +8,7 @@ import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.repository.OrderItemRepository;
 import com.foodthunder.order.repository.OrderRepository;
+import com.foodthunder.order.service.SystemSettingsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -34,6 +35,7 @@ public class MerchantRevenueServiceImpl implements MerchantRevenueService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final RestaurantClient restaurantClient;
+    private final SystemSettingsService systemSettingsService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM");
     private static final DateTimeFormatter ISO_DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
@@ -50,11 +52,22 @@ public class MerchantRevenueServiceImpl implements MerchantRevenueService {
     ) {
         DateRange range = resolveDateRange(period, startDate, endDate);
         List<Order> orders = fetchOrders(restaurantId, restaurantIds, range.start, range.end);
+        Map<LocalDateTime, BigDecimal> commissionRates = systemSettingsService.commissionRatesAt(
+                orders.stream()
+                        .filter(order -> OrderStatus.COMPLETED.equalsIgnoreCase(
+                                order.getStatus() != null ? order.getStatus().getCode() : ""))
+                        .map(Order::getCreatedAt)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList()
+        );
 
         String restaurantName = resolveRestaurantName(restaurantId, restaurantIds);
 
         BigDecimal totalRevenue = BigDecimal.ZERO;
         BigDecimal totalDiscount = BigDecimal.ZERO;
+        BigDecimal platformCommission = BigDecimal.ZERO;
+        BigDecimal restaurantPayout = BigDecimal.ZERO;
         long successfulOrders = 0L;
         long totalOrders = orders.size();
         long cancelledOrders = 0L;
@@ -69,6 +82,12 @@ public class MerchantRevenueServiceImpl implements MerchantRevenueService {
                 if (o.getDiscountAmount() != null) {
                     totalDiscount = totalDiscount.add(o.getDiscountAmount());
                 }
+                BigDecimal itemSubtotal = o.getSubtotalAmount() != null ? o.getSubtotalAmount() : BigDecimal.ZERO;
+                BigDecimal commissionRate = commissionRates.getOrDefault(o.getCreatedAt(), BigDecimal.ZERO);
+                BigDecimal orderCommission = itemSubtotal.multiply(commissionRate)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                platformCommission = platformCommission.add(orderCommission);
+                restaurantPayout = restaurantPayout.add(itemSubtotal.subtract(orderCommission));
             } else if (OrderStatus.CANCELLED.equalsIgnoreCase(statusCode) || OrderStatus.TIMEOUT.equalsIgnoreCase(statusCode)) {
                 cancelledOrders++;
             }
@@ -94,6 +113,8 @@ public class MerchantRevenueServiceImpl implements MerchantRevenueService {
                 .cancelledOrders(cancelledOrders)
                 .averageOrderValue(aov)
                 .totalDiscount(totalDiscount)
+                .platformCommission(platformCommission)
+                .restaurantPayout(restaurantPayout)
                 .completionRate(completionRate)
                 .build();
     }
@@ -425,4 +446,3 @@ public class MerchantRevenueServiceImpl implements MerchantRevenueService {
         return points;
     }
 }
-

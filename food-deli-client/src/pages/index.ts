@@ -11,6 +11,7 @@ export * from './order';
 export * from './admin/AdminUserPage';
 export * from './admin/AdminApprovalPage';
 export * from './admin/AdminAnalyticsPage';
+export * from './admin/AdminSystemSettingsPage';
 export * from './driver/ShipperHubPage';
 export * from './driver/ShipperHistoryPage';
 export * from './admin/AdminReviewManagementPage';

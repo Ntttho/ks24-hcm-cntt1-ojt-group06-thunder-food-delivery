@@ -9,6 +9,8 @@ import com.foodthunder.order.dto.client.RemoteToppingDto;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
+import com.foodthunder.order.dto.settings.ShippingSettingsResponse;
+import com.foodthunder.order.service.SystemSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,11 +54,20 @@ public class OrderE2EIntegrationTest {
     @MockBean
     private RestaurantClient restaurantClient;
 
+    @MockBean
+    private SystemSettingsService systemSettingsService;
+
     private RemoteRestaurantDto validRestaurant;
 
     @BeforeEach
     void setupDatabase() {
         orderRepository.deleteAll();
+        when(systemSettingsService.getShippingSettings()).thenReturn(
+                ShippingSettingsResponse.builder()
+                        .defaultShippingFee(BigDecimal.valueOf(15000))
+                        .shippingFeePerKilometer(BigDecimal.valueOf(5000))
+                        .build()
+        );
         // Seed order statuses if not already present in in-memory H2
         ensureStatusExists(OrderStatus.AWAITING_PAYMENT, "Chờ thanh toán VNPay", 1);
         ensureStatusExists(OrderStatus.PENDING, "Chờ xác nhận", 2);
@@ -147,10 +158,10 @@ public class OrderE2EIntegrationTest {
                 .andExpect(jsonPath("$.data.paymentMethod").value("COD"))
                 // Tiền món: 45k * 2 = 90k, Topping: 10k * 1 * 2 = 20k => Subtotal: 110k
                 .andExpect(jsonPath("$.data.subtotalAmount").value(110000.0))
-                // Phí ship 3.2km: 15k (2km đầu) + ceil(1.2)*5k (10k) = 25k
-                .andExpect(jsonPath("$.data.shippingFee").value(25000.0))
-                // Tổng: 110k + 25k = 135k
-                .andExpect(jsonPath("$.data.totalAmount").value(135000.0))
+                // Phí ship 3.2km: 15k + (3.2 * 5k) = 31k
+                .andExpect(jsonPath("$.data.shippingFee").value(31000.0))
+                // Tổng: 110k + 31k = 141k
+                .andExpect(jsonPath("$.data.totalAmount").value(141000.0))
                 .andExpect(jsonPath("$.data.items[0].foodName").value("Trà Sữa Ô Long Nướng"))
                 .andExpect(jsonPath("$.data.items[0].toppings[0].toppingId").value(10))
                 .andReturn();

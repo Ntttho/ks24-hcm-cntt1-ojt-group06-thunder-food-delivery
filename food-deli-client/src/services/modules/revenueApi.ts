@@ -13,6 +13,8 @@ export interface MerchantRevenueSummary {
   cancelledOrders: number;
   averageOrderValue: number;
   totalDiscount: number;
+  platformCommission: number;
+  restaurantPayout: number;
   completionRate: number;
 }
 
@@ -93,4 +95,3 @@ export const revenueApi = {
     });
   },
 };
-

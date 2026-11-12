@@ -15,6 +15,7 @@ export const APP_ROUTES = {
   USERS: '/users',
   ADMIN_USERS: '/admin/users',
   ADMIN_ANALYTICS: '/admin/analytics',
+  ADMIN_SETTINGS: '/admin/system-settings',
   ADMIN_APPROVALS: '/admin/approvals',
   CART: '/cart',
   CHECKOUT: '/checkout',

@@ -38,6 +38,11 @@ public class MerchantRevenueSummaryResponse {
     private BigDecimal totalDiscount = BigDecimal.ZERO;
 
     @Builder.Default
+    private BigDecimal platformCommission = BigDecimal.ZERO;
+
+    @Builder.Default
+    private BigDecimal restaurantPayout = BigDecimal.ZERO;
+
+    @Builder.Default
     private Double completionRate = 0.0;
 }
-
