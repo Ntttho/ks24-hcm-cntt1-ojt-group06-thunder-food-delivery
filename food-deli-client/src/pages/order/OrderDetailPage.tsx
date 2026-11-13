@@ -161,7 +161,7 @@ export const OrderDetailPage: React.FC = () => {
                   if (reviewRes.data.isDriverReviewed) setDriverReviewed(true);
                 }
               })
-              .catch(() => {});
+              .catch(() => { });
           }
         } else {
           fallbackDemoOrder();
