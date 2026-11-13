@@ -72,6 +72,7 @@ export const MerchantLayout: React.FC = () => {
   const handleSelectShop = (shop: Shop) => {
     setActiveRestaurant(shop);
     localStorage.setItem('thunder_merchant_active_shop_id', String(shop.id));
+    window.dispatchEvent(new CustomEvent('merchantShopChanged', { detail: shop }));
     message.info(`Đã chuyển sang quản lý chi nhánh: ${shop.name}`);
   };
 
@@ -162,8 +163,9 @@ export const MerchantLayout: React.FC = () => {
             <MerchantOnboardingView onSuccess={handleOnboardingSuccess} />
           ) : (
             <Outlet
+              key={activeRestaurant?.id || 'default-shop'}
               context={{
-                restaurantId: activeRestaurant?.id || restaurants[0]?.id || 1,
+                restaurantId: Number(activeRestaurant?.id || restaurants[0]?.id || 1),
                 activeRestaurant: activeRestaurant || restaurants[0] || null,
                 restaurants,
                 refreshRestaurants: fetchMyRestaurants,

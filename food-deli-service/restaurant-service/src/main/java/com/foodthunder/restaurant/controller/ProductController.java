@@ -92,16 +92,24 @@ public class ProductController {
 
     /**
      * Bật/Tắt trạng thái còn hàng của món ăn
-     * PATCH /api/v1/products/{id}/status
+     * Hỗ trợ cả PUT và PATCH theo tài liệu hệ thống:
+     * PUT /api/v1/products/{id}/status & PATCH /api/v1/products/{id}/status
      */
-    @PatchMapping("/{id}/status")
+    @RequestMapping(value = "/{id}/status", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public ResponseEntity<ApiResponse<ProductDto>> updateProductStatus(
             @PathVariable Integer id,
-            @RequestBody Map<String, Object> payload
+            @RequestBody(required = false) Map<String, Object> payload
     ) {
-        Boolean isAvailable = payload.containsKey("isAvailable")
-                ? (Boolean) payload.get("isAvailable")
-                : true;
+        Boolean isAvailable = true;
+        if (payload != null) {
+            if (payload.containsKey("isAvailable")) {
+                Object val = payload.get("isAvailable");
+                isAvailable = val instanceof Boolean ? (Boolean) val : Boolean.parseBoolean(String.valueOf(val));
+            } else if (payload.containsKey("status")) {
+                Object val = payload.get("status");
+                isAvailable = val instanceof Boolean ? (Boolean) val : Boolean.parseBoolean(String.valueOf(val));
+            }
+        }
         ProductDto updated = productService.updateProductStatus(id, isAvailable);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái món ăn thành công", updated));
     }

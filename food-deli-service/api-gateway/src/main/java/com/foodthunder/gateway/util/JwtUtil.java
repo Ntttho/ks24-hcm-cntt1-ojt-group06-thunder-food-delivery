@@ -77,4 +77,30 @@ public class JwtUtil {
         }
         return "CUSTOMER";
     }
+
+    public boolean hasAdminRole(Claims claims) {
+        if (claims == null) {
+            return false;
+        }
+        if (isAdminRoleName(extractRole(claims))) {
+            return true;
+        }
+        Object roles = claims.get("roles");
+        if (roles instanceof java.util.Collection<?> collection) {
+            for (Object item : collection) {
+                if (item != null && isAdminRoleName(String.valueOf(item))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public boolean isAdminRoleName(String roleName) {
+        if (roleName == null) {
+            return false;
+        }
+        String normalized = roleName.trim().toUpperCase();
+        return "ADMIN".equals(normalized) || "ROLE_ADMIN".equals(normalized);
+    }
 }

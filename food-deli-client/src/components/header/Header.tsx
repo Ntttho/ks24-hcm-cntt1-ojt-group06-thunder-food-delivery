@@ -16,6 +16,9 @@ import {
   HomeOutlined,
   HistoryOutlined,
   StarOutlined,
+  AuditOutlined,
+  BarChartOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -67,6 +70,15 @@ export const Header: React.FC = () => {
         break;
       case 'admin-portal':
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
+        break;
+      case 'admin-approvals':
+        navigate(APP_ROUTES.ADMIN_APPROVALS);
+        break;
+      case 'admin-analytics':
+        navigate(APP_ROUTES.ADMIN_ANALYTICS);
+        break;
+      case 'admin-settings':
+        navigate(APP_ROUTES.ADMIN_SETTINGS);
         break;
       case 'admin-restaurant-reviews':
         navigate(APP_ROUTES.ADMIN_RESTAURANT_REVIEWS);
@@ -127,6 +139,21 @@ export const Header: React.FC = () => {
           Trang Quản trị Hệ thống (Admin Portal)
         </span>
       ),
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-approvals',
+      icon: <AuditOutlined className="text-amber-500 text-base" />,
+      label: <span className="font-bold text-slate-700">Kiểm duyệt Quán & Tài xế</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-analytics',
+      icon: <BarChartOutlined className="text-indigo-600 text-base" />,
+      label: <span className="font-bold text-slate-700">Thống kê &amp; Phân tích sàn</span>,
+    });
+    roleSpecificMenuItems.push({
+      key: 'admin-settings',
+      icon: <SettingOutlined className="text-orange-600 text-base" />,
+      label: <span className="font-bold text-slate-700">Cấu hình Hệ thống &amp; Phí Order</span>,
     });
     roleSpecificMenuItems.push({
       key: 'admin-restaurant-reviews',
@@ -383,13 +410,22 @@ export const Header: React.FC = () => {
                   </Link>
                 )}
                 {isAdmin && (
-                  <Link
-                    to={APP_ROUTES.ADMIN_DASHBOARD}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
-                  >
-                    <DashboardOutlined /> Trang Quản trị (Admin Portal)
-                  </Link>
+                  <>
+                    <Link
+                      to={APP_ROUTES.ADMIN_ANALYTICS}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
+                    >
+                      <BarChartOutlined /> Thống kê & Tổng thu sàn
+                    </Link>
+                    <Link
+                      to={APP_ROUTES.ADMIN_DASHBOARD}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
+                    >
+                      <DashboardOutlined /> Trang Quản trị (Admin Portal)
+                    </Link>
+                  </>
                 )}
                 <Link
                   to={APP_ROUTES.PROFILE}

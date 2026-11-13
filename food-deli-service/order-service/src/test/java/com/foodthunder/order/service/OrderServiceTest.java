@@ -10,10 +10,12 @@ import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ConflictException;
 import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.repository.OrderRepository;
 import com.foodthunder.order.repository.OrderStatusLogRepository;
 import com.foodthunder.order.repository.OrderStatusRepository;
+import com.foodthunder.order.dto.settings.ShippingSettingsResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,6 +49,9 @@ class OrderServiceTest {
     @Mock
     private RestaurantClient restaurantClient;
 
+    @Mock
+    private SystemSettingsService systemSettingsService;
+
     @InjectMocks
     private OrderServiceImpl orderService;
 
@@ -62,6 +67,12 @@ class OrderServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(systemSettingsService.getShippingSettings()).thenReturn(
+                ShippingSettingsResponse.builder()
+                        .defaultShippingFee(BigDecimal.valueOf(15000))
+                        .shippingFeePerKilometer(BigDecimal.valueOf(5000))
+                        .build()
+        );
         awaitingPaymentStatus = OrderStatus.builder().id(0).code(OrderStatus.AWAITING_PAYMENT).label("Chờ thanh toán VNPay").build();
         pendingStatus = OrderStatus.builder().id(1).code(OrderStatus.PENDING).label("Chờ xác nhận").build();
         confirmedStatus = OrderStatus.builder().id(4).code(OrderStatus.CONFIRMED).label("Đã xác nhận").build();
@@ -137,10 +148,10 @@ class OrderServiceTest {
         assertThat(response.getRestaurantId()).isEqualTo(10);
         // Subtotal: (45000 * 2) + (10000 * 1 * 2) = 110,000
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(110000));
-        // Distance 3.2km: base 15,000 + ceil(1.2)*5,000 = 25,000
-        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(25000));
-        // Total: 110,000 + 25,000 = 135,000
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(135000));
+        // Distance 3.2km: base 15,000 + (3.2 * 5,000) = 31,000
+        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(31000));
+        // Total: 110,000 + 31,000 = 141,000
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(141000));
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getFoodName()).isEqualTo("Trà Sữa Ô Long");
         assertThat(response.getItems().get(0).getToppings()).hasSize(1);
@@ -187,7 +198,7 @@ class OrderServiceTest {
         assertThat(response.getId()).isEqualTo(6001L);
         assertThat(response.getStatusCode()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
         assertThat(response.getPaymentMethod()).isEqualTo("VNPAY");
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(60000)); // 45k + 15k ship
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(70000)); // 45k + 25k ship
     }
 
     @Test
@@ -473,7 +484,7 @@ class OrderServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
         assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(95000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(105000));
         assertThat(response.getVoucherId()).isEqualTo(99);
     }
 
@@ -517,5 +528,151 @@ class OrderServiceTest {
         assertThatThrownBy(() -> orderService.createOrder(request, 1))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không thể áp dụng voucher");
+    }
+
+    @Test
+    @DisplayName("Ném lỗi ConflictException (409) khi tài xế khác bấm nhận đơn đã có tài xế nhận trước")
+    void testUpdateOrderStatus_SecondDriverAcceptSameOrder_ThrowsConflict() {
+        Order order = Order.builder()
+                .id(10L)
+                .orderCode("ORD-010")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(order));
+
+        UpdateOrderStatusRequest acceptRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.DRIVER_ACCEPTED)
+                .reason("Tài xế #4 nhận đơn")
+                .build();
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(10L, acceptRequest, 4, "ROLE_DRIVER"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("đã được một tài xế khác nhận trước");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ném lỗi ForbiddenException khi tài xế không phụ trách đơn cố cập nhật tiến trình giao")
+    void testUpdateOrderStatus_OtherDriverUpdatesStep_ThrowsForbidden() {
+        Order order = Order.builder()
+                .id(11L)
+                .orderCode("ORD-011")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(11L)).thenReturn(Optional.of(order));
+
+        UpdateOrderStatusRequest pickupRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.PICKING_UP)
+                .build();
+
+        assertThatThrownBy(() -> orderService.updateOrderStatus(11L, pickupRequest, 4, "ROLE_DRIVER"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("không phải tài xế phụ trách");
+
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Tài xế phụ trách có thể trả đơn (DRIVER_REJECTED) kèm lý do và giữ driverId để lưu lịch sử")
+    void testUpdateOrderStatus_DriverRejectsAcceptedOrder_Success() {
+        OrderStatus driverRejectedStatus = OrderStatus.builder()
+                .id(3)
+                .code(OrderStatus.DRIVER_REJECTED)
+                .label("Tài xế từ chối")
+                .build();
+
+        Order order = Order.builder()
+                .id(12L)
+                .orderCode("ORD-012")
+                .customerId(1)
+                .restaurantId(10)
+                .driverId(2)
+                .status(driverAcceptedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(12L)).thenReturn(Optional.of(order));
+        when(orderStatusRepository.findByCode(OrderStatus.DRIVER_REJECTED)).thenReturn(Optional.of(driverRejectedStatus));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        UpdateOrderStatusRequest rejectRequest = UpdateOrderStatusRequest.builder()
+                .statusCode(OrderStatus.DRIVER_REJECTED)
+                .reason("Xe hỏng giữa đường")
+                .build();
+
+        OrderResponse res = orderService.updateOrderStatus(12L, rejectRequest, 2, "ROLE_DRIVER");
+
+        assertThat(res.getStatusCode()).isEqualTo(OrderStatus.DRIVER_REJECTED);
+        assertThat(res.getDriverId()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Áp dụng đúng cấu hình chi phí đơn hàng động (priority + serviceFee + VAT chưa gồm) từ auth-service")
+    void testCreateOrder_AppliesDynamicOrderCostConfig() {
+        com.foodthunder.order.client.AuthClient mockAuthClient = mock(com.foodthunder.order.client.AuthClient.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", mockAuthClient);
+
+        try {
+            com.foodthunder.order.dto.client.RemoteOrderCostConfigDto cfg = com.foodthunder.order.dto.client.RemoteOrderCostConfigDto.builder()
+                    .baseKm(2.0)
+                    .baseFee(BigDecimal.valueOf(20000))
+                    .extraPerKm(BigDecimal.valueOf(6000))
+                    .priorityFee(BigDecimal.valueOf(7000))
+                    .serviceFee(BigDecimal.valueOf(4000))
+                    .vatRate(0.10)
+                    .vatIncluded(false)
+                    .build();
+
+            when(mockAuthClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(cfg)));
+
+            RemoteProductDto productDto = RemoteProductDto.builder()
+                    .id(101)
+                    .name("Phở Bò")
+                    .price(BigDecimal.valueOf(50000))
+                    .restaurantId(10)
+                    .isAvailable(true)
+                    .build();
+
+            CreateOrderRequest request = CreateOrderRequest.builder()
+                    .restaurantId(10)
+                    .receiverAddress("123 Cầu Giấy")
+                    .distanceKm(3.0)
+                    .deliverySpeed("priority")
+                    .idempotencyKey("KEY-DYNAMIC-01")
+                    .paymentMethod("COD")
+                    .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(2).build()))
+                    .build();
+
+            when(orderRepository.findByIdempotencyKey("KEY-DYNAMIC-01")).thenReturn(Optional.empty());
+            when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+            when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+            when(orderStatusRepository.findByCode(OrderStatus.PENDING)).thenReturn(Optional.of(pendingStatus));
+            when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
+                Order o = i.getArgument(0);
+                o.setId(9001L);
+                return o;
+            });
+
+            OrderResponse response = orderService.createOrder(request, 1);
+
+            // Subtotal: 100,000
+            // Shipping: 20,000 + ceil(3.0 - 2.0) * 6,000 + 7,000 (priority) = 33,000
+            // TaxAmount: 4,000 (serviceFee) + 10% * 100,000 (VAT) = 14,000
+            // Total: 100,000 + 33,000 + 14,000 = 147,000
+            assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
+            assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(33000));
+            assertThat(response.getTaxAmount()).isEqualByComparingTo(BigDecimal.valueOf(14000));
+            assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(147000));
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", null);
+        }
     }
 }

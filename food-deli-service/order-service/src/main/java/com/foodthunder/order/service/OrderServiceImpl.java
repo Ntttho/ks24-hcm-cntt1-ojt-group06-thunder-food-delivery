@@ -1,7 +1,9 @@
 package com.foodthunder.order.service;
 
+import com.foodthunder.order.client.AuthClient;
 import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.*;
+import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
@@ -9,6 +11,7 @@ import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.*;
 import com.foodthunder.order.exception.BadRequestException;
+import com.foodthunder.order.exception.ConflictException;
 import com.foodthunder.order.exception.ForbiddenException;
 import com.foodthunder.order.exception.ResourceNotFoundException;
 import com.foodthunder.order.exception.UnauthorizedException;
@@ -48,22 +51,28 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusLogRepository orderStatusLogRepository;
     private final RestaurantClient restaurantClient;
     private final SimpMessagingTemplate messagingTemplate;
+    private final SystemSettingsService systemSettingsService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.foodthunder.order.client.NotificationClient notificationClient;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AuthClient authClient;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
             OrderStatusRepository orderStatusRepository,
             OrderStatusLogRepository orderStatusLogRepository,
             RestaurantClient restaurantClient,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            SystemSettingsService systemSettingsService
     ) {
         this.orderRepository = orderRepository;
         this.orderStatusRepository = orderStatusRepository;
         this.orderStatusLogRepository = orderStatusLogRepository;
         this.restaurantClient = restaurantClient;
         this.messagingTemplate = messagingTemplate;
+        this.systemSettingsService = systemSettingsService;
     }
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
@@ -198,13 +207,23 @@ public class OrderServiceImpl implements OrderService {
             orderItems.add(orderItem);
         }
 
-        // 4. Calculate shipping fee based on distance
+        // 4. Calculate shipping fee, service fee & VAT dynamically from auth-service Admin Settings (or fallback to shipping settings)
+        RemoteOrderCostConfigDto costConfig = fetchOrderCostConfig();
         Double distanceKm = request.getDistanceKm();
         if (distanceKm == null || distanceKm <= 0) {
-            distanceKm = 2.0;
+            distanceKm = (costConfig != null && costConfig.getBaseKm() != null && costConfig.getBaseKm() > 0)
+                    ? costConfig.getBaseKm() : 2.0;
         }
-        BigDecimal shippingFee = calculateShippingFee(distanceKm);
-        BigDecimal taxAmount = BigDecimal.ZERO;
+        BigDecimal shippingFee = calculateShippingFee(distanceKm, request.getDeliverySpeed(), costConfig);
+        BigDecimal serviceFee = (costConfig != null && costConfig.getServiceFee() != null && costConfig.getServiceFee().compareTo(BigDecimal.ZERO) > 0)
+                ? costConfig.getServiceFee() : BigDecimal.ZERO;
+        BigDecimal vatAmount = BigDecimal.ZERO;
+        if (costConfig != null && Boolean.FALSE.equals(costConfig.getVatIncluded())
+                && costConfig.getVatRate() != null && costConfig.getVatRate() > 0) {
+            vatAmount = subtotal.multiply(BigDecimal.valueOf(costConfig.getVatRate()))
+                    .setScale(0, java.math.RoundingMode.HALF_UP);
+        }
+        BigDecimal taxAmount = serviceFee.add(vatAmount);
         BigDecimal discountAmount = BigDecimal.ZERO;
         Integer appliedVoucherId = request.getVoucherId();
 
@@ -456,18 +475,25 @@ public class OrderServiceImpl implements OrderService {
         log.info("Request status transition for order {}: {} -> {} (user: {}, role: {})",
                 orderId, currentStatus, targetStatus, requestingUserId, requestingUserRole);
 
-        // 1. If same status, no-op return
+        // 1. Chặn Race Condition khi nhiều tài xế cùng bấm nhận 1 đơn hàng
+        if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus)
+                && order.getDriverId() != null
+                && (requestingUserId == null || !order.getDriverId().equals(requestingUserId))) {
+            throw new ConflictException("Đơn hàng này đã được một tài xế khác nhận trước. Vui lòng chọn đơn khác!");
+        }
+
+        // 2. If same status, no-op return (only valid for same driver on DRIVER_ACCEPTED)
         if (currentStatus.equals(targetStatus)) {
             return mapToOrderResponse(order);
         }
 
-        // 2. Validate state machine transition graph
+        // 3. Validate state machine transition graph
         Set<String> allowedNext = ALLOWED_TRANSITIONS.getOrDefault(currentStatus, Collections.emptySet());
         if (!allowedNext.contains(targetStatus)) {
             throw new BadRequestException("Không thể chuyển trạng thái đơn hàng từ '" + currentStatus + "' sang '" + targetStatus + "'");
         }
 
-        // 3. RBAC validation based on user role
+        // 4. RBAC validation based on user role
         if (requestingUserRole != null && !requestingUserRole.isBlank()) {
             String roleUpper = requestingUserRole.toUpperCase();
             if (roleUpper.contains("CUSTOMER")) {
@@ -484,6 +510,24 @@ public class OrderServiceImpl implements OrderService {
             } else if (roleUpper.contains("DRIVER")) {
                 if (OrderStatus.CANCELLED.equals(targetStatus)) {
                     throw new BadRequestException("Tài xế không thể hủy đơn trực tiếp, vui lòng thực hiện qua quy trình trả đơn");
+                }
+                if (OrderStatus.CONFIRMED.equals(targetStatus)
+                        || OrderStatus.PENDING.equals(targetStatus)
+                        || OrderStatus.AWAITING_PAYMENT.equals(targetStatus)
+                        || OrderStatus.TIMEOUT.equals(targetStatus)) {
+                    throw new ForbiddenException("Tài xế không có quyền chuyển đơn sang trạng thái '" + targetStatus + "'");
+                }
+                if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus) && requestingUserId == null) {
+                    throw new UnauthorizedException("Thiếu thông tin định danh tài xế (X-User-Id)");
+                }
+                if ((OrderStatus.PICKING_UP.equals(targetStatus)
+                        || OrderStatus.DELIVERING.equals(targetStatus)
+                        || OrderStatus.COMPLETED.equals(targetStatus)
+                        || OrderStatus.DRIVER_REJECTED.equals(targetStatus))
+                        && order.getDriverId() != null
+                        && requestingUserId != null
+                        && !order.getDriverId().equals(requestingUserId)) {
+                    throw new ForbiddenException("Bạn không phải tài xế phụ trách đơn hàng này");
                 }
             } else if (roleUpper.contains("MERCHANT")) {
                 if (!OrderStatus.CONFIRMED.equals(targetStatus) && !OrderStatus.CANCELLED.equals(targetStatus)) {
@@ -522,14 +566,53 @@ public class OrderServiceImpl implements OrderService {
         return mapToOrderResponse(updatedOrder);
     }
 
-    private BigDecimal calculateShippingFee(Double distanceKm) {
-        BigDecimal baseFee = BigDecimal.valueOf(15000); // 15,000 VND for <= 2.0 km
-        if (distanceKm <= 2.0) {
-            return baseFee;
+    private RemoteOrderCostConfigDto fetchOrderCostConfig() {
+        if (authClient == null) {
+            return null;
         }
-        double extraKm = Math.ceil(distanceKm - 2.0);
-        BigDecimal extraFee = BigDecimal.valueOf(extraKm * 5000); // 5,000 VND per extra km
-        return baseFee.add(extraFee);
+        try {
+            ResponseEntity<ApiResponse<RemoteOrderCostConfigDto>> res = authClient.getOrderFeeConfig();
+            if (res != null && res.getBody() != null && res.getBody().getData() != null
+                    && !res.getBody().getData().isFallback()) {
+                return res.getBody().getData();
+            }
+        } catch (Exception ex) {
+            log.warn("Could not fetch order cost config from auth-service, using shipping settings fallback: {}", ex.getMessage());
+        }
+        return null;
+    }
+
+    private BigDecimal calculateShippingFee(Double distanceKm, String deliverySpeed, RemoteOrderCostConfigDto cfg) {
+        if (cfg == null) {
+            if (systemSettingsService != null) {
+                var settings = systemSettingsService.getShippingSettings();
+                return settings.getDefaultShippingFee().add(
+                        settings.getShippingFeePerKilometer().multiply(BigDecimal.valueOf(distanceKm))
+                );
+            }
+            BigDecimal baseFee = BigDecimal.valueOf(15000);
+            if (distanceKm <= 2.0) {
+                return baseFee;
+            }
+            double extraKm = Math.ceil(distanceKm - 2.0);
+            return baseFee.add(BigDecimal.valueOf(extraKm * 5000));
+        }
+
+        double baseKm = (cfg.getBaseKm() != null && cfg.getBaseKm() > 0) ? cfg.getBaseKm() : 2.0;
+        BigDecimal baseFee = cfg.getBaseFee() != null ? cfg.getBaseFee() : BigDecimal.valueOf(15000);
+        BigDecimal extraPerKm = cfg.getExtraPerKm() != null ? cfg.getExtraPerKm() : BigDecimal.valueOf(5000);
+
+        BigDecimal total = baseFee;
+        if (distanceKm > baseKm) {
+            double extraKm = Math.ceil(distanceKm - baseKm);
+            total = total.add(extraPerKm.multiply(BigDecimal.valueOf(extraKm)));
+        }
+        if ("priority".equalsIgnoreCase(deliverySpeed)
+                && cfg.getPriorityFee() != null
+                && cfg.getPriorityFee().compareTo(BigDecimal.ZERO) > 0) {
+            total = total.add(cfg.getPriorityFee());
+        }
+        return total;
     }
 
     private OrderStatus getOrCreateStatus(String code, String defaultLabel, String defaultDescription, int sortOrder) {

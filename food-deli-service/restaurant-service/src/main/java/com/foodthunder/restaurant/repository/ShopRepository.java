@@ -16,6 +16,8 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
 
     Optional<Shop> findByIdAndDeletedAtIsNull(Integer id);
 
+    long countByDeletedAtIsNullAndApprovalStatus(String approvalStatus);
+
     List<Shop> findByOwnerIdAndDeletedAtIsNull(Integer ownerId);
 
     @Query("SELECT s FROM Shop s WHERE s.ownerId = :ownerId AND s.deletedAt IS NULL " +
@@ -36,4 +38,6 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
         @Param("isOpen") Boolean isOpen,
         Pageable pageable
     );
+
+    long countByDeletedAtIsNull();
 }

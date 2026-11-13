@@ -5,6 +5,11 @@ import { orderApi, type CreateOrderPayload } from '@/services/modules/orderApi';
 import { addressApi } from '@/services/modules/addressApi';
 import { paymentApi, type SepayGenerateResponse } from '@/services/modules/paymentApi';
 import { type VoucherItem } from '@/services/modules/restaurantApi';
+import {
+  adminSettingsApi,
+  DEFAULT_ORDER_COST_CONFIG,
+  type OrderCostConfig,
+} from '@/services/modules/adminSettingsApi';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
@@ -153,6 +158,32 @@ export const CheckoutPage: React.FC = () => {
 
   // Submission State
   const [orderState, setOrderState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [orderCostConfig, setOrderCostConfig] = useState<OrderCostConfig>(DEFAULT_ORDER_COST_CONFIG);
+
+  useEffect(() => {
+    let active = true;
+    adminSettingsApi
+      .getPublicOrderFeeConfig()
+      .then((res) => {
+        if (active && res?.data) {
+          setOrderCostConfig({
+            baseKm: Number(res.data.baseKm ?? DEFAULT_ORDER_COST_CONFIG.baseKm),
+            baseFee: Number(res.data.baseFee ?? DEFAULT_ORDER_COST_CONFIG.baseFee),
+            extraPerKm: Number(res.data.extraPerKm ?? DEFAULT_ORDER_COST_CONFIG.extraPerKm),
+            priorityFee: Number(res.data.priorityFee ?? DEFAULT_ORDER_COST_CONFIG.priorityFee),
+            serviceFee: Number(res.data.serviceFee ?? DEFAULT_ORDER_COST_CONFIG.serviceFee),
+            vatRate: Number(res.data.vatRate ?? DEFAULT_ORDER_COST_CONFIG.vatRate),
+            vatIncluded: res.data.vatIncluded ?? DEFAULT_ORDER_COST_CONFIG.vatIncluded,
+          });
+        }
+      })
+      .catch(() => {
+        // Fallback silently to defaults
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Real Items from Selected Cart Items
   const orderItemsData = useMemo(() => {
@@ -173,10 +204,24 @@ export const CheckoutPage: React.FC = () => {
     }, 0);
   }, [selectedItems]);
 
-  const baseShippingFee = selectedItems.length > 0 ? 18000 : 0;
-  const prioritySurcharge = deliverySpeed === 'priority' ? 5000 : 0;
+  const checkoutDistanceKm = 1.8;
+  const baseShippingFee = useMemo(() => {
+    if (selectedItems.length === 0) return 0;
+    const extraKm =
+      checkoutDistanceKm > orderCostConfig.baseKm
+        ? Math.ceil(checkoutDistanceKm - orderCostConfig.baseKm)
+        : 0;
+    return orderCostConfig.baseFee + extraKm * orderCostConfig.extraPerKm;
+  }, [selectedItems.length, orderCostConfig]);
+
+  const prioritySurcharge =
+    selectedItems.length > 0 && deliverySpeed === 'priority' ? orderCostConfig.priorityFee : 0;
   const shippingFee = baseShippingFee + prioritySurcharge;
-  const serviceFee = selectedItems.length > 0 ? 3000 : 0;
+  const serviceFee = selectedItems.length > 0 ? orderCostConfig.serviceFee : 0;
+  const vatAmount = useMemo(() => {
+    if (selectedItems.length === 0 || orderCostConfig.vatIncluded) return 0;
+    return Math.round(itemsSubtotal * (orderCostConfig.vatRate || 0));
+  }, [selectedItems.length, itemsSubtotal, orderCostConfig]);
 
   // Single Voucher Calculation
   const voucherDiscount = useMemo(() => {
@@ -196,7 +241,7 @@ export const CheckoutPage: React.FC = () => {
 
   const paymentMethodDiscount = paymentMethod.extraDiscount;
   const totalDiscount = voucherDiscount + paymentMethodDiscount;
-  const originalTotal = itemsSubtotal + shippingFee + serviceFee;
+  const originalTotal = itemsSubtotal + shippingFee + serviceFee + vatAmount;
   const finalTotal = Math.max(0, originalTotal - totalDiscount);
 
   const handleToggleKitchenChip = (chip: string) => {
@@ -236,7 +281,8 @@ export const CheckoutPage: React.FC = () => {
         receiverAddress: selectedAddress?.fullAddress || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
         receiverLat: 10.795,
         receiverLng: 106.721,
-        distanceKm: 1.8,
+        distanceKm: checkoutDistanceKm,
+        deliverySpeed,
         voucherId: appliedVoucher?.id || undefined,
         note: fullNote,
         items: selectedItems.map((it) => ({
@@ -300,7 +346,7 @@ export const CheckoutPage: React.FC = () => {
   return (
     <div className="bg-gray-50 flex flex-col min-h-screen font-sans">
       {/* 1. Top Header with Hover Animation & Click Home */}
-      <CheckoutHeader shopName={currentShopName} distance="1.8 km" />
+      <CheckoutHeader shopName={currentShopName} distance={`${checkoutDistanceKm} km`} />
 
       {/* Main Body */}
       <main className="flex-1 w-full pt-16 pb-36">
@@ -326,7 +372,8 @@ export const CheckoutPage: React.FC = () => {
             <CheckoutDeliverySpeed
               deliverySpeed={deliverySpeed}
               onSelectDeliverySpeed={setDeliverySpeed}
-              distance="1.8 km"
+              distance={`${checkoutDistanceKm} km`}
+              priorityFee={orderCostConfig.priorityFee}
             />
 
             {/* 5. Order Summary Card (Real items from Redux) */}
@@ -362,6 +409,8 @@ export const CheckoutPage: React.FC = () => {
               itemsSubtotal={itemsSubtotal}
               shippingFee={shippingFee}
               serviceFee={serviceFee}
+              vatAmount={vatAmount}
+              vatIncluded={orderCostConfig.vatIncluded}
               totalDiscount={totalDiscount}
               originalTotal={originalTotal}
               finalTotal={finalTotal}

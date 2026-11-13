@@ -147,4 +147,68 @@ public class DeliveryController {
         DriverMetricsResponse res = deliveryService.getDriverMetrics(driverId);
         return ResponseEntity.ok(ApiResponse.success("Thống kê tài xế thành công", res));
     }
+
+    /**
+     * SP3-ADM-02: Lấy danh sách hồ sơ tài xế chờ duyệt (driver_details)
+     * GET /api/v1/deliveries/drivers/approvals?status=PENDING
+     */
+    @GetMapping({"/drivers/approvals", "/driver/approvals"})
+    public ResponseEntity<ApiResponse<List<DriverApprovalDto>>> getDriverApprovals(
+            @RequestParam(required = false) String status
+    ) {
+        List<DriverApprovalDto> list = deliveryService.getDriverApprovals(status);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách hồ sơ tài xế thành công", list));
+    }
+
+    /**
+     * SP3-ADM-02: Lấy chi tiết hồ sơ tài xế
+     * GET /api/v1/deliveries/drivers/{userId}/approval
+     */
+    @GetMapping({"/drivers/{userId}/approval", "/driver/{userId}/approval"})
+    public ResponseEntity<ApiResponse<DriverApprovalDto>> getDriverApprovalDetail(@PathVariable Integer userId) {
+        DriverApprovalDto detail = deliveryService.getDriverApprovalDetail(userId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tài xế thành công", detail));
+    }
+
+    /**
+     * SP3-ADM-02: Phê duyệt hồ sơ tài xế (APPROVED)
+     * PUT /api/v1/deliveries/drivers/{userId}/approve
+     */
+    @PutMapping({"/drivers/{userId}/approve", "/driver/{userId}/approve"})
+    public ResponseEntity<ApiResponse<DriverApprovalDto>> approveDriver(@PathVariable Integer userId) {
+        DriverApprovalDto approved = deliveryService.approveDriver(userId);
+        return ResponseEntity.ok(ApiResponse.success("Phê duyệt hồ sơ tài xế thành công", approved));
+    }
+
+    /**
+     * SP3-ADM-02: Từ chối hồ sơ tài xế (REJECTED) kèm lý do
+     * PUT /api/v1/deliveries/drivers/{userId}/reject
+     */
+    @PutMapping({"/drivers/{userId}/reject", "/driver/{userId}/reject"})
+    public ResponseEntity<ApiResponse<DriverApprovalDto>> rejectDriver(
+            @PathVariable Integer userId,
+            @RequestBody(required = false) com.foodthunder.delivery.dto.request.RejectDriverRequest request
+    ) {
+        String reason = (request != null && request.getRejectReason() != null)
+                ? request.getRejectReason().trim()
+                : "Hồ sơ không đáp ứng điều kiện sàn";
+        DriverApprovalDto rejected = deliveryService.rejectDriver(userId, reason);
+        return ResponseEntity.ok(ApiResponse.success("Đã từ chối hồ sơ tài xế thành công", rejected));
+    }
+
+    /**
+     * Tài xế đăng ký / cập nhật hồ sơ phương tiện & CCCD
+     * POST /api/v1/deliveries/drivers/register
+     */
+    @PostMapping({"/drivers/register", "/driver/register"})
+    public ResponseEntity<ApiResponse<DriverApprovalDto>> registerDriver(
+            @RequestHeader(value = "X-User-Id", required = false) Integer headerUserId,
+            @RequestParam(required = false) Integer userId,
+            @Valid @RequestBody com.foodthunder.delivery.dto.request.DriverRegistrationRequest request
+    ) {
+        Integer effectiveUserId = headerUserId != null ? headerUserId : (userId != null ? userId : 2);
+        DriverApprovalDto registered = deliveryService.registerOrUpdateDriver(effectiveUserId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created("Gửi hồ sơ đăng ký tài xế thành công, vui lòng chờ duyệt", registered));
+    }
 }

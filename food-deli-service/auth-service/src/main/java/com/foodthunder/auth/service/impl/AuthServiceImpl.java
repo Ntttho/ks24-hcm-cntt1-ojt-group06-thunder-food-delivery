@@ -355,6 +355,17 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public UserAnalyticsCountsDto getAnalyticsCounts() {
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long totalMerchants = userRepository.countActiveMerchants();
+        return UserAnalyticsCountsDto.builder()
+                .totalUsersCount(totalUsers)
+                .totalMerchantsCount(totalMerchants)
+                .build();
+    }
+
+    @Override
     @Transactional
     public UserDto updateRating(Long userId, BigDecimal ratingAvg) {
         if (ratingAvg == null || ratingAvg.compareTo(BigDecimal.ZERO) < 0
@@ -396,6 +407,17 @@ public class AuthServiceImpl implements AuthService {
                 .status(status)
                 .createdAt(user.getCreatedAt())
                 .deletedAt(user.getDeletedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserStatsSummaryDto getUserStatsSummary() {
+        long totalUsers = userRepository.countByDeletedAtIsNull();
+        long totalMerchants = userRepository.countActiveMerchants();
+        return UserStatsSummaryDto.builder()
+                .totalUsers(totalUsers)
+                .totalMerchants(totalMerchants)
                 .build();
     }
 }

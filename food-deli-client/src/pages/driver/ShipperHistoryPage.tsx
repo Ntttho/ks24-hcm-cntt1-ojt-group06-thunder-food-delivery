@@ -1,22 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Tag, Table, Modal, Input, message } from 'antd';
+import { Tag, Table, Modal, message } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-  Bike,
   Wallet,
   TrendingUp,
   Calendar,
   ChevronLeft,
   Search,
-  MapPin,
-  Clock,
-  Phone,
   DollarSign,
-  Award,
   CheckCircle,
-  Package,
-  ShieldCheck,
+  AlertCircle,
+  RotateCcw,
   CreditCard,
 } from './icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,6 +19,7 @@ import {
   driverApi,
   DriverTripHistory,
   DriverIncomeStatistics,
+  filterDriverTripHistory,
 } from '@/services/modules/driverApi';
 import { APP_ROUTES } from '@/constants';
 
@@ -32,38 +28,59 @@ export const ShipperHistoryPage: React.FC = () => {
 
   // State management
   const [stats, setStats] = useState<DriverIncomeStatistics | null>(null);
-  const [trips, setTrips] = useState<DriverTripHistory[]>([]);
+  const [allTrips, setAllTrips] = useState<DriverTripHistory[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'all'>('all');
+  const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'SUCCESS' | 'FAILED'>('ALL');
   const [searchKeyword, setSearchKeyword] = useState<string>('');
   const [selectedTrip, setSelectedTrip] = useState<DriverTripHistory | null>(null);
 
-  // Load initial statistics and trips
-  useEffect(() => {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
-    Promise.all([
-      driverApi.getIncomeStatistics(),
-      driverApi.getTripHistory({ period: selectedPeriod, search: searchKeyword }),
-    ])
-      .then(([statsData, tripsData]) => {
-        setStats(statsData);
-        setTrips(tripsData);
-      })
-      .catch((err) => {
-        console.error('Lỗi tải dữ liệu lịch sử cuốc xe:', err);
-        message.error('Không thể tải lịch sử chuyến đi.');
-      })
-      .finally(() => setLoading(false));
-  }, [selectedPeriod, searchKeyword]);
+    setLoadError(null);
+    try {
+      const dashboard = await driverApi.getHistoryDashboard({
+        driverId: user?.id,
+        period: 'all',
+      });
+      setStats(dashboard.stats);
+      setAllTrips(dashboard.trips);
+    } catch (err: any) {
+      const errMsg =
+        err?.response?.data?.message || err?.message || 'Không thể tải lịch sử đơn hàng từ máy chủ.';
+      console.error('Lỗi tải dữ liệu lịch sử đơn hàng:', err);
+      setLoadError(errMsg);
+      message.error(errMsg);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  const trips = useMemo(
+    () =>
+      filterDriverTripHistory(allTrips, {
+        period: selectedPeriod,
+        statusFilter: selectedStatus,
+        search: searchKeyword,
+      }),
+    [allTrips, selectedPeriod, selectedStatus, searchKeyword]
+  );
 
   // Payment badge helper
-  const renderPaymentBadge = (method: string, codAmount: number) => {
+  const renderPaymentBadge = (method: string, codAmount: number, isSuccess: boolean) => {
     switch (method.toUpperCase()) {
       case 'COD':
         return (
           <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md text-[11px] font-bold border border-amber-200">
             <DollarSign className="w-3 h-3 text-amber-600" />
-            COD ({codAmount > 0 ? `${codAmount.toLocaleString('vi-VN')} đ` : '0 đ'})
+            {isSuccess
+              ? `COD (${codAmount > 0 ? `${codAmount.toLocaleString('vi-VN')} đ` : '0 đ'})`
+              : 'COD (Chưa thu)'}
           </span>
         );
       case 'SEPAY':
@@ -82,10 +99,18 @@ export const ShipperHistoryPage: React.FC = () => {
           </span>
         );
       case 'WALLET':
+      case 'E_WALLET':
         return (
           <span className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md text-[11px] font-bold border border-purple-200">
             <Wallet className="w-3 h-3 text-purple-600" />
-            Ví Thunder
+            Ví điện tử
+          </span>
+        );
+      case 'UNKNOWN':
+      case '':
+        return (
+          <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md text-[11px] font-bold">
+            Chưa rõ
           </span>
         );
       default:
@@ -135,21 +160,47 @@ export const ShipperHistoryPage: React.FC = () => {
       ),
     },
     {
-      title: 'Hình thức thanh toán',
-      dataIndex: 'paymentMethod',
-      key: 'paymentMethod',
-      render: (method: string, record: DriverTripHistory) => renderPaymentBadge(method, record.codAmount),
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      render: (_: string, record: DriverTripHistory) => (
+        <div>
+          <Tag color={record.isSuccess ? 'success' : 'error'} className="m-0 font-bold text-[11px]">
+            {record.statusLabel}
+          </Tag>
+          {!record.isSuccess && record.cancelReason && (
+            <span className="text-[10px] text-rose-500 block mt-1 line-clamp-1">
+              {record.cancelReason}
+            </span>
+          )}
+        </div>
+      ),
     },
     {
-      title: 'Tiền cước thu về',
-      dataIndex: 'shippingFee',
-      key: 'shippingFee',
+      title: 'Thanh toán',
+      dataIndex: 'paymentMethod',
+      key: 'paymentMethod',
+      render: (method: string, record: DriverTripHistory) =>
+        renderPaymentBadge(method, record.codAmount, record.isSuccess),
+    },
+    {
+      title: 'Tiền cước thực nhận',
+      dataIndex: 'earnedFee',
+      key: 'earnedFee',
       align: 'right',
-      render: (fee: number) => (
-        <span className="font-black text-emerald-600 text-sm">
-          +{fee.toLocaleString('vi-VN')} đ
-        </span>
-      ),
+      render: (fee: number, record: DriverTripHistory) =>
+        record.isSuccess ? (
+          <span className="font-black text-emerald-600 text-sm">
+            +{fee.toLocaleString('vi-VN')} đ
+          </span>
+        ) : (
+          <div className="text-right">
+            <span className="font-bold text-slate-400 text-xs line-through block">
+              {record.shippingFee.toLocaleString('vi-VN')} đ
+            </span>
+            <span className="font-bold text-rose-500 text-[11px]">0 đ</span>
+          </div>
+        ),
     },
     {
       title: 'Thao tác',
@@ -166,12 +217,12 @@ export const ShipperHistoryPage: React.FC = () => {
     },
   ];
 
-  const driverName = user?.fullName || 'Tài xế Sấm Sét ⚡';
+  const driverName = user?.fullName || 'Tài xế Thunder';
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-start items-center py-0 sm:py-6">
       {/* Top Navigation Bar */}
-      <aside className="w-full max-w-4xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-4 py-3 shadow-md flex items-center justify-between text-xs sm:rounded-t-3xl">
+      <aside className="w-full max-w-5xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white px-4 py-3 shadow-md flex items-center justify-between text-xs sm:rounded-t-3xl">
         <div className="flex items-center gap-2">
           <Link
             to={APP_ROUTES.SHIPPER_DASHBOARD}
@@ -182,10 +233,19 @@ export const ShipperHistoryPage: React.FC = () => {
             <span>Radar Quét Đơn</span>
           </Link>
           <span className="text-white/40">|</span>
-          <span className="font-black tracking-wide uppercase">LỊCH SỬ CUỐC XE & THU NHẬP</span>
+          <span className="font-black tracking-wide uppercase">LỊCH SỬ ĐƠN HÀNG & THU NHẬP</span>
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={loadHistory}
+            disabled={loading}
+            className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+            title="Làm mới dữ liệu từ máy chủ"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
           <Tag color="cyan" className="text-[10px] m-0 font-bold uppercase border-0">
             {driverName}
           </Tag>
@@ -193,21 +253,36 @@ export const ShipperHistoryPage: React.FC = () => {
       </aside>
 
       {/* Main Container */}
-      <main className="w-full max-w-4xl bg-slate-50 flex flex-col p-4 sm:p-6 shadow-2xl border-x border-b border-slate-200 sm:rounded-b-3xl min-h-[780px] space-y-6">
+      <main className="w-full max-w-5xl bg-slate-50 flex flex-col p-4 sm:p-6 shadow-2xl border-x border-b border-slate-200 sm:rounded-b-3xl min-h-[780px] space-y-6">
+        {loadError && (
+          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-rose-700 font-semibold">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+            <button
+              onClick={loadHistory}
+              className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shrink-0 cursor-pointer"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
         {/* =========================================================================
-            SECTION 1: THẺ TỔNG KẾT THU NHẬP TÍCH LŨY (NGÀY, TUẦN, VÍ)
+            SECTION 1: THẺ TỔNG KẾT THU NHẬP TÍCH LŨY TỪ ĐƠN HÀNG THẬT
            ========================================================================= */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Số dư ví hiện tại */}
+            {/* 1. Tổng cước tích lũy */}
             <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col justify-between relative overflow-hidden">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Wallet className="w-4 h-4 text-emerald-600" />
-                  Số dư ví tài xế
+                  Tổng cước đã quyết toán
                 </span>
                 <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full">
-                  Khả dụng
+                  Tích lũy
                 </span>
               </div>
               <div className="my-3">
@@ -215,12 +290,12 @@ export const ShipperHistoryPage: React.FC = () => {
                   {stats.walletBalance.toLocaleString('vi-VN')} đ
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Đã quyết toán tức thì sau mỗi cuốc hoàn tất
+                  Chỉ cộng tiền cước từ các đơn giao thành công
                 </p>
               </div>
               <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-600">
-                <span className="text-[11px]">Tỷ lệ nhận đơn (AR):</span>
-                <span className="text-emerald-600 font-black">{stats.acceptanceRate}%</span>
+                <span className="text-[11px]">Đơn thất bại / hủy:</span>
+                <span className="text-rose-600 font-black">{stats.failedTripsAll} đơn</span>
               </div>
             </div>
 
@@ -240,14 +315,18 @@ export const ShipperHistoryPage: React.FC = () => {
                   {stats.todayEarnings.toLocaleString('vi-VN')} đ
                 </div>
                 <div className="mt-2 text-xs flex items-center gap-3 text-emerald-100">
-                  <span><strong>{stats.completedTripsToday}</strong> cuốc giao</span>
+                  <span>
+                    <strong>{stats.completedTripsToday}</strong> thành công
+                  </span>
                   <span>•</span>
-                  <span>Tip: <strong>+{stats.tipsToday.toLocaleString('vi-VN')} đ</strong></span>
+                  <span>
+                    <strong>{stats.failedTripsToday}</strong> hủy/thất bại
+                  </span>
                 </div>
               </div>
               <div className="pt-3 border-t border-white/20 flex items-center justify-between text-xs">
-                <span className="text-emerald-200 text-[11px]">Tỷ lệ hoàn thành (CR):</span>
-                <span className="font-black text-white">{stats.completionRate}% (Xuất sắc)</span>
+                <span className="text-emerald-200 text-[11px]">Tỷ lệ hoàn thành:</span>
+                <span className="font-black text-white">{stats.completionRate}%</span>
               </div>
             </div>
 
@@ -267,15 +346,19 @@ export const ShipperHistoryPage: React.FC = () => {
                   {stats.weekEarnings.toLocaleString('vi-VN')} đ
                 </div>
                 <div className="mt-2 text-xs flex items-center gap-3 text-slate-300">
-                  <span><strong>{stats.completedTripsWeek}</strong> cuốc giao</span>
+                  <span>
+                    <strong>{stats.completedTripsWeek}</strong> thành công
+                  </span>
                   <span>•</span>
-                  <span>Tip: <strong>+{stats.tipsWeek.toLocaleString('vi-VN')} đ</strong></span>
+                  <span>
+                    <strong>{stats.failedTripsWeek}</strong> hủy/thất bại
+                  </span>
                 </div>
               </div>
               <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs">
-                <span className="text-slate-400 text-[11px]">Đánh giá trung bình:</span>
-                <span className="font-black text-amber-400 flex items-center gap-1">
-                  ★ 4.9 / 5.0 (Hạng 1)
+                <span className="text-slate-400 text-[11px]">Tổng đơn trong hệ thống:</span>
+                <span className="font-black text-amber-400">
+                  {stats.completedTripsAll} / {stats.totalTripsAll} đơn
                 </span>
               </div>
             </div>
@@ -283,23 +366,30 @@ export const ShipperHistoryPage: React.FC = () => {
         )}
 
         {/* =========================================================================
-            SECTION 2: BẢNG LỊCH SỬ CÁC CUỐC XE ĐÃ GIAO THÀNH CÔNG
+            SECTION 2: BẢNG LỊCH SỬ ĐƠN HÀNG (THÀNH CÔNG & THẤT BẠI/HỦY)
            ========================================================================= */}
-        <section aria-labelledby="trip-history-heading" className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-          {/* Header Controls: Title, Filter Tabs, Search Bar */}
+        <section
+          aria-labelledby="trip-history-heading"
+          className="bg-white p-5 sm:p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4"
+        >
+          {/* Header Controls: Title & Period Filter Tabs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
-              <h2 id="trip-history-heading" className="text-base font-black text-slate-900 flex items-center gap-2">
+              <h2
+                id="trip-history-heading"
+                className="text-base font-black text-slate-900 flex items-center gap-2"
+              >
                 <CheckCircle className="w-5 h-5 text-emerald-600" />
-                Lịch sử cuốc xe đã giao thành công
+                Lịch sử đơn hàng của tài xế
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tổng cộng {trips.length} chuyến xe đã hoàn thành trong hệ thống
+                Hiển thị {trips.length} đơn ({stats?.completedTripsAll ?? 0} thành công •{' '}
+                {stats?.failedTripsAll ?? 0} thất bại/hủy trong toàn hệ thống)
               </p>
             </div>
 
             {/* Period Filters */}
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl self-start sm:self-auto">
               <button
                 onClick={() => setSelectedPeriod('all')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -333,16 +423,51 @@ export const ShipperHistoryPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Search Input */}
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchKeyword}
-              onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="Tìm theo mã đơn, tên quán ăn hoặc địa chỉ khách hàng..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50/50"
-            />
+          {/* Status Filter & Search Bar */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl shrink-0 self-start">
+              <button
+                onClick={() => setSelectedStatus('ALL')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedStatus === 'ALL'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Tất cả ({allTrips.length})
+              </button>
+              <button
+                onClick={() => setSelectedStatus('SUCCESS')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedStatus === 'SUCCESS'
+                    ? 'bg-white text-emerald-700 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Thành công ({stats?.completedTripsAll ?? 0})
+              </button>
+              <button
+                onClick={() => setSelectedStatus('FAILED')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedStatus === 'FAILED'
+                    ? 'bg-white text-rose-600 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Thất bại / Hủy ({stats?.failedTripsAll ?? 0})
+              </button>
+            </div>
+
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="Tìm theo mã đơn, tên quán, địa chỉ hoặc lý do hủy..."
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-slate-50/50"
+              />
+            </div>
           </div>
 
           {/* Desktop Table View */}
@@ -352,12 +477,13 @@ export const ShipperHistoryPage: React.FC = () => {
               dataSource={trips}
               rowKey="id"
               loading={loading}
-              pagination={{ pageSize: 6, showTotal: (total) => `Tổng ${total} cuốc xe` }}
+              locale={{ emptyText: 'Chưa có đơn hàng lịch sử nào phù hợp.' }}
+              pagination={{ pageSize: 6, showTotal: (total) => `Tổng ${total} đơn hàng` }}
               className="text-xs"
             />
           </div>
 
-          {/* Mobile Card List View (Tối ưu cho hiển thị điện thoại) */}
+          {/* Mobile Card List View */}
           <div className="sm:hidden space-y-3">
             {trips.length > 0 ? (
               trips.map((trip) => (
@@ -366,14 +492,23 @@ export const ShipperHistoryPage: React.FC = () => {
                   onClick={() => setSelectedTrip(trip)}
                   className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 transition-all cursor-pointer space-y-2.5 active:scale-98"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <div>
-                      <span className="font-black text-slate-900 text-xs">{trip.orderCode}</span>
-                      <span className="text-[10px] text-slate-400 block">{trip.completedAt}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-black text-slate-900 text-xs">{trip.orderCode}</span>
+                        <Tag color={trip.isSuccess ? 'success' : 'error'} className="m-0 text-[10px] font-bold">
+                          {trip.statusLabel}
+                        </Tag>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">{trip.completedAt}</span>
                     </div>
-                    <span className="font-black text-emerald-600 text-sm">
-                      +{trip.shippingFee.toLocaleString('vi-VN')} đ
-                    </span>
+                    {trip.isSuccess ? (
+                      <span className="font-black text-emerald-600 text-sm shrink-0">
+                        +{trip.earnedFee.toLocaleString('vi-VN')} đ
+                      </span>
+                    ) : (
+                      <span className="font-bold text-rose-500 text-xs shrink-0">0 đ</span>
+                    )}
                   </div>
 
                   <div className="space-y-1 text-xs">
@@ -389,24 +524,29 @@ export const ShipperHistoryPage: React.FC = () => {
                         {trip.receiverAddress}
                       </span>
                     </div>
+                    {!trip.isSuccess && trip.cancelReason && (
+                      <p className="text-[11px] text-rose-600 bg-rose-50 px-2 py-1 rounded-lg">
+                        Lý do: {trip.cancelReason}
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px]">
-                    {renderPaymentBadge(trip.paymentMethod, trip.codAmount)}
+                    {renderPaymentBadge(trip.paymentMethod, trip.codAmount, trip.isSuccess)}
                     <span className="text-emerald-700 font-bold">Xem chi tiết &gt;</span>
                   </div>
                 </article>
               ))
             ) : (
               <div className="py-12 text-center text-slate-400 text-xs">
-                Không tìm thấy cuốc xe nào phù hợp.
+                {loading ? 'Đang tải dữ liệu từ máy chủ...' : 'Không tìm thấy đơn hàng nào phù hợp.'}
               </div>
             )}
           </div>
         </section>
       </main>
 
-      {/* Modal chi tiết cuốc xe khi nhấn vào */}
+      {/* Modal chi tiết đơn hàng */}
       {selectedTrip && (
         <Modal
           open={true}
@@ -416,25 +556,57 @@ export const ShipperHistoryPage: React.FC = () => {
           className="rounded-3xl overflow-hidden"
           title={
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
-              <span className="font-black text-sm">Chi tiết cuốc xe {selectedTrip.orderCode}</span>
+              {selectedTrip.isSuccess ? (
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-rose-600" />
+              )}
+              <span className="font-black text-sm">Chi tiết đơn hàng {selectedTrip.orderCode}</span>
+              <Tag color={selectedTrip.isSuccess ? 'success' : 'error'} className="m-0 font-bold text-[11px]">
+                {selectedTrip.statusLabel}
+              </Tag>
             </div>
           }
         >
           <div className="space-y-4 pt-2 text-xs">
-            {/* Shipping fee & payment hero */}
-            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center justify-between">
+            {/* Hero cước & thanh toán */}
+            <div
+              className={`p-4 rounded-2xl border flex items-center justify-between ${
+                selectedTrip.isSuccess
+                  ? 'bg-emerald-50 border-emerald-100'
+                  : 'bg-rose-50 border-rose-100'
+              }`}
+            >
               <div>
-                <span className="text-[11px] text-emerald-700 font-bold block">Tiền cước tài xế thu về</span>
-                <span className="text-2xl font-black text-emerald-600">
-                  +{selectedTrip.shippingFee.toLocaleString('vi-VN')} đ
+                <span
+                  className={`text-[11px] font-bold block ${
+                    selectedTrip.isSuccess ? 'text-emerald-700' : 'text-rose-700'
+                  }`}
+                >
+                  {selectedTrip.isSuccess ? 'Tiền cước tài xế thực nhận' : 'Đơn không hoàn thành (không cộng cước)'}
+                </span>
+                <span
+                  className={`text-2xl font-black ${
+                    selectedTrip.isSuccess ? 'text-emerald-600' : 'text-rose-600'
+                  }`}
+                >
+                  {selectedTrip.isSuccess
+                    ? `+${selectedTrip.earnedFee.toLocaleString('vi-VN')} đ`
+                    : '0 đ'}
                 </span>
               </div>
               <div className="text-right">
                 <span className="text-[10px] text-slate-400 block mb-1">Hình thức thanh toán</span>
-                {renderPaymentBadge(selectedTrip.paymentMethod, selectedTrip.codAmount)}
+                {renderPaymentBadge(selectedTrip.paymentMethod, selectedTrip.codAmount, selectedTrip.isSuccess)}
               </div>
             </div>
+
+            {!selectedTrip.isSuccess && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-[11px]">
+                <strong className="block mb-0.5">Lý do thất bại / hủy:</strong>
+                <span>{selectedTrip.cancelReason || 'Không có ghi chú lý do từ hệ thống.'}</span>
+              </div>
+            )}
 
             {/* Timeline Route */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3 relative pl-6">
@@ -487,4 +659,3 @@ export const ShipperHistoryPage: React.FC = () => {
 };
 
 export default ShipperHistoryPage;
-

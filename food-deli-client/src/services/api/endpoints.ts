@@ -66,12 +66,14 @@ export const API_ENDPOINTS = {
     CANCEL: (id: number | string) => `/orders/${id}/cancel`,
     STATUS: (id: number | string) => `/orders/${id}/status`,
   },
-  // Revenue & Analytics (Merchant Dashboard)
   REVENUE: {
     SUMMARY: '/orders/revenue/summary',
     CHART: '/orders/revenue/chart',
     TOP_FOODS: '/orders/revenue/top-foods',
     BRANCHES: '/orders/revenue/branches',
+  },
+  SYSTEM_SETTINGS: {
+    SHIPPING: '/system-settings/shipping',
   },
   // Delivery & Shipper Service
   DELIVERY: {
@@ -100,5 +102,24 @@ export const API_ENDPOINTS = {
     SEPAY_GENERATE: '/payments/sepay/generate',
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
+  },
+  // Admin Portal & Approvals (SP3-ADM-02, SP3-ADM-03 & SP3-ADM-05)
+  ADMIN: {
+    ANALYTICS_SUMMARY: '/admin/analytics/summary',
+    SYSTEM_SETTINGS: '/admin/system-settings',
+    SETTINGS: '/admin/settings',
+    CHANGE_REQUESTS: '/restaurants/change-requests',
+    CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
+    APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,
+    REJECT_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/reject`,
+    DRIVER_APPROVALS: '/drivers/approvals',
+    DRIVER_APPROVAL_DETAIL: (userId: number | string) => `/drivers/${userId}/approval`,
+    APPROVE_DRIVER: (userId: number | string) => `/drivers/${userId}/approve`,
+    REJECT_DRIVER: (userId: number | string) => `/drivers/${userId}/reject`,
+  },
+  // Public Platform Settings (Order Fees & Shipping)
+  SETTINGS: {
+    ORDER_FEES: '/settings/order-fees',
+    SHIPPING: '/settings/shipping',
   },
 } as const;

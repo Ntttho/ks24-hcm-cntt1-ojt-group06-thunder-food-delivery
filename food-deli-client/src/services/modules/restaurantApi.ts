@@ -6,6 +6,8 @@ export interface Shop {
   ownerId?: number;
   name: string;
   address: string;
+  latitude?: number;
+  longitude?: number;
   phoneNumber?: string;
   rating?: number;
   imageUrl?: string;
@@ -323,7 +325,7 @@ export const restaurantApi = {
   },
 
   updateProductStatus: async (id: number | string, isAvailable: boolean): Promise<ApiResponse<ProductItem>> => {
-    return apiClient.patch<ProductItem>(`/products/${id}/status`, { isAvailable });
+    return apiClient.put<ProductItem>(`/products/${id}/status`, { isAvailable });
   },
 
   getMyRestaurants: async (

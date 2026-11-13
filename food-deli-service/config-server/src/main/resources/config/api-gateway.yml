@@ -16,7 +16,7 @@ spring:
         - id: auth-service-route
           uri: lb://auth-service
           predicates:
-            - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/addresses/**
+            - Path=/api/v1/auth/**,/api/v1/users/**,/api/v1/addresses/**,/api/v1/admin/settings/**,/api/v1/settings/**
 
         # 2. Restaurant & Catalog Service Route
         - id: restaurant-service-route
@@ -28,7 +28,7 @@ spring:
         - id: order-service-route
           uri: lb://order-service
           predicates:
-            - Path=/api/v1/orders/**,/api/v1/orders,/api/v1/cart/**,/api/v1/cart
+            - Path=/api/v1/orders/**,/api/v1/orders,/api/v1/cart/**,/api/v1/cart,/api/v1/admin/analytics/**,/api/v1/admin/system-settings/**,/api/v1/system-settings/**
 
         # 3b. Order WebSocket Route (STOMP Real-time)
         - id: order-service-ws-route

@@ -21,12 +21,13 @@ Hệ thống đặt & giao đồ ăn trực tuyến chuẩn doanh nghiệp theo 
 ### Cách 1: Khởi chạy bằng Docker Compose (Khuyên dùng - 1 lệnh duy nhất)
 
 ```bash
-docker compose up --build -d
+docker compose up -d --build
 ```
-- **Web Frontend (Nginx):** `http://localhost` (Port 80)
-- **Backend API (Spring Boot):** `http://localhost:3000`
-- **Tài liệu API (Swagger UI):** `http://localhost:3000/swagger-ui.html`
-- **Cơ sở dữ liệu (MySQL 8):** `localhost:3306` (`grabfood_db`, tự động nạp `seed_all.sql` hoặc nạp thủ công bằng DBeaver - xem chi tiết tại [food-deli-service/README.md](file:///d:/ojt-food-deli-start/food-deli-service/README.md#hướng-dẫn-sử-dụng-dbeaver-quản-lý-database--import-seed-data))
+- **Web Frontend (Nginx):** `http://<server-ip>:3001`
+- **Backend API Gateway:** `http://<server-ip>:8080`
+- **Cơ sở dữ liệu (MySQL 8):** `localhost:3307` (`grabfood_db`, tự động nạp `database/seed_all.sql`)
+
+Các Dockerfile tự build ứng dụng; không cần build JAR hoặc frontend trước. Trên server, cấu hình `MYSQL_ROOT_PASSWORD` và `JWT_SECRET` trong file `.env` trước khi chạy. Nếu chưa đặt, Compose vẫn dùng giá trị mặc định phục vụ chạy thử.
 
 ---
 

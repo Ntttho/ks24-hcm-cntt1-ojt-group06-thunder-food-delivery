@@ -3,6 +3,7 @@ package com.foodthunder.restaurant.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.restaurant.dto.CreateRestaurantRequest;
 import com.foodthunder.restaurant.dto.PageResponse;
+import com.foodthunder.restaurant.dto.RestaurantAnalyticsCountsDto;
 import com.foodthunder.restaurant.dto.RestaurantDto;
 import com.foodthunder.restaurant.service.ProductService;
 import com.foodthunder.restaurant.service.RestaurantService;
@@ -144,5 +145,39 @@ class RestaurantControllerTest {
                 .andExpect(jsonPath("$.status").value(200))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.name").value("Quán Cơm Tấm Sài Gòn Update"));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/restaurants/admin/analytics-counts với ROLE_ADMIN trả về 200 OK")
+    void getAnalyticsCounts_asAdmin_returns200() throws Exception {
+        RestaurantAnalyticsCountsDto counts = RestaurantAnalyticsCountsDto.builder()
+                .totalRestaurantsCount(48L)
+                .totalFoodItemsCount(420L)
+                .build();
+        when(restaurantService.getAnalyticsCounts()).thenReturn(counts);
+
+        mockMvc.perform(get("/api/v1/restaurants/admin/analytics-counts")
+                        .header("X-User-Role", "ROLE_ADMIN"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data.totalRestaurantsCount").value(48))
+                .andExpect(jsonPath("$.data.totalFoodItemsCount").value(420));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/restaurants/admin/analytics-counts với MERCHANT trả về 403 Forbidden")
+    void getAnalyticsCounts_asMerchant_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/restaurants/admin/analytics-counts")
+                        .header("X-User-Role", "MERCHANT"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/restaurants/admin/analytics-counts thiếu role header trả về 401 Unauthorized")
+    void getAnalyticsCounts_missingRoleHeader_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/restaurants/admin/analytics-counts"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401));
     }
 }
