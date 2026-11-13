@@ -78,15 +78,20 @@ public class CartController {
     }
 
     /**
-     * Xóa toàn bộ giỏ hàng
+     * Xóa toàn bộ giỏ hàng (hoặc purge hoàn toàn key khỏi Redis khi purge=true)
      * DELETE /api/v1/cart
      */
     @DeleteMapping
     public ResponseEntity<ApiResponse<CartDto>> clearCart(
             @RequestHeader(value = "X-User-Id", required = false) Long headerUserId,
-            @RequestParam(required = false) Long userId
+            @RequestParam(required = false) Long userId,
+            @RequestParam(defaultValue = "false") boolean purge
     ) {
         Long effectiveUserId = resolveUserId(headerUserId, userId);
+        if (purge) {
+            cartService.purgeCart(effectiveUserId);
+            return ResponseEntity.ok(ApiResponse.success("Đã xóa sạch giỏ hàng khỏi Redis", null));
+        }
         CartDto cart = cartService.clearCart(effectiveUserId);
         return ResponseEntity.ok(ApiResponse.success("Đã xóa toàn bộ giỏ hàng", cart));
     }

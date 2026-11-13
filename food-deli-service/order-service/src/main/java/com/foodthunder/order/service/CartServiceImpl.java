@@ -181,6 +181,19 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    public void purgeCart(Long userId) {
+        Long effectiveUserId = userId != null ? userId : 0L;
+        String key = getRedisKey(effectiveUserId);
+        localCartFallback.remove(effectiveUserId);
+        try {
+            redisTemplate.delete(key);
+            log.info("Đã xóa hoàn toàn key giỏ hàng {} khỏi Redis", key);
+        } catch (Exception e) {
+            log.warn("Lỗi khi xóa key giỏ hàng {} khỏi Redis: {}", key, e.getMessage());
+        }
+    }
+
+    @Override
     public CartDto syncCart(Long userId, SyncCartRequest request) {
         Long effectiveUserId = userId != null ? userId : 0L;
         CartDto cart = CartDto.builder()

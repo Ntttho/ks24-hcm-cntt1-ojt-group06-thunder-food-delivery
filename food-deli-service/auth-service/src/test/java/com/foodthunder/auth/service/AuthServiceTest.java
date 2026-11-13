@@ -42,6 +42,9 @@ class AuthServiceTest {
     private RoleRepository roleRepository;
 
     @Mock
+    private UserDataCleanupService userDataCleanupService;
+
+    @Mock
     private DriverDetailsRepository driverDetailsRepository;
 
     @Mock
@@ -278,6 +281,22 @@ class AuthServiceTest {
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
 
+        verify(userDataCleanupService, never()).purgeRelatedData(any());
+        verify(userRepository, never()).delete(any());
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("deleteUser: permanently deletes non-admin user and purges all related history")
+    void deleteUser_nonAdmin_purgesAndHardDeletes() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(sampleUser));
+
+        authService.deleteUser(1L);
+
+        verify(userDataCleanupService).purgeRelatedData(1L);
+        verify(userRepository).delete(sampleUser);
+        verify(userRepository).flush();
+        verify(userDataCleanupService).scheduleExternalCleanup(1L);
         verify(userRepository, never()).save(any());
     }
 }

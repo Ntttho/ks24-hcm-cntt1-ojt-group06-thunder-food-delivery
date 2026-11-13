@@ -86,7 +86,7 @@ export const userApi = {
   },
 
   /**
-   * Xóa tài khoản người dùng (DELETE /api/v1/users/{id})
+   * Xóa vĩnh viễn tài khoản người dùng và toàn bộ dữ liệu/lịch sử liên quan (DELETE /api/v1/users/{id})
    */
   deleteUser: async (id: number | string): Promise<ApiResponse<void>> => {
     return apiClient.delete<void>(API_ENDPOINTS.USERS.DETAIL(id));

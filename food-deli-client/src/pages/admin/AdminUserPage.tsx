@@ -254,8 +254,12 @@ export const AdminUserPage: React.FC = () => {
     }
     try {
       await userApi.deleteUser(user.id);
-      message.success(`Đã xóa/vô hiệu hóa tài khoản #${user.id} thành công!`);
-      fetchUsers(page, pageSize, searchText, selectedRole, selectedStatus);
+      message.success(`Đã xóa vĩnh viễn tài khoản #${user.id} và toàn bộ dữ liệu liên quan!`);
+      const nextPage = users.length <= 1 && page > 0 ? page - 1 : page;
+      if (nextPage !== page) {
+        setPage(nextPage);
+      }
+      fetchUsers(nextPage, pageSize, searchText, selectedRole, selectedStatus);
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || 'Không thể xóa tài khoản');
     }
@@ -466,16 +470,16 @@ export const AdminUserPage: React.FC = () => {
               </Tooltip>
             </Popconfirm>
 
-            {/* Xóa tài khoản */}
+            {/* Xóa vĩnh viễn tài khoản */}
             <Popconfirm
-              title="Xóa tài khoản người dùng?"
-              description={`Hành động này sẽ vô hiệu hóa tài khoản "${record.fullName}". Bạn có chắc chắn muốn tiếp tục?`}
+              title="Xóa vĩnh viễn tài khoản?"
+              description={`Hành động này sẽ XÓA SẠCH vĩnh viễn tài khoản "${record.fullName}" cùng toàn bộ dữ liệu và lịch sử liên quan (đơn hàng, đánh giá, tin nhắn, cửa hàng/tài xế) và KHÔNG THỂ KHÔI PHỤC. Bạn có chắc chắn?`}
               onConfirm={() => handleDeleteUser(record)}
-              okText="Xóa tài khoản"
+              okText="Xóa vĩnh viễn"
               cancelText="Hủy"
               okButtonProps={{ danger: true }}
             >
-              <Tooltip title="Xóa tài khoản">
+              <Tooltip title="Xóa vĩnh viễn tài khoản & toàn bộ lịch sử">
                 <Button
                   type="text"
                   size="small"

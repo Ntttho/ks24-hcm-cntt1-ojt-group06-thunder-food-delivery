@@ -10,6 +10,7 @@ public interface CartService {
     CartDto updateItemQuantity(Long userId, String itemId, Integer quantity);
     CartDto removeItem(Long userId, String itemId);
     CartDto clearCart(Long userId);
+    void purgeCart(Long userId);
     CartDto syncCart(Long userId, SyncCartRequest request);
 }
 

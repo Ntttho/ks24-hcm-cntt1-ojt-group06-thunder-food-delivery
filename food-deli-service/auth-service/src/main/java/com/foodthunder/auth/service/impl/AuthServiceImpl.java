@@ -13,6 +13,7 @@ import com.foodthunder.auth.repository.RoleRepository;
 import com.foodthunder.auth.repository.UserRepository;
 import com.foodthunder.auth.security.JwtProvider;
 import com.foodthunder.auth.service.AuthService;
+import com.foodthunder.auth.service.UserDataCleanupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final DriverDetailsRepository driverDetailsRepository;
     private final RoleRepository roleRepository;
+    private final UserDataCleanupService userDataCleanupService;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
 
@@ -295,9 +297,14 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Không được phép xóa tài khoản có vai trò Quản trị viên (Admin)");
         }
 
-        user.setDeletedAt(java.time.LocalDateTime.now());
-        userRepository.save(user);
-        log.info("Admin deleted user id={}", id);
+        userDataCleanupService.purgeRelatedData(id);
+        if (user.getRoles() != null) {
+            user.getRoles().clear();
+        }
+        userRepository.delete(user);
+        userRepository.flush();
+        userDataCleanupService.scheduleExternalCleanup(id);
+        log.info("Admin permanently deleted user id={} and all related history", id);
     }
 
     private boolean isUserAdmin(User user) {

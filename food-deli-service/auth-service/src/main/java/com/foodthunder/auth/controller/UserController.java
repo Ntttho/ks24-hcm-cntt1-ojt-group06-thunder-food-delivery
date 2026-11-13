@@ -128,13 +128,13 @@ public class UserController {
     }
 
     /**
-     * Xóa tài khoản người dùng (Soft Delete / Vô hiệu hóa)
+     * Xóa vĩnh viễn tài khoản người dùng và toàn bộ dữ liệu/lịch sử liên quan (Hard Delete)
      * DELETE /api/v1/users/{id}
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteUser(@PathVariable Long id) {
         authService.deleteUser(id);
-        return ResponseEntity.ok(ApiResponse.success("Xóa tài khoản người dùng thành công", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa vĩnh viễn tài khoản và toàn bộ dữ liệu liên quan", null));
     }
 
     @GetMapping("/me")
