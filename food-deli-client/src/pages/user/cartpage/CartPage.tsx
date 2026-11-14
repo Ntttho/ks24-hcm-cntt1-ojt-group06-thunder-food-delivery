@@ -437,7 +437,6 @@ export const CartPage: React.FC = () => {
             totalItemCount={selectedItemCount}
             subtotal={selectedSubtotal}
             shippingFee={shippingFee}
-            onOpenPromoSelector={() => message.info('Mã giảm giá sẽ được áp dụng tại bước Thanh toán')}
           />
         </div>
       </main>

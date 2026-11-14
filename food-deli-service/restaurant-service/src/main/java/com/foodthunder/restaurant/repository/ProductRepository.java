@@ -16,6 +16,10 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     Optional<Product> findByIdAndDeletedAtIsNull(Integer id);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id AND p.deletedAt IS NULL")
+    Optional<Product> findByIdForUpdate(@Param("id") Integer id);
+
     List<Product> findByCategoryIdAndDeletedAtIsNull(Integer categoryId);
 
     long countByCategoryIdAndDeletedAtIsNull(Integer categoryId);

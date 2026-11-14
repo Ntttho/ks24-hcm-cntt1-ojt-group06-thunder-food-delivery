@@ -26,6 +26,7 @@ import {
   MerchantOrderDetailDrawer,
   CANCEL_REASONS,
 } from './components';
+import { OrderChatDrawer } from '@/pages/order/components/OrderChatDrawer';
 
 export const MerchantDashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -45,7 +46,7 @@ export const MerchantDashboardPage: React.FC = () => {
   const [totalElements, setTotalElements] = useState<number>(0);
 
   // Status counts for overview KPI cards
-  const [counts, setCounts] = useState({ pending: 0, confirmed: 0, completed: 0, cancelled: 0 });
+  const [counts, setCounts] = useState({ pending: 0, confirmed: 0, delivering: 0, completed: 0, cancelled: 0 });
 
   // Cancel Order Modal State
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
@@ -57,6 +58,7 @@ export const MerchantDashboardPage: React.FC = () => {
   // Detail Drawer State
   const [isDetailDrawerOpen, setIsDetailDrawerOpen] = useState<boolean>(false);
   const [viewingOrderDetail, setViewingOrderDetail] = useState<MerchantOrder | null>(null);
+  const [chatOrder, setChatOrder] = useState<MerchantOrder | null>(null);
 
   // Track known order IDs for polling detection
   const knownOrderIdsRef = useRef<Set<number>>(new Set());
@@ -77,6 +79,7 @@ export const MerchantDashboardPage: React.FC = () => {
         setCounts({
           pending: all.filter((o) => o.statusCode === 'PENDING').length,
           confirmed: all.filter((o) => o.statusCode === 'CONFIRMED').length,
+          delivering: all.filter((o) => o.statusCode === 'DELIVERING' || o.statusCode === 'DRIVER_ACCEPTED' || o.statusCode === 'PICKING_UP').length,
           completed: all.filter((o) => o.statusCode === 'COMPLETED').length,
           cancelled: all.filter((o) => o.statusCode === 'CANCELLED').length,
         });
@@ -160,9 +163,23 @@ export const MerchantDashboardPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchText, pageSize, activeTab]);
 
-  // Switch tab handler
+  // Switch tab handler with activity toast notification
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
+    const tabLabels: Record<string, string> = {
+      ALL: 'Tất cả đơn hàng',
+      PENDING: 'Đơn mới chờ nhận',
+      CONFIRMED: 'Đang nấu chuẩn bị',
+      DELIVERING: 'Đang giao hàng',
+      COMPLETED: 'Đã hoàn thành',
+      CANCELLED: 'Đã hủy',
+    };
+    notification.info({
+      message: `Đang xem: ${tabLabels[newTab] || newTab}`,
+      description: `Đã lọc danh sách theo trạng thái ${tabLabels[newTab] || newTab}.`,
+      duration: 1.5,
+      placement: 'bottomRight',
+    });
     setPage(0);
     fetchOrders(false, 0, pageSize, searchText, newTab);
   };
@@ -268,6 +285,7 @@ export const MerchantDashboardPage: React.FC = () => {
   // Statistics counts for all tabs from state
   const pendingCount = counts.pending;
   const confirmedCount = counts.confirmed;
+  const deliveringCount = counts.delivering;
   const completedCount = counts.completed;
   const cancelledCount = counts.cancelled;
 
@@ -397,6 +415,7 @@ export const MerchantDashboardPage: React.FC = () => {
       <MerchantStats
         pendingCount={pendingCount}
         confirmedCount={confirmedCount}
+        deliveringCount={deliveringCount}
         completedCount={completedCount}
         cancelledCount={cancelledCount}
         activeTab={activeTab}
@@ -429,6 +448,14 @@ export const MerchantDashboardPage: React.FC = () => {
                 label: (
                   <Badge count={confirmedCount} offset={[10, 0]} color="#3b82f6">
                     <span className="pr-2 text-blue-700">Đang nấu (CONFIRMED)</span>
+                  </Badge>
+                ),
+              },
+              {
+                key: 'DELIVERING',
+                label: (
+                  <Badge count={deliveringCount} offset={[10, 0]} color="#06b6d4">
+                    <span className="pr-2 text-cyan-700 font-semibold">Đang giao (DELIVERING)</span>
                   </Badge>
                 ),
               },
@@ -493,6 +520,7 @@ export const MerchantDashboardPage: React.FC = () => {
                   setViewingOrderDetail(o);
                   setIsDetailDrawerOpen(true);
                 }}
+                onOpenChat={(o) => setChatOrder(o)}
               />
             ))}
 
@@ -547,6 +575,19 @@ export const MerchantDashboardPage: React.FC = () => {
         onConfirmOrder={handleConfirmOrder}
         onOpenCancelModal={handleOpenCancelModal}
       />
+
+      {/* 6. Drawer: Chat 2 chiều thời gian thực cho Quán */}
+      {chatOrder && (
+        <OrderChatDrawer
+          isOpen={Boolean(chatOrder)}
+          onClose={() => setChatOrder(null)}
+          orderId={chatOrder.id}
+          orderCode={chatOrder.orderCode}
+          driverName={chatOrder.driverName || (chatOrder.driverId ? `Tài xế #${chatOrder.driverId}` : undefined)}
+          driverPhone={chatOrder.driverPhone}
+          restaurantName={outletContext?.activeRestaurant?.name}
+        />
+      )}
     </div>
   );
 };

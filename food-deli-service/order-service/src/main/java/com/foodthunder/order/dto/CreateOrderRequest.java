@@ -29,6 +29,8 @@ public class CreateOrderRequest {
     @NotBlank(message = "Địa chỉ nhận hàng (receiverAddress) không được để trống")
     private String receiverAddress;
 
+    private String note;
+
     private Double receiverLat;
 
     private Double receiverLng;

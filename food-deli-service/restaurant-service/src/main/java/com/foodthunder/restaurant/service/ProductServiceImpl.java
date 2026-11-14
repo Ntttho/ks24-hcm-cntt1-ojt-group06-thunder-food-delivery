@@ -15,6 +15,7 @@ import com.foodthunder.restaurant.repository.MenuCategoryRepository;
 import com.foodthunder.restaurant.repository.ProductRepository;
 import com.foodthunder.restaurant.repository.ToppingRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProductServiceImpl implements ProductService {
@@ -280,6 +282,55 @@ public class ProductServiceImpl implements ProductService {
                 .map(this::mapToppingToDto)
                 .sorted(Comparator.comparing(ToppingDto::getId))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void deductStock(com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return;
+        }
+
+        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : request.getItems()) {
+            Product product = productRepository.findByIdForUpdate(item.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn ID=" + item.getProductId()));
+
+            int current = product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0;
+            if (current < item.getQuantity()) {
+                throw new BadRequestException("Món ăn '" + product.getName() + "' chỉ còn " + current
+                        + " phần, không đủ số lượng yêu cầu (" + item.getQuantity() + ").");
+            }
+
+            int remaining = current - item.getQuantity();
+            product.setCurrentQuantity(remaining);
+            if (remaining <= 0) {
+                product.setIsAvailable(false);
+            }
+            productRepository.save(product);
+            log.info("Deducted stock for product ID={}, deducted={}, remaining={}", product.getId(), item.getQuantity(), remaining);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void restoreStock(com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request) {
+        if (request == null || request.getItems() == null || request.getItems().isEmpty()) {
+            return;
+        }
+
+        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : request.getItems()) {
+            Product product = productRepository.findByIdForUpdate(item.getProductId()).orElse(null);
+            if (product != null) {
+                int current = product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0;
+                int restored = current + item.getQuantity();
+                product.setCurrentQuantity(restored);
+                if (restored > 0) {
+                    product.setIsAvailable(true);
+                }
+                productRepository.save(product);
+                log.info("Restored stock for product ID={}, restored={}, newQuantity={}", product.getId(), item.getQuantity(), restored);
+            }
+        }
     }
 
     private ProductDto mapProductToDto(Product product) {

@@ -138,4 +138,28 @@ public class ProductController {
         List<ToppingDto> toppings = productService.getProductToppings(id);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping của món ăn thành công", toppings));
     }
+
+    /**
+     * Trừ số lượng tồn kho món ăn khi đặt hàng (Internal Feign / Order Service)
+     * POST /api/v1/products/deduct-stock
+     */
+    @PostMapping("/deduct-stock")
+    public ResponseEntity<ApiResponse<Void>> deductStock(
+            @Valid @RequestBody com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request
+    ) {
+        productService.deductStock(request);
+        return ResponseEntity.ok(ApiResponse.success("Trừ kho món ăn thành công", null));
+    }
+
+    /**
+     * Hoàn lại số lượng tồn kho món ăn khi đơn hàng bị hủy (Internal Feign / Order Service)
+     * POST /api/v1/products/restore-stock
+     */
+    @PostMapping("/restore-stock")
+    public ResponseEntity<ApiResponse<Void>> restoreStock(
+            @Valid @RequestBody com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request
+    ) {
+        productService.restoreStock(request);
+        return ResponseEntity.ok(ApiResponse.success("Hoàn kho món ăn thành công", null));
+    }
 }

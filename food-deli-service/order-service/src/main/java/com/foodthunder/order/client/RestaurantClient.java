@@ -39,4 +39,10 @@ public interface RestaurantClient {
 
     @GetMapping("/api/v1/restaurants/admin/analytics-counts")
     ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> getRestaurantAnalyticsCounts();
+
+    @PostMapping("/api/v1/products/deduct-stock")
+    ResponseEntity<ApiResponse<Void>> deductStock(@RequestBody com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest request);
+
+    @PostMapping("/api/v1/products/restore-stock")
+    ResponseEntity<ApiResponse<Void>> restoreStock(@RequestBody com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest request);
 }

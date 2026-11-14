@@ -23,6 +23,7 @@ public class OrderResponse {
     private Integer driverId;
     private Integer voucherId;
     private String receiverAddress;
+    private String note;
     private Double receiverLat;
     private Double receiverLng;
     private Double distanceKm;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, useOutletContext, Navigate } from 'react-router-dom';
-import { Layout, message, Spin } from 'antd';
+import { Layout, message, Spin, Alert } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
@@ -30,17 +30,12 @@ export const MerchantLayout: React.FC = () => {
   const location = useLocation();
   const { user, logout, isAuthenticated, isMerchant, isAdmin } = useAuth();
 
-  // Access control
-  if (!isAuthenticated) {
-    return <Navigate to={APP_ROUTES.LOGIN} replace />;
-  }
-
-  if (!isMerchant && !isAdmin) {
-    return <Navigate to={APP_ROUTES.HOME} replace />;
-  }
-
   // Load all restaurants owned by this merchant
   const fetchMyRestaurants = useCallback(async () => {
+    if (!isAuthenticated || (!isMerchant && !isAdmin)) {
+      setLoadingShops(false);
+      return;
+    }
     setLoadingShops(true);
     try {
       const res = await restaurantApi.getMyRestaurantsAll(Number(user?.id));
@@ -62,11 +57,30 @@ export const MerchantLayout: React.FC = () => {
     } finally {
       setLoadingShops(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isAuthenticated, isMerchant, isAdmin]);
 
   useEffect(() => {
     fetchMyRestaurants();
   }, [fetchMyRestaurants]);
+
+  const selectedKey = useMemo(() => {
+    if (location.pathname.includes('/merchant/revenue') || location.pathname.includes('/merchant/analytics')) return '/merchant/revenue';
+    if (location.pathname.includes('/merchant/toppings')) return '/merchant/toppings';
+    if (location.pathname.includes('/merchant/categories')) return '/merchant/categories';
+    if (location.pathname.includes('/merchant/vouchers')) return '/merchant/vouchers';
+    if (location.pathname.includes('/merchant/reviews')) return '/merchant/reviews';
+    if (location.pathname.includes('/merchant/menu')) return '/merchant/menu';
+    return '/merchant';
+  }, [location.pathname]);
+
+  // Access control
+  if (!isAuthenticated) {
+    return <Navigate to={APP_ROUTES.LOGIN} replace />;
+  }
+
+  if (!isMerchant && !isAdmin) {
+    return <Navigate to={APP_ROUTES.HOME} replace />;
+  }
 
   // Handle switching active branch
   const handleSelectShop = (shop: Shop) => {
@@ -79,6 +93,10 @@ export const MerchantLayout: React.FC = () => {
   // Toggle restaurant open/close receiving orders
   const handleToggleShopStatus = async (checked: boolean) => {
     if (!activeRestaurant) return;
+    if (activeRestaurant.approvalStatus && activeRestaurant.approvalStatus !== 'APPROVED') {
+      message.warning('Quán ăn chưa được Ban quản trị phê duyệt, không thể mở bán!');
+      return;
+    }
     try {
       await restaurantApi.updateRestaurantStatus(
         activeRestaurant.id,
@@ -91,8 +109,9 @@ export const MerchantLayout: React.FC = () => {
         prev.map((s) => (s.id === updated.id ? updated : s))
       );
       message.success(checked ? 'Đã bật nhận đơn (Quán đang mở cửa)' : 'Đã chuyển sang tạm dừng nhận đơn');
-    } catch {
-      message.info(checked ? 'Chế độ: Đang mở cửa nhận đơn' : 'Chế độ: Tạm nghỉ nhận đơn');
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Không thể cập nhật trạng thái quán';
+      message.error(msg);
     }
   };
 
@@ -108,16 +127,6 @@ export const MerchantLayout: React.FC = () => {
     localStorage.setItem('thunder_merchant_active_shop_id', String(newShop.id));
     setIsAddShopModalOpen(false);
   };
-
-  const selectedKey = useMemo(() => {
-    if (location.pathname.includes('/merchant/revenue') || location.pathname.includes('/merchant/analytics')) return '/merchant/revenue';
-    if (location.pathname.includes('/merchant/toppings')) return '/merchant/toppings';
-    if (location.pathname.includes('/merchant/categories')) return '/merchant/categories';
-    if (location.pathname.includes('/merchant/vouchers')) return '/merchant/vouchers';
-    if (location.pathname.includes('/merchant/reviews')) return '/merchant/reviews';
-    if (location.pathname.includes('/merchant/menu')) return '/merchant/menu';
-    return '/merchant';
-  }, [location.pathname]);
 
   const isOpen = activeRestaurant ? activeRestaurant.isOpen !== false : true;
 
@@ -151,7 +160,26 @@ export const MerchantLayout: React.FC = () => {
         />
 
         {/* Content Body */}
-        <Content className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
+        <Content className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-4">
+          {activeRestaurant?.approvalStatus === 'PENDING' && (
+            <Alert
+              type="warning"
+              showIcon
+              message={<span className="font-bold">Quán ăn đang chờ Ban quản trị phê duyệt</span>}
+              description="Hồ sơ chi nhánh quán ăn này đang được Quản trị viên xét duyệt. Trong thời gian này, quán không thể mở cửa nhận đơn hoặc bán hàng cho khách."
+              className="rounded-2xl border-amber-200 bg-amber-50 shadow-xs"
+            />
+          )}
+          {activeRestaurant?.approvalStatus === 'REJECTED' && (
+            <Alert
+              type="error"
+              showIcon
+              message={<span className="font-bold">Quán ăn bị từ chối phê duyệt</span>}
+              description={`Lý do: ${activeRestaurant.rejectReason || 'Hồ sơ chưa đạt tiêu chuẩn. Vui lòng liên hệ Admin để được hỗ trợ.'}`}
+              className="rounded-2xl border-rose-200 bg-rose-50 shadow-xs"
+            />
+          )}
+
           {loadingShops ? (
             <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
               <Spin size="large" />

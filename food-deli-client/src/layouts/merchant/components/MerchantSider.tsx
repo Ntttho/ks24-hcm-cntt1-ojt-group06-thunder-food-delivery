@@ -1,7 +1,7 @@
 // sider bên trái trang merchant điều hướng qua các trang quản lý
 
 import React from 'react';
-import { Layout, Menu, Switch } from 'antd';
+import { Layout, Menu, Switch, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   InboxOutlined,
@@ -115,40 +115,85 @@ export const MerchantSider: React.FC<MerchantSiderProps> = ({
       {activeRestaurant && (
         <div className="p-3">
           {!collapsed ? (
-            <div className="p-3 rounded-2xl bg-orange-50/60 border border-orange-100 space-y-2">
+            <div className={`p-3 rounded-2xl border space-y-2 ${
+              activeRestaurant.approvalStatus === 'PENDING'
+                ? 'bg-amber-50/60 border-amber-200'
+                : activeRestaurant.approvalStatus === 'REJECTED'
+                ? 'bg-rose-50/60 border-rose-200'
+                : 'bg-orange-50/60 border-orange-100'
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-gray-700">Trạng thái quán:</span>
-                <Switch
-                  checked={isOpen}
-                  onChange={onToggleShopStatus}
-                  checkedChildren="Mở"
-                  unCheckedChildren="Đóng"
-                  size="small"
-                  style={{ backgroundColor: isOpen ? '#10b981' : undefined }}
-                />
+                <Tooltip
+                  title={
+                    activeRestaurant.approvalStatus === 'PENDING'
+                      ? 'Quán ăn đang chờ Ban quản trị duyệt'
+                      : activeRestaurant.approvalStatus === 'REJECTED'
+                      ? 'Quán ăn bị từ chối phê duyệt'
+                      : 'Bật / Tắt nhận đơn'
+                  }
+                >
+                  <Switch
+                    checked={isOpen && activeRestaurant.approvalStatus === 'APPROVED'}
+                    onChange={onToggleShopStatus}
+                    disabled={activeRestaurant.approvalStatus !== 'APPROVED'}
+                    checkedChildren="Mở"
+                    unCheckedChildren="Đóng"
+                    size="small"
+                    style={{ backgroundColor: (isOpen && activeRestaurant.approvalStatus === 'APPROVED') ? '#10b981' : undefined }}
+                  />
+                </Tooltip>
               </div>
 
               <div className="flex items-center gap-1.5 text-xs">
                 <span
                   className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${
-                    isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
+                    activeRestaurant.approvalStatus === 'PENDING'
+                      ? 'bg-amber-500 animate-pulse'
+                      : activeRestaurant.approvalStatus === 'REJECTED'
+                      ? 'bg-rose-500'
+                      : isOpen
+                      ? 'bg-emerald-500 animate-pulse'
+                      : 'bg-gray-400'
                   }`}
                 />
                 <span
                   className={`font-bold truncate text-[11px] ${
-                    isOpen ? 'text-emerald-700' : 'text-gray-500'
+                    activeRestaurant.approvalStatus === 'PENDING'
+                      ? 'text-amber-700'
+                      : activeRestaurant.approvalStatus === 'REJECTED'
+                      ? 'text-rose-700'
+                      : isOpen
+                      ? 'text-emerald-700'
+                      : 'text-gray-500'
                   }`}
                 >
-                  {isOpen ? 'Đang mở cửa nhận đơn' : 'Tạm dừng nhận đơn'}
+                  {activeRestaurant.approvalStatus === 'PENDING'
+                    ? 'Chờ duyệt phê duyệt'
+                    : activeRestaurant.approvalStatus === 'REJECTED'
+                    ? 'Bị từ chối'
+                    : isOpen
+                    ? 'Đang mở cửa nhận đơn'
+                    : 'Tạm dừng nhận đơn'}
                 </span>
               </div>
             </div>
           ) : (
             <div className="flex justify-center py-2">
               <span
-                title={isOpen ? 'Đang mở cửa' : 'Tạm đóng'}
+                title={
+                  activeRestaurant.approvalStatus === 'PENDING'
+                    ? 'Chờ duyệt'
+                    : isOpen
+                    ? 'Đang mở cửa'
+                    : 'Tạm đóng'
+                }
                 className={`w-3.5 h-3.5 rounded-full ${
-                  isOpen ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'
+                  activeRestaurant.approvalStatus === 'PENDING'
+                    ? 'bg-amber-500 animate-pulse'
+                    : isOpen
+                    ? 'bg-emerald-500 animate-pulse'
+                    : 'bg-gray-300'
                 }`}
               />
             </div>

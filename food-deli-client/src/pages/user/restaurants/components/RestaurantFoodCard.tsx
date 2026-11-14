@@ -10,20 +10,35 @@ interface RestaurantFoodCardProps {
 }
 
 export const RestaurantFoodCard: React.FC<RestaurantFoodCardProps> = ({ food, onAddToCart }) => {
+  const isOutOfStock = food.isAvailable === false || (typeof food.currentQuantity === 'number' && food.currentQuantity <= 0);
+
   return (
-    <div className="group bg-white p-4 rounded-2xl border border-gray-100 flex gap-4 hover:shadow-md transition-all justify-between items-center">
+    <div className={`group bg-white p-4 rounded-2xl border flex gap-4 transition-all justify-between items-center ${
+      isOutOfStock ? 'opacity-75 border-gray-200 bg-gray-50/50' : 'border-gray-100 hover:shadow-md'
+    }`}>
       <div className="flex flex-col justify-between flex-1 min-w-0 self-stretch py-0.5">
         <div>
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h3 className="font-bold text-gray-900 text-base leading-snug group-hover:text-orange-600 transition-colors line-clamp-1">
+            <h3 className={`font-bold text-base leading-snug line-clamp-1 transition-colors ${
+              isOutOfStock ? 'text-gray-400 line-through' : 'text-gray-900 group-hover:text-orange-600'
+            }`}>
               {food.name}
             </h3>
-            {food.isPopular && (
+            {isOutOfStock ? (
+              <Tag color="default" className="text-[10px] font-bold px-1.5 py-0 border-none rounded bg-gray-200 text-gray-600">
+                Hết món
+              </Tag>
+            ) : typeof food.currentQuantity === 'number' && food.currentQuantity > 0 && food.currentQuantity <= 10 ? (
+              <Tag color="warning" className="text-[10px] font-bold px-1.5 py-0 border-none rounded">
+                Còn {food.currentQuantity} phần
+              </Tag>
+            ) : null}
+            {food.isPopular && !isOutOfStock && (
               <Tag color="volcano" className="text-[10px] font-bold px-1.5 py-0 border-none rounded">
                 <FireOutlined /> Bán chạy
               </Tag>
             )}
-            {food.isNew && (
+            {food.isNew && !isOutOfStock && (
               <Tag color="blue" className="text-[10px] font-bold px-1.5 py-0 border-none rounded">
                 Mới
               </Tag>
@@ -36,7 +51,7 @@ export const RestaurantFoodCard: React.FC<RestaurantFoodCardProps> = ({ food, on
 
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-50">
           <div className="flex items-baseline gap-2">
-            <span className="font-extrabold text-orange-600 text-base sm:text-lg">
+            <span className={`font-extrabold text-base sm:text-lg ${isOutOfStock ? 'text-gray-400' : 'text-orange-600'}`}>
               {food.price.toLocaleString('vi-VN')}đ
             </span>
             {food.originalPrice && food.originalPrice > food.price && (
@@ -48,11 +63,14 @@ export const RestaurantFoodCard: React.FC<RestaurantFoodCardProps> = ({ food, on
 
           <Button
             type="primary"
-            icon={<PlusOutlined />}
-            className="h-9 rounded-xl bg-orange-500 px-3 font-bold hover:bg-orange-600 shadow-sm active:scale-95 transition-transform"
+            icon={!isOutOfStock ? <PlusOutlined /> : undefined}
+            disabled={isOutOfStock}
+            className={`h-9 rounded-xl px-3 font-bold shadow-sm transition-transform ${
+              isOutOfStock ? 'bg-gray-200 text-gray-400 border-none' : 'bg-orange-500 hover:bg-orange-600 active:scale-95'
+            }`}
             onClick={() => onAddToCart(food)}
           >
-            <span className="hidden sm:inline">Thêm</span>
+            <span>{isOutOfStock ? 'Hết hàng' : 'Thêm'}</span>
           </Button>
         </div>
       </div>

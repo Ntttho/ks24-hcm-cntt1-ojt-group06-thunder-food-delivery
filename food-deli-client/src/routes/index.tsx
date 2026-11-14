@@ -1,5 +1,5 @@
-import { createBrowserRouter } from 'react-router-dom';
-import { MainLayout, AuthLayout, MerchantLayout, UserLayout } from '@/layouts';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { MainLayout, AuthLayout, MerchantLayout, UserLayout, AdminLayout } from '@/layouts';
 import {
   HomePage,
   LoginPage,
@@ -58,75 +58,7 @@ export const router = createBrowserRouter([
       },
       {
         path: APP_ROUTES.USERS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminUserPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_ANALYTICS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminAnalyticsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_SYSTEM_SETTINGS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminSystemSettingsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: '/admin/dashboard',
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminAnalyticsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_USERS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminUserPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_APPROVALS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminApprovalPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_RESTAURANT_REVIEWS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminRestaurantReviewsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_DRIVER_REVIEWS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminDriverReviewsPage />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: APP_ROUTES.ADMIN_SETTINGS,
-        element: (
-          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminSettingsPage />
-          </ProtectedRoute>
-        ),
+        element: <Navigate to="/admin/users" replace />,
       },
       // User Account Management Layout (Profile, Orders, Addresses)
       {
@@ -197,6 +129,53 @@ export const router = createBrowserRouter([
   {
     path: APP_ROUTES.ADMIN_LOGIN,
     element: <AdminLoginPage />,
+  },
+  // Dedicated Admin Portal Layout (Chuyên biệt cho Quản trị viên ADMIN)
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/admin/dashboard" replace />,
+      },
+      {
+        path: 'dashboard',
+        element: <AdminAnalyticsPage />,
+      },
+      {
+        path: 'analytics',
+        element: <AdminAnalyticsPage />,
+      },
+      {
+        path: 'users',
+        element: <AdminUserPage />,
+      },
+      {
+        path: 'approvals',
+        element: <AdminApprovalPage />,
+      },
+      {
+        path: 'reviews/restaurants',
+        element: <AdminRestaurantReviewsPage />,
+      },
+      {
+        path: 'reviews/drivers',
+        element: <AdminDriverReviewsPage />,
+      },
+      {
+        path: 'settings',
+        element: <AdminSettingsPage />,
+      },
+      {
+        path: 'system-settings',
+        element: <AdminSystemSettingsPage />,
+      },
+    ],
   },
   // Merchant Layout: Merchant Dashboard, Menu & Toppings Management (Chặt chẽ: Chỉ MERCHANT và ADMIN mới được phép truy cập)
   {

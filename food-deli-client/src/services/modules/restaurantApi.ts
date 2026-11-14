@@ -18,6 +18,8 @@ export interface Shop {
   closingTime?: string;
   ratingAvg?: number;
   approvalStatus?: string;
+  rejectReason?: string;
+  temporaryClosedReason?: string;
   categories?: Array<{
     id: number;
     name: string;
