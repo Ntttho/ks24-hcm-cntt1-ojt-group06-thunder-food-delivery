@@ -563,6 +563,9 @@ public class OrderServiceImpl implements OrderService {
         Order updatedOrder = orderRepository.save(order);
         log.info("Order status updated successfully for id: {}, newStatus: {}", updatedOrder.getId(), targetStatus);
 
+        // Phát realtime WebSocket tới khách hàng (/topic/orders/{orderId}) và quán (/topic/merchant/...)
+        broadcastOrderToMerchant(updatedOrder);
+
         return mapToOrderResponse(updatedOrder);
     }
 
@@ -757,6 +760,10 @@ public class OrderServiceImpl implements OrderService {
 
         Order saved = orderRepository.save(order);
         log.info("Order ID={} cancelled with reason: {}", orderId, reason);
+
+        // Phát realtime WebSocket tới khách hàng và quán khi hủy đơn
+        broadcastOrderToMerchant(saved);
+
         return mapToOrderResponse(saved);
     }
 

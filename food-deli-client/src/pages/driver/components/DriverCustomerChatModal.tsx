@@ -102,9 +102,12 @@ export const DriverCustomerChatModal: React.FC<DriverCustomerChatModalProps> = (
         </div>
 
         {/* Status Note */}
-        <div className="bg-amber-50 border-b border-amber-100 px-3.5 py-2 text-[11px] text-amber-800 leading-snug">
-          Phiên chat UI cho đơn <strong>#{order.orderCode}</strong> (lưu cục bộ trên trình duyệt;
-          sẵn sàng đồng bộ hai chiều khi kích hoạt dịch vụ chat).
+        <div className="bg-emerald-50 border-b border-emerald-100 px-3.5 py-2 text-[11px] text-emerald-800 leading-snug flex items-center justify-between">
+          <span>Kênh chat trực tiếp đơn <strong>#{order.orderCode}</strong></span>
+          <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-emerald-700">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Realtime STOMP
+          </span>
         </div>
 
         {/* Messages Thread */}
@@ -123,16 +126,28 @@ export const DriverCustomerChatModal: React.FC<DriverCustomerChatModalProps> = (
               </p>
             </div>
           ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="flex flex-col items-end">
-                <div className="bg-emerald-600 text-white text-xs rounded-2xl rounded-br-sm px-3.5 py-2 max-w-[85%] shadow-xs leading-relaxed">
-                  {msg.text}
+            messages.map((msg) => {
+              const isMe = msg.sender === 'DRIVER';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                >
+                  <div
+                    className={`text-xs rounded-2xl px-3.5 py-2 max-w-[85%] shadow-xs leading-relaxed ${
+                      isMe
+                        ? 'bg-emerald-600 text-white rounded-br-sm'
+                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-0.5 px-1">
+                    {isMe ? 'Bạn (Tài xế)' : 'Khách hàng'} • {formatChatTime(msg.sentAtIso)}
+                  </span>
                 </div>
-                <span className="text-[10px] text-slate-400 mt-0.5 px-1">
-                  Bạn • {formatChatTime(msg.sentAtIso)}
-                </span>
-              </div>
-            ))
+              );
+            })
           )}
           <div ref={bottomRef} />
         </div>

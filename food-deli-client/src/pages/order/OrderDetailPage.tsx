@@ -235,10 +235,11 @@ export const OrderDetailPage: React.FC = () => {
 
     orderLiveTrackingWs.connect(id);
 
-    const unsubscribe = orderLiveTrackingWs.subscribeOrderUpdates((updated) => {
+    const unsubscribe = orderLiveTrackingWs.subscribeOrderUpdates((updated: any) => {
       setOrder((prev) => {
         if (!prev) return prev;
-        const newStatusCode = updated.statusCode || prev.statusCode;
+        const rawCode = updated.statusCode || updated.status || updated.code;
+        const newStatusCode = (rawCode ? String(rawCode) : prev.statusCode).toUpperCase();
         const newStatusLabel = ORDER_STATUS_LABELS[newStatusCode] || updated.statusLabel || prev.statusLabel;
 
         message.info({
