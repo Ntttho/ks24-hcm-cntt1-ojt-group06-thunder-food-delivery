@@ -10,6 +10,8 @@ import {
   ExclamationCircleOutlined,
   EyeOutlined,
   CheckOutlined,
+  CarOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import type { MerchantOrder } from '@/services/modules/orderApi';
 import { formatCurrency, formatDate } from '@/utils/formatters';
@@ -21,6 +23,7 @@ interface MerchantOrderCardProps {
   onConfirmOrder: (order: MerchantOrder) => void;
   onOpenCancelModal: (order: MerchantOrder) => void;
   onViewDetail: (order: MerchantOrder) => void;
+  onOpenChat?: (order: MerchantOrder) => void;
 }
 
 export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
@@ -29,9 +32,11 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
   onConfirmOrder,
   onOpenCancelModal,
   onViewDetail,
+  onOpenChat,
 }) => {
   const isPending = order.statusCode === 'PENDING';
   const isConfirmed = order.statusCode === 'CONFIRMED';
+  const isDelivering = order.statusCode === 'DELIVERING' || order.statusCode === 'DRIVER_ACCEPTED' || order.statusCode === 'PICKING_UP';
   const isCompleted = order.statusCode === 'COMPLETED';
   const isCancelled = order.statusCode === 'CANCELLED';
 
@@ -42,6 +47,8 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
           ? 'border-amber-300 bg-amber-50/20 shadow-md ring-1 ring-amber-300/50 hover:shadow-lg'
           : isConfirmed
           ? 'border-blue-200 bg-white hover:border-blue-300 hover:shadow-xs'
+          : isDelivering
+          ? 'border-cyan-300 bg-cyan-50/20 hover:border-cyan-400 hover:shadow-xs'
           : isCompleted
           ? 'border-emerald-200 bg-emerald-50/10 hover:border-emerald-300'
           : 'border-slate-200 bg-slate-50/60'
@@ -70,6 +77,17 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
           >
             Chi tiết đơn
           </Button>
+          {onOpenChat && (
+            <Button
+              type="link"
+              size="small"
+              icon={<MessageOutlined />}
+              onClick={() => onOpenChat(order)}
+              className="text-emerald-600 hover:text-emerald-700 font-semibold p-0 h-auto"
+            >
+              Nhắn tin
+            </Button>
+          )}
         </div>
       </div>
 
@@ -109,13 +127,15 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
             </div>
           )}
 
-          {!isCancelled && order.customerNote && (
-            <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-800">
-              <span className="font-semibold block mb-0.5">
-                <FileTextOutlined className="mr-1 text-amber-600" />
-                Ghi chú của khách:
+          {!isCancelled && (order.customerNote || (order as any).note) && (
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-xs text-amber-900 shadow-2xs">
+              <span className="font-extrabold flex items-center gap-1.5 text-amber-700 mb-1">
+                <FileTextOutlined className="text-amber-600" />
+                Ghi chú từ khách hàng:
               </span>
-              "{order.customerNote}"
+              <p className="m-0 font-bold bg-white/80 p-2 rounded-lg border border-amber-200 text-amber-950">
+                "{order.customerNote || (order as any).note}"
+              </p>
             </div>
           )}
         </Col>
@@ -207,6 +227,20 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
               >
                 Hủy đột xuất
               </Button>
+            </div>
+          )}
+
+          {isDelivering && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Tag color="cyan" className="text-xs px-3 py-1 font-semibold rounded-lg">
+                <CarOutlined className="mr-1" /> Tài xế đang giao hàng
+                {order.driverId ? ` (Tài xế #${order.driverId})` : ''}
+              </Tag>
+              {order.distanceKm && (
+                <Tag color="blue" className="text-xs px-2.5 py-1 font-medium rounded-lg">
+                  Khoảng cách: {order.distanceKm} km
+                </Tag>
+              )}
             </div>
           )}
 

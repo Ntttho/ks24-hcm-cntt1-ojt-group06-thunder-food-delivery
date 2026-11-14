@@ -1,6 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { message, Modal, Tag, Input } from 'antd';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { message, Modal, Tag, Input, Dropdown, type MenuProps } from 'antd';
+import {
+  UserOutlined,
+  LogoutOutlined,
+  HomeOutlined,
+  DashboardOutlined,
+  HistoryOutlined,
+  ExclamationCircleOutlined,
+} from '@ant-design/icons';
+import { calculateHaversineDistance } from '@/utils/geoUtils';
 import {
   Bike,
   Power,
@@ -16,6 +25,8 @@ import {
   ShieldCheck,
 } from './icons';
 import { ActiveDeliveryView } from './components/ActiveDeliveryView';
+import { ShipperWalletView } from './components/ShipperWalletView';
+import { ShipperReviewsView } from './components/ShipperReviewsView';
 import { useAuth } from '@/hooks/useAuth';
 import {
   driverApi,
@@ -53,7 +64,78 @@ const formatPaymentLabel = (order: DriverOrder): string => {
 };
 
 export const ShipperHubPage: React.FC = () => {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, logout, isAdmin } = useAuth();
+
+  // Safe Logout with confirmation
+  const handleLogoutConfirm = () => {
+    Modal.confirm({
+      title: 'Xác nhận đăng xuất tài xế',
+      icon: <ExclamationCircleOutlined className="text-orange-500" />,
+      content: 'Bạn có chắc chắn muốn kết thúc ca làm việc và đăng xuất khỏi cổng Shipper Hub không?',
+      okText: 'Đăng xuất',
+      cancelText: 'Hủy bỏ',
+      okButtonProps: { danger: true, className: 'bg-red-500 font-bold' },
+      onOk: () => {
+        logout();
+        message.success('Đã kết thúc phiên làm việc an toàn!');
+        navigate(APP_ROUTES.LOGIN);
+      },
+    });
+  };
+
+  const shipperHeaderMenuItems: MenuProps['items'] = [
+    {
+      key: 'driver-info',
+      disabled: true,
+      label: (
+        <div className="py-1">
+          <div className="font-extrabold text-slate-900 text-xs truncate max-w-[160px]">
+            {user?.fullName || 'Tài xế giao vận'}
+          </div>
+          <div className="text-[10px] text-slate-400">{user?.phone || user?.email}</div>
+          <Tag color="blue" className="mt-1 font-bold text-[10px]">
+            Tài Xế Đối Tác
+          </Tag>
+        </div>
+      ),
+    },
+    { type: 'divider' },
+    {
+      key: 'history',
+      icon: <HistoryOutlined className="text-blue-500" />,
+      label: <span className="font-semibold text-slate-700">Lịch sử chuyến đi & Thu nhập</span>,
+      onClick: () => navigate(APP_ROUTES.SHIPPER_HISTORY),
+    },
+    {
+      key: 'home',
+      icon: <HomeOutlined className="text-emerald-500" />,
+      label: <span className="font-semibold text-slate-700">Trang chủ đặt món (Khách hàng)</span>,
+      onClick: () => navigate(APP_ROUTES.HOME),
+    },
+    ...(isAdmin
+      ? [
+          {
+            key: 'admin-portal',
+            icon: <DashboardOutlined className="text-red-500" />,
+            label: (
+              <span className="font-bold text-red-600">
+                Cổng Quản trị (Admin Portal)
+              </span>
+            ),
+            onClick: () => navigate('/admin/dashboard'),
+          },
+        ]
+      : []),
+    { type: 'divider' },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      danger: true,
+      label: <span className="font-bold">Đăng xuất ca làm</span>,
+      onClick: handleLogoutConfirm,
+    },
+  ];
 
   // Navigation tab for Hub
   const [activeTab, setActiveTab] = useState<'deliveries' | 'wallet' | 'reviews'>('deliveries');
@@ -64,6 +146,34 @@ export const ShipperHubPage: React.FC = () => {
   const [loadingRadar, setLoadingRadar] = useState<boolean>(false);
   const [radarError, setRadarError] = useState<string | null>(null);
   const dismissedOrderIdsRef = useRef<Set<number>>(new Set());
+
+  // Radar Radius & GPS Coordinates (Bug 9)
+  const [radarRadius, setRadarRadius] = useState<number>(5);
+  const [driverCoords, setDriverCoords] = useState<{ lat: number; lng: number }>({ lat: 10.7769, lng: 106.7009 });
+
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setDriverCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {}
+      );
+    }
+  }, []);
+
+  const filteredAvailableOrders = useMemo(() => {
+    return availableOrders
+      .map((order) => {
+        const distanceToShop = calculateHaversineDistance(
+          driverCoords.lat,
+          driverCoords.lng,
+          order.restaurantLat || 10.7769,
+          order.restaurantLng || 106.7009
+        );
+        return { ...order, distanceToShop };
+      })
+      .filter((o) => radarRadius >= 999 || o.distanceToShop <= radarRadius)
+      .sort((a, b) => a.distanceToShop - b.distanceToShop);
+  }, [availableOrders, driverCoords, radarRadius]);
 
   // Single Active Order constraint (Ràng buộc đơn duy nhất)
   const [currentOrder, setCurrentOrder] = useState<DriverOrder | null>(null);
@@ -344,23 +454,36 @@ export const ShipperHubPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Toggle Online/Offline Power Button (Disabled during active delivery) */}
-            {!currentOrder && (
-              <button
-                onClick={() => setIsOnline(!isOnline)}
-                className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 cursor-pointer ${
-                  isOnline
-                    ? 'bg-emerald-500 shadow-emerald-500/40 text-white hover:bg-emerald-600'
-                    : 'bg-white shadow-slate-200 text-slate-400 border border-slate-200 hover:text-slate-600'
-                }`}
-                title={isOnline ? 'Nhấn để tắt trực tuyến' : 'Nhấn để bật trực tuyến'}
-              >
-                {isOnline && (
-                  <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400 opacity-40 pointer-events-none"></span>
-                )}
-                <Power className={`w-6 h-6 ${isOnline ? 'animate-pulse' : ''}`} />
-              </button>
-            )}
+            {/* Actions: Navigation Dropdown & Online/Offline Toggle */}
+            <div className="flex items-center gap-2.5">
+              <Dropdown menu={{ items: shipperHeaderMenuItems }} placement="bottomRight" trigger={['click']}>
+                <button
+                  type="button"
+                  className="flex items-center justify-center w-11 h-11 rounded-2xl bg-white shadow-sm border border-slate-200 text-slate-700 hover:text-emerald-600 hover:bg-slate-50 transition-all cursor-pointer"
+                  title="Menu tài khoản & điều hướng"
+                >
+                  <UserOutlined className="text-base" />
+                </button>
+              </Dropdown>
+
+              {/* Toggle Online/Offline Power Button (Disabled during active delivery) */}
+              {!currentOrder && (
+                <button
+                  onClick={() => setIsOnline(!isOnline)}
+                  className={`relative flex items-center justify-center w-12 h-12 rounded-2xl shadow-lg transition-all duration-300 cursor-pointer ${
+                    isOnline
+                      ? 'bg-emerald-500 shadow-emerald-500/40 text-white hover:bg-emerald-600'
+                      : 'bg-white shadow-slate-200 text-slate-400 border border-slate-200 hover:text-slate-600'
+                  }`}
+                  title={isOnline ? 'Nhấn để tắt trực tuyến' : 'Nhấn để bật trực tuyến'}
+                >
+                  {isOnline && (
+                    <span className="absolute inset-0 rounded-2xl animate-ping bg-emerald-400 opacity-40 pointer-events-none"></span>
+                  )}
+                  <Power className={`w-5 h-5 ${isOnline ? 'animate-pulse' : ''}`} />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Navigation Tabs (Only visible when NOT in active delivery) */}
@@ -473,13 +596,38 @@ export const ShipperHubPage: React.FC = () => {
                 </div>
               )}
 
+              {/* Radar Radius Selector */}
+              <div className="bg-white p-3 rounded-2xl border border-slate-200/80 flex items-center justify-between gap-2 flex-wrap shadow-2xs">
+                <span className="text-xs font-bold text-slate-700">Bán kính dò đơn:</span>
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { label: '3 km', value: 3 },
+                    { label: '5 km', value: 5 },
+                    { label: '10 km', value: 10 },
+                    { label: 'Toàn sàn', value: 999 },
+                  ].map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => setRadarRadius(r.value)}
+                      className={`px-3 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        radarRadius === r.value
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Available Orders List */}
-              {loadingRadar && availableOrders.length === 0 ? (
+              {loadingRadar && filteredAvailableOrders.length === 0 ? (
                 <div className="bg-white/90 p-10 rounded-3xl border border-slate-200 text-center text-xs text-slate-500">
                   Đang quét đơn hàng từ máy chủ...
                 </div>
-              ) : availableOrders.length > 0 ? (
-                availableOrders.map((order) => (
+              ) : filteredAvailableOrders.length > 0 ? (
+                filteredAvailableOrders.map((order) => (
                   <article
                     key={order.id}
                     aria-label={`Đơn hàng ${order.orderCode} từ ${order.restaurantName}`}
@@ -512,9 +660,13 @@ export const ShipperHubPage: React.FC = () => {
                       {/* Order Details: Distance, Payment, Addresses */}
                       <div className="space-y-2 mb-4 text-xs">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <div className="flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-bold">
+                          <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
                             <Navigation className="w-3 h-3 text-emerald-600" />
-                            <span>{order.distanceKm} km</span>
+                            <span>Cách bạn {(order as any).distanceToShop?.toFixed(1) || '1.2'} km</span>
+                          </div>
+
+                          <div className="flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-bold">
+                            <span>Quán tới khách: {order.distanceKm} km</span>
                           </div>
 
                           <div
@@ -610,165 +762,21 @@ export const ShipperHubPage: React.FC = () => {
               VIEW 3: WALLET (VÍ THU NHẬP THẬT CỦA TÀI XẾ)
              ========================================================================= */}
           {!currentOrder && activeTab === 'wallet' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              {loadingWallet && !walletData ? (
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center text-xs text-slate-500">
-                  Đang tải dữ liệu ví từ máy chủ...
-                </div>
-              ) : walletData ? (
-                <>
-                  <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-xl shadow-emerald-600/20">
-                    <span className="text-xs font-semibold text-emerald-100 flex items-center gap-1">
-                      <TrendingUp className="w-3.5 h-3.5" />
-                      Thu nhập hôm nay
-                    </span>
-                    <div className="text-3xl font-black mt-2 tracking-tight">
-                      {walletData.todayEarnings.toLocaleString('vi-VN')} đ
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-white/20 grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <span className="text-emerald-200 block text-[11px]">Cuốc xong hôm nay</span>
-                        <span className="font-black text-sm text-white">
-                          {walletData.completedTripsToday} chuyến
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-emerald-200 block text-[11px]">Tổng tích lũy</span>
-                        <span className="font-black text-sm text-white">
-                          {walletData.walletBalance.toLocaleString('vi-VN')} đ
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
-                        Chuyến hoàn thành gần nhất
-                      </h3>
-                      <button
-                        onClick={loadWalletSummary}
-                        className="text-[11px] text-emerald-600 font-bold cursor-pointer"
-                      >
-                        Làm mới
-                      </button>
-                    </div>
-
-                    {walletData.recentTrips.length > 0 ? (
-                      <div className="space-y-2 text-xs">
-                        {walletData.recentTrips.map((trip) => (
-                          <div
-                            key={trip.id}
-                            className="p-3 rounded-2xl bg-slate-50 flex items-center justify-between border border-slate-100"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <span className="font-bold text-slate-800 block truncate">
-                                {trip.orderCode} • {trip.restaurantName}
-                              </span>
-                              <span className="text-slate-400 text-[10px] block truncate">
-                                {trip.address} • {trip.time}
-                              </span>
-                            </div>
-                            <span className="font-black text-emerald-600 text-xs shrink-0">
-                              +{trip.earning.toLocaleString('vi-VN')} đ
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 text-center py-4">
-                        Chưa có chuyến xe nào hoàn thành.
-                      </p>
-                    )}
-
-                    <Link
-                      to={APP_ROUTES.SHIPPER_HISTORY}
-                      className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-                    >
-                      <span>Xem toàn bộ lịch sử đơn hàng (cả thất bại &amp; thành công) &gt;</span>
-                    </Link>
-                  </div>
-                </>
-              ) : (
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center text-xs text-slate-500">
-                  Không có dữ liệu ví.
-                </div>
-              )}
-            </div>
+            <ShipperWalletView
+              walletData={walletData}
+              loadingWallet={loadingWallet}
+              onRefresh={loadWalletSummary}
+            />
           )}
 
           {/* =========================================================================
               VIEW 4: REVIEWS (ĐÁNH GIÁ THẬT CỦA TÀI XẾ)
              ========================================================================= */}
           {!currentOrder && activeTab === 'reviews' && (
-            <div className="space-y-4 animate-in fade-in duration-150">
-              {loadingReviews && !reviewData ? (
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center text-xs text-slate-500">
-                  Đang tải đánh giá từ máy chủ...
-                </div>
-              ) : reviewData ? (
-                <>
-                  <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm text-center">
-                    <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-2">
-                      <Award className="w-7 h-7" />
-                    </div>
-                    <div className="text-3xl font-black text-slate-900">
-                      {reviewData.totalReviews > 0 ? `${reviewData.averageRating} / 5.0` : 'Chưa có'}
-                    </div>
-                    {reviewData.totalReviews > 0 && (
-                      <div className="flex items-center justify-center gap-1 my-1.5">
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Star
-                            key={s}
-                            className={`w-4 h-4 ${
-                              s <= Math.round(reviewData.averageRating)
-                                ? 'fill-amber-400 text-amber-400'
-                                : 'text-slate-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-xs font-bold text-emerald-600 mt-1">{reviewData.ratingRank}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {reviewData.unavailableReason
-                        ? reviewData.unavailableReason
-                        : `Dựa trên ${reviewData.totalReviews} lượt đánh giá từ khách hàng`}
-                    </p>
-                  </div>
-
-                  <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
-                    <h3 className="font-bold text-xs text-slate-800 uppercase tracking-wider">
-                      Nhận xét từ khách hàng
-                    </h3>
-
-                    {reviewData.reviews.length > 0 ? (
-                      <div className="space-y-2.5 text-xs">
-                        {reviewData.reviews.map((rev) => (
-                          <div key={rev.id} className="p-3 rounded-2xl bg-slate-50 space-y-1 border border-slate-100">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold text-slate-700">{rev.customerName}</span>
-                              <div className="flex text-amber-400 text-[11px]">
-                                {'★'.repeat(rev.rating)}
-                              </div>
-                            </div>
-                            <p className="text-slate-600 italic">"{rev.comment}"</p>
-                            <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1">
-                              <span>{rev.orderCode}</span>
-                              <span>{rev.timeAgo}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400 text-center py-4">
-                        {reviewData.unavailableReason || 'Chưa có nhận xét nào từ khách hàng.'}
-                      </p>
-                    )}
-                  </div>
-                </>
-              ) : null}
-            </div>
+            <ShipperReviewsView
+              reviewData={reviewData}
+              loadingReviews={loadingReviews}
+            />
           )}
         </header>
       </main>

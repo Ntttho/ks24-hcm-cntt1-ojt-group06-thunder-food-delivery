@@ -257,6 +257,7 @@ CREATE TABLE `orders` (
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
   `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
   `receiver_address` TEXT,                -- Snapshot dữ liệu lúc đặt đơn
+  `note` TEXT DEFAULT NULL,               -- Ghi chú của khách cho Quán ăn & Tài xế
   `receiver_lat` DOUBLE DEFAULT NULL,
   `receiver_lng` DOUBLE DEFAULT NULL,
   `distance_km` DOUBLE DEFAULT NULL,

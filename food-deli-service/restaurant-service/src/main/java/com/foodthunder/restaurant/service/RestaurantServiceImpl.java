@@ -151,12 +151,13 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .longitude(lng)
                 .openingTime(opening)
                 .closingTime(closing)
-                .isOpen(true)
-                .isOpenToday(true)
+                .isOpen(false)
+                .isOpenToday(false)
                 .imageUrl(img)
                 .ratingAvg(BigDecimal.valueOf(5.00))
-                .approvalStatus("APPROVED")
-                .approvedAt(LocalDateTime.now())
+                .approvalStatus("PENDING")
+                .approvedAt(null)
+                .approvedBy(null)
                 .build();
 
         Shop savedShop = shopRepository.save(shop);
@@ -228,8 +229,13 @@ public class RestaurantServiceImpl implements RestaurantService {
         Shop shop = shopRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + id));
 
+        if (Boolean.TRUE.equals(isOpen) && !"APPROVED".equalsIgnoreCase(shop.getApprovalStatus())) {
+            throw new com.foodthunder.restaurant.exception.BadRequestException("Quán ăn đang ở trạng thái chờ phê duyệt hoặc bị từ chối, không thể mở bán");
+        }
+
         if (isOpen != null) {
             shop.setIsOpen(isOpen);
+            shop.setIsOpenToday(isOpen);
         }
         if (temporaryClosedReason != null) {
             shop.setTemporaryClosedReason(temporaryClosedReason);

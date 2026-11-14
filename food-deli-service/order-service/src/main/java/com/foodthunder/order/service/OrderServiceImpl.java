@@ -135,6 +135,7 @@ public class OrderServiceImpl implements OrderService {
         // 3. Fetch products and validate single-shop constraint via OpenFeign
         BigDecimal subtotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
+        List<com.foodthunder.order.dto.client.RemoteDeductStockItemRequest> stockDeductItems = new ArrayList<>();
 
         for (CreateOrderItemRequest itemRequest : request.getItems()) {
             ResponseEntity<ApiResponse<RemoteProductDto>> productResponse;
@@ -155,6 +156,14 @@ public class OrderServiceImpl implements OrderService {
             if (Boolean.FALSE.equals(product.getIsAvailable())) {
                 throw new BadRequestException("Món ăn '" + product.getName() + "' hiện đang tạm ngưng phục vụ");
             }
+
+            // Check stock quantity
+            if (product.getCurrentQuantity() != null && product.getCurrentQuantity() < itemRequest.getQuantity()) {
+                throw new BadRequestException("Món ăn '" + product.getName() + "' chỉ còn " + product.getCurrentQuantity()
+                        + " phần, không đủ số lượng đặt (" + itemRequest.getQuantity() + ")");
+            }
+
+            stockDeductItems.add(new com.foodthunder.order.dto.client.RemoteDeductStockItemRequest(product.getId(), itemRequest.getQuantity()));
 
             // Check Single-Shop Constraint
             if (!targetRestaurantId.equals(product.getRestaurantId())) {
@@ -308,6 +317,7 @@ public class OrderServiceImpl implements OrderService {
                 .restaurantId(targetRestaurantId)
                 .voucherId(appliedVoucherId)
                 .receiverAddress(request.getReceiverAddress())
+                .note(request.getNote())
                 .receiverLat(request.getReceiverLat())
                 .receiverLng(request.getReceiverLng())
                 .distanceKm(distanceKm)
@@ -334,6 +344,18 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(LocalDateTime.now())
                 .build();
         order.addStatusLog(initialLog);
+
+        // Deduct product stock via restaurantClient
+        if (!stockDeductItems.isEmpty()) {
+            try {
+                restaurantClient.deductStock(new com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest(stockDeductItems));
+            } catch (BadRequestException bre) {
+                throw bre;
+            } catch (Exception ex) {
+                log.error("Failed to deduct stock from restaurant-service: {}", ex.getMessage());
+                throw new BadRequestException("Không thể trừ số lượng tồn kho của món ăn: " + ex.getMessage());
+            }
+        }
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, discount: {}, status: {}",
@@ -419,7 +441,15 @@ public class OrderServiceImpl implements OrderService {
                 predicates.add(cb.equal(root.get("driverId"), driverId));
             }
             if (statusCode != null && !statusCode.isBlank()) {
-                predicates.add(cb.equal(root.get("status").get("code"), statusCode.toUpperCase()));
+                String upper = statusCode.toUpperCase().trim();
+                if ("DELIVERING".equals(upper)) {
+                    predicates.add(root.get("status").get("code").in(java.util.List.of("DELIVERING", "DRIVER_ACCEPTED", "PICKING_UP")));
+                } else if (upper.contains(",")) {
+                    java.util.List<String> codes = java.util.Arrays.stream(upper.split(",")).map(String::trim).toList();
+                    predicates.add(root.get("status").get("code").in(codes));
+                } else {
+                    predicates.add(cb.equal(root.get("status").get("code"), upper));
+                }
             }
 
             if (keyword != null && !keyword.isBlank()) {
@@ -542,6 +572,7 @@ public class OrderServiceImpl implements OrderService {
             order.setCancelledByRole(requestingUserRole != null ? requestingUserRole : "SYSTEM");
             order.setCancelledByUserId(requestingUserId);
             order.setCancelledAt(LocalDateTime.now());
+            restoreProductStock(order);
         } else if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus) && requestingUserId != null) {
             order.setDriverId(requestingUserId);
         }
@@ -681,6 +712,7 @@ public class OrderServiceImpl implements OrderService {
                 .driverId(order.getDriverId())
                 .voucherId(order.getVoucherId())
                 .receiverAddress(order.getReceiverAddress())
+                .note(order.getNote())
                 .receiverLat(order.getReceiverLat())
                 .receiverLng(order.getReceiverLng())
                 .distanceKm(order.getDistanceKm())
@@ -758,6 +790,8 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         order.addStatusLog(logEntry);
 
+        restoreProductStock(order);
+
         Order saved = orderRepository.save(order);
         log.info("Order ID={} cancelled with reason: {}", orderId, reason);
 
@@ -765,6 +799,20 @@ public class OrderServiceImpl implements OrderService {
         broadcastOrderToMerchant(saved);
 
         return mapToOrderResponse(saved);
+    }
+
+    private void restoreProductStock(Order order) {
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            try {
+                List<com.foodthunder.order.dto.client.RemoteDeductStockItemRequest> restoreItems = order.getItems().stream()
+                        .map(it -> new com.foodthunder.order.dto.client.RemoteDeductStockItemRequest(it.getFoodId(), it.getQuantity()))
+                        .collect(Collectors.toList());
+                restaurantClient.restoreStock(new com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest(restoreItems));
+                log.info("Restored stock for cancelled order ID={}, itemCount={}", order.getId(), restoreItems.size());
+            } catch (Exception ex) {
+                log.warn("Failed to restore stock on cancellation for order ID={}: {}", order.getId(), ex.getMessage());
+            }
+        }
     }
 
     private void broadcastOrderToMerchant(Order order) {

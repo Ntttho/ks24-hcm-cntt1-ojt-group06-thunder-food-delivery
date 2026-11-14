@@ -54,6 +54,7 @@ export interface CustomerOrder {
   driverName?: string;
   driverPhone?: string;
   receiverAddress: string;
+  note?: string;
   receiverLat?: number;
   receiverLng?: number;
   distanceKm?: number;

@@ -10,8 +10,8 @@
 
 ## 🎯 I. MỤC TIÊU CỐT LÕI CỦA SPRINT 3 (SPRINT 3 GOALS - ĐÃ CHUẨN HÓA CHI TIẾT)
 
-Mục tiêu Sprint 3 được định vị cụ thể gồm 3 phân hệ chính:
-1. **Phân hệ Quản trị viên (Admin Portal):**
+Mục tiêu Sprint 3 được định vị cụ thể gồm 3 phân quyền chính:
+1. **phân quyền Quản trị viên (Admin Portal):**
    - **Quản lý người dùng (CRUD Toàn Diện):** Xem danh sách phân trang, tìm kiếm, lọc role, Thêm mới tài khoản, Sửa thông tin & vai trò, Khóa/Mở khóa hoặc Xóa tài khoản.
    - **Giao diện Quản lý Tổng thu & Chỉ số Hệ thống (Admin System Analytics Dashboard):**
      - Sơ đồ/Biểu đồ biến động doanh thu toàn sàn tính theo tháng.
@@ -19,7 +19,7 @@ Mục tiêu Sprint 3 được định vị cụ thể gồm 3 phân hệ chính:
    - **Quản lý Đánh giá Review Xem & Xóa (Tách biệt 2 trang chuyên biệt):**
      - Trang 1: Quản lý đánh giá Nhà hàng (`/admin/reviews/restaurants`): Xem chi tiết số sao, món ăn gắn kèm, hình ảnh và nút xóa đánh giá vi phạm.
      - Trang 2: Quản lý đánh giá Tài xế (`/admin/reviews/drivers`): Xem chi tiết số sao, thẻ nhận xét nhanh (quick tags), thông tin tài xế và nút xóa đánh giá vi phạm.
-2. **Phân hệ Tài xế (Driver Hub - Giả Lập Tính Năng Hoàn Chỉnh):**
+2. **phân quyền Tài xế (Driver Hub - Giả Lập Tính Năng Hoàn Chỉnh):**
    - **Quản lý lịch sử đơn hàng của tài xế:** Danh sách các cuốc xe đã hoàn tất, tiền ship thu về, tiền COD đã nộp.
    - **Cơ chế nhận đơn 1-chạm & Ràng buộc Đơn duy nhất (Single Active Order):** Dừng hiển thị danh sách đơn mới trên radar khi tài xế đã và đang nhận 1 đơn hàng (`DRIVER_ACCEPTED`, `PICKING_UP`, `DELIVERING`). Chỉ mở lại radar khi đã bấm hoàn thành cuốc hiện tại.
    - **Chỉnh sửa trạng thái đơn trực quan, dễ hiểu:** Các nút bấm/trượt chuyển mốc trạng thái tuần tự rõ ràng: *"Đến quán lấy món"* $\rightarrow$ *"Bắt đầu đi giao"* $\rightarrow$ *"Giao thành công & Thu tiền COD"*.
@@ -88,7 +88,7 @@ Mục tiêu Sprint 3 được định vị cụ thể gồm 3 phân hệ chính:
 
 ---
 
-## 🛵 IV. CHI TIẾT MODULE 1: PHÂN HỆ VẬN CHUYỂN & TÀI XẾ (DELIVERY SERVICE & SHIPPER WEB HUB)
+## 🛵 IV. CHI TIẾT MODULE 1: phân quyền VẬN CHUYỂN & TÀI XẾ (DELIVERY SERVICE & SHIPPER WEB HUB)
 
 ### 1. Vòng Đời Trạng Thái Đơn Hàng & Thẩm Quyền Tài Xế
 Trạng thái đơn hàng dịch chuyển tuần tự theo đúng State Machine:
@@ -390,9 +390,9 @@ CREATE TABLE `driver_offers` (
 
 ---
 
-## 🛡️ V. CHI TIẾT MODULE 2: PHÂN HỆ QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN PORTAL)
+## 🛡️ V. CHI TIẾT MODULE 2: phân quyền QUẢN TRỊ VIÊN HỆ THỐNG (ADMIN PORTAL)
 
-### 1. Phân Hệ Quản Lý Người Dùng Toàn Sàn (CRUD Toàn Diện - `/admin/users`)
+### 1. phân quyền Quản Lý Người Dùng Toàn Sàn (CRUD Toàn Diện - `/admin/users`)
 
 #### Chức năng nghiệp vụ:
 - **Xem danh sách (Read):** Hiển thị bảng người dùng phân trang, tìm kiếm theo Tên, Email, Số điện thoại và lọc theo vai trò (`ROLE_CUSTOMER`, `ROLE_MERCHANT`, `ROLE_DRIVER`, `ROLE_ADMIN`).
@@ -449,7 +449,7 @@ CREATE TABLE `driver_offers` (
 
 ### 3. Quản Trị Đánh Giá Hệ Thống: Xem & Xóa (Tách Biệt 2 Trang Chuyên Biệt)
 
-Để quản lý đánh giá một cách minh bạch, phân hệ Admin được tách thành 2 trang độc lập:
+Để quản lý đánh giá một cách minh bạch, phân quyền Admin được tách thành 2 trang độc lập:
 
 #### 🔹 Trang 1: Quản lý Đánh giá Quán Ăn (`/admin/reviews/restaurants`)
 - **Chức năng:**
@@ -478,7 +478,7 @@ CREATE TABLE `driver_offers` (
 
 ---
 
-## 🛵 VI. CHI TIẾT MODULE 1 (CẬP NHẬT): PHÂN HỆ TÀI XẾ (DRIVER HUB GIẢ LẬP)
+## 🛵 VI. CHI TIẾT MODULE 1 (CẬP NHẬT): phân quyền TÀI XẾ (DRIVER HUB GIẢ LẬP)
 
 ### 1. Quản Lý Lịch Sử Đơn Hàng Của Tài Xế (`/driver/history`)
 - Hiển thị toàn bộ các cuốc xe tài xế đã từng tiếp nhận và hoàn tất.
@@ -639,7 +639,7 @@ CREATE TABLE `chat_messages` (
 
 ### 1. Ma Trận Kịch Bản Kiểm Thử (Test Cases)
 
-| Mã Test | Phân hệ | Kịch bản kiểm thử | Dữ liệu đầu vào (Input) | Kết quả mong đợi (Expected Output) |
+| Mã Test | phân quyền | Kịch bản kiểm thử | Dữ liệu đầu vào (Input) | Kết quả mong đợi (Expected Output) |
 | :---: | :--- | :--- | :--- | :--- |
 | **TC-DRV-01** | `delivery-service` | Happy Path: Tài xế bấm nhận đơn thành công | Đơn trạng thái `CONFIRMED`, `driverId = null` | Trả về 200 OK, đơn chuyển sang `DRIVER_ACCEPTED`, gán `driverId` |
 | **TC-DRV-02** | `delivery-service` | **Concurrency Race Condition:** 2 tài xế cùng bấm nhận 1 đơn tại cùng 1 mili-giây | Driver A & Driver B cùng gửi request đồng thời | Driver A nhận 200 OK, Driver B nhận 409 Conflict, CSDL chỉ lưu duy nhất 1 driver |

@@ -3,7 +3,9 @@ import { Modal, Form, Input, Button, Space, Tag } from 'antd';
 import { CloseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 interface RejectReasonModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
+  open?: boolean;
+  visible?: boolean;
   title?: string;
   subTitle?: string;
   submitting: boolean;
@@ -21,19 +23,22 @@ const PRESET_REASONS = [
 
 export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
   isOpen,
+  open,
+  visible,
   title = 'Từ Chối Hồ Sơ',
   subTitle,
   submitting,
   onClose,
   onSubmit,
 }) => {
+  const modalOpen = open ?? isOpen ?? visible ?? false;
   const [form] = Form.useForm();
 
   useEffect(() => {
-    if (isOpen) {
+    if (modalOpen) {
       form.resetFields();
     }
-  }, [isOpen, form]);
+  }, [modalOpen, form]);
 
   const handleFinish = async (values: { reason: string }) => {
     await onSubmit(values.reason.trim());
@@ -45,7 +50,7 @@ export const RejectReasonModal: React.FC<RejectReasonModalProps> = ({
 
   return (
     <Modal
-      open={isOpen}
+      open={modalOpen}
       onCancel={onClose}
       title={
         <div className="flex items-center gap-2 text-rose-600">

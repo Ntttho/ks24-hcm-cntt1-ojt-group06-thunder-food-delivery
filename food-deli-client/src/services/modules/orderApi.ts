@@ -258,9 +258,15 @@ export interface MerchantOrder {
   shippingFee: number;
   discountAmount: number;
   totalAmount: number;
-  paymentMethod?: 'COD' | 'VNPAY' | 'MOMO';
-  statusCode: 'PENDING' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED';
+  paymentMethod?: string;
+  statusCode: 'PENDING' | 'CONFIRMED' | 'DRIVER_ACCEPTED' | 'PICKING_UP' | 'DELIVERING' | 'COMPLETED' | 'CANCELLED' | 'AWAITING_PAYMENT' | string;
   statusLabel?: string;
+  driverId?: number;
+  driverName?: string;
+  driverPhone?: string;
+  distanceKm?: number;
+  receiverLat?: number;
+  receiverLng?: number;
   customerNote?: string;
   cancelReason?: string;
   createdAt: string;

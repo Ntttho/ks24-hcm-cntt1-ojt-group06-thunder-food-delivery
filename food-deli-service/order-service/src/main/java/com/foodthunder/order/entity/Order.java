@@ -48,6 +48,9 @@ public class Order {
     @Column(name = "receiver_address", columnDefinition = "TEXT")
     private String receiverAddress;
 
+    @Column(name = "note", columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "receiver_lat")
     private Double receiverLat;
 

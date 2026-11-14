@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Input, Button, Alert, Checkbox, message } from 'antd';
 import {
   LockOutlined,
@@ -11,6 +11,7 @@ import {
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
+import { getRoleDefaultPath } from '@/utils/navigation';
 import { SocialAuthButtons } from './components/SocialAuthButtons';
 
 type UserRole = 'CUSTOMER' | 'MERCHANT' | 'DRIVER';
@@ -18,7 +19,7 @@ type UserRole = 'CUSTOMER' | 'MERCHANT' | 'DRIVER';
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated, user } = useAuth();
   const [form] = Form.useForm();
   const [activeRole, setActiveRole] = useState<UserRole>('CUSTOMER');
 
@@ -33,6 +34,14 @@ export const LoginPage: React.FC = () => {
       : fromState?.pathname
       ? `${fromState.pathname}${fromState.search || ''}`
       : fromQuery) || APP_ROUTES.HOME;
+
+  // Tự động điều hướng người dùng đã đăng nhập về trang chính tương ứng theo role
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const target = getRoleDefaultPath(user.role);
+      navigate(target, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const roleDefinitions = [
     {
@@ -83,10 +92,15 @@ export const LoginPage: React.FC = () => {
         role: activeRole,
       };
 
-      await login(payload);
+      const res = await login(payload);
       message.success('Đăng nhập thành công! Chào mừng bạn quay trở lại.');
-      if (fromLocation === APP_ROUTES.HOME && activeRole === 'MERCHANT') {
-        navigate('/merchant', { replace: true });
+
+      const userRole = (res as any)?.user?.role || (res as any)?.role || activeRole;
+      const roleHome = getRoleDefaultPath(userRole);
+
+      // Nếu không có đích đến cụ thể (hoặc là trang chủ/login), điều hướng về trang chính của role
+      if (!fromLocation || fromLocation === APP_ROUTES.HOME || fromLocation === APP_ROUTES.LOGIN) {
+        navigate(roleHome, { replace: true });
       } else {
         navigate(fromLocation, { replace: true });
       }

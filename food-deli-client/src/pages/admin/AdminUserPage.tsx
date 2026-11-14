@@ -40,7 +40,13 @@ import {
 import { userApi, type CreateUserPayload, type UpdateUserPayload } from '@/services/modules/userApi';
 import type { User } from '@/types/auth.types';
 import { AdminApprovalModal, type ApprovalPartnerData } from './components/AdminApprovalModal';
-import { CreateUserModal, EditUserModal } from './components';
+import {
+  CreateUserModal,
+  EditUserModal,
+  UserStatCards,
+  UserFilterBar,
+  UserDataTable,
+} from './components';
 
 const { Title, Text } = Typography;
 
@@ -261,36 +267,6 @@ export const AdminUserPage: React.FC = () => {
     }
   };
 
-  const getRoleBadge = (roleName: string) => {
-    const r = roleName.toUpperCase();
-    if (r.includes('ADMIN')) {
-      return (
-        <Tag color="purple" icon={<SafetyCertificateOutlined />} className="font-semibold px-2 py-0.5 rounded-md">
-          ADMIN
-        </Tag>
-      );
-    }
-    if (r.includes('MERCHANT')) {
-      return (
-        <Tag color="orange" icon={<ShopOutlined />} className="font-semibold px-2 py-0.5 rounded-md">
-          QUÁN ĂN
-        </Tag>
-      );
-    }
-    if (r.includes('DRIVER') || r.includes('SHIPPER')) {
-      return (
-        <Tag color="green" icon={<CarOutlined />} className="font-semibold px-2 py-0.5 rounded-md">
-          TÀI XẾ
-        </Tag>
-      );
-    }
-    return (
-      <Tag color="blue" icon={<UserOutlined />} className="font-semibold px-2 py-0.5 rounded-md">
-        KHÁCH HÀNG
-      </Tag>
-    );
-  };
-
   const handleOpenApprovalModal = (partner: ApprovalPartnerData) => {
     setSelectedPartner(partner);
     setIsApprovalModalOpen(true);
@@ -307,189 +283,6 @@ export const AdminUserPage: React.FC = () => {
       );
     }
   };
-
-  const getStatusBadge = (status?: string) => {
-    const isLocked = status?.toUpperCase() === 'LOCKED';
-    if (isLocked) {
-      return (
-        <Tag color="error" icon={<StopOutlined />} className="font-semibold px-2.5 py-0.5 rounded-md">
-          Bị khóa
-        </Tag>
-      );
-    }
-    return (
-      <Tag color="success" icon={<CheckCircleOutlined />} className="font-semibold px-2.5 py-0.5 rounded-md">
-        Hoạt động
-      </Tag>
-    );
-  };
-
-  // User table columns
-  const userColumns: ColumnsType<User> = [
-    {
-      title: 'Mã ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 75,
-      render: (id) => <span className="text-slate-400 font-mono text-xs font-semibold">#{id}</span>,
-    },
-    {
-      title: 'Họ và tên & Liên hệ',
-      dataIndex: 'fullName',
-      key: 'fullName',
-      render: (name, record) => (
-        <div>
-          <div className="font-bold text-slate-800 text-sm">{name || 'Chưa cập nhật'}</div>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-xs text-slate-400 mt-0.5">
-            <span className="font-mono text-slate-600">{record.phone || record.phoneNumber}</span>
-            {record.email && (
-              <span className="flex items-center gap-1 text-slate-500">
-                <MailOutlined className="text-[11px]" />
-                {record.email}
-              </span>
-            )}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Vai trò (Role)',
-      dataIndex: 'role',
-      key: 'role',
-      width: 140,
-      render: (role, record) => {
-        if (record.roles && record.roles.length > 0) {
-          return (
-            <div className="flex flex-wrap gap-1">
-              {record.roles.map((r) => (
-                <span key={r}>{getRoleBadge(r)}</span>
-              ))}
-            </div>
-          );
-        }
-        return getRoleBadge(role || 'CUSTOMER');
-      },
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 130,
-      render: (status) => getStatusBadge(status),
-    },
-    {
-      title: 'Đánh giá',
-      dataIndex: 'ratingAvg',
-      key: 'ratingAvg',
-      width: 130,
-      render: (rating) => (
-        <div className="flex items-center gap-1">
-          <Rate disabled defaultValue={rating || 5} count={5} className="text-xs text-amber-400" />
-          <span className="text-xs font-bold text-slate-600">{rating ? Number(rating).toFixed(1) : '5.0'}</span>
-        </div>
-      ),
-    },
-    {
-      title: 'Ngày tham gia',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 120,
-      render: (date) => (
-        <span className="text-xs text-slate-500 font-medium">
-          {date ? new Date(date).toLocaleDateString('vi-VN') : 'Mới tạo'}
-        </span>
-      ),
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      width: 150,
-      fixed: 'right',
-      render: (_, record) => {
-        if (isUserAdmin(record)) {
-          return (
-            <Tooltip title="Tài khoản Quản trị viên được bảo vệ hệ thống: Không cho phép chỉnh sửa, khóa hoặc xóa">
-              <Tag
-                color="cyan"
-                icon={<SafetyCertificateOutlined />}
-                className="px-2.5 py-1 font-semibold text-xs rounded-lg m-0 border border-cyan-200 bg-cyan-50 text-cyan-700 flex items-center gap-1 w-fit cursor-default"
-              >
-                Bảo vệ hệ thống
-              </Tag>
-            </Tooltip>
-          );
-        }
-
-        const isLocked = record.status?.toUpperCase() === 'LOCKED';
-        return (
-          <Space size={4}>
-            {/* Chỉnh sửa */}
-            <Tooltip title="Chỉnh sửa thông tin & vai trò">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined className="text-blue-600" />}
-                onClick={() => {
-                  setSelectedUser(record);
-                  setIsEditModalOpen(true);
-                }}
-                className="hover:bg-blue-50"
-              />
-            </Tooltip>
-
-            {/* Khóa / Mở khóa */}
-            <Popconfirm
-              title={isLocked ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?'}
-              description={
-                isLocked
-                  ? `Bạn có chắc chắn muốn mở khóa cho tài khoản "${record.fullName}"?`
-                  : `Bạn có chắc chắn muốn khóa tài khoản "${record.fullName}"? Người dùng này sẽ không thể đăng nhập.`
-              }
-              onConfirm={() => handleToggleStatus(record)}
-              okText={isLocked ? 'Mở khóa' : 'Khóa'}
-              cancelText="Hủy"
-              okButtonProps={{ danger: !isLocked }}
-            >
-              <Tooltip title={isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={
-                    isLocked ? (
-                      <UnlockOutlined className="text-emerald-600" />
-                    ) : (
-                      <LockOutlined className="text-amber-600" />
-                    )
-                  }
-                  className={isLocked ? 'hover:bg-emerald-50' : 'hover:bg-amber-50'}
-                />
-              </Tooltip>
-            </Popconfirm>
-
-            {/* Xóa tài khoản */}
-            <Popconfirm
-              title="Xóa tài khoản người dùng?"
-              description={`Hành động này sẽ vô hiệu hóa tài khoản "${record.fullName}". Bạn có chắc chắn muốn tiếp tục?`}
-              onConfirm={() => handleDeleteUser(record)}
-              okText="Xóa tài khoản"
-              cancelText="Hủy"
-              okButtonProps={{ danger: true }}
-            >
-              <Tooltip title="Xóa tài khoản">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  className="hover:bg-red-50"
-                />
-              </Tooltip>
-            </Popconfirm>
-          </Space>
-        );
-      },
-    },
-  ];
 
   // Approval Partners Table Columns
   const approvalColumns: ColumnsType<ApprovalPartnerData> = [
@@ -659,38 +452,14 @@ export const AdminUserPage: React.FC = () => {
       </div>
 
       {/* Overview Stat Cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={12} sm={6}>
-          <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Tổng người dùng</div>
-            <div className="text-2xl font-black text-slate-800 mt-1">{totalElements}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Tất cả tài khoản hệ thống</div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Hồ sơ chờ duyệt</div>
-            <div className="text-2xl font-black text-amber-500 mt-1">{pendingApprovalsCount}</div>
-            <div className="text-[11px] text-amber-600/80 mt-0.5">Quán & Tài xế mới</div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Đang hiển thị</div>
-            <div className="text-2xl font-black text-blue-600 mt-1">{users.length}</div>
-            <div className="text-[11px] text-slate-500 mt-0.5">Trang {page + 1} ({pageSize}/trang)</div>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Phân quyền Vai trò</div>
-            <div className="text-2xl font-black text-orange-500 mt-1">
-              {selectedRole ? selectedRole : 'Đa vai trò'}
-            </div>
-            <div className="text-[11px] text-orange-500/80 mt-0.5">CUSTOMER, MERCHANT, DRIVER, ADMIN</div>
-          </Card>
-        </Col>
-      </Row>
+      <UserStatCards
+        totalElements={totalElements}
+        pendingApprovalsCount={pendingApprovalsCount}
+        showingCount={users.length}
+        page={page}
+        pageSize={pageSize}
+        selectedRole={selectedRole}
+      />
 
       {/* Main Tabbed Card */}
       <Card className="rounded-2xl shadow-sm border-slate-200">
@@ -709,66 +478,32 @@ export const AdminUserPage: React.FC = () => {
               ),
               children: (
                 <div className="space-y-4 pt-2">
-                  {/* Search & Filter Toolbar */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1 flex-wrap">
-                      <Input
-                        placeholder="Tìm theo họ tên, số điện thoại hoặc email..."
-                        prefix={<SearchOutlined className="text-slate-400" />}
-                        value={searchText}
-                        onChange={(e) => setSearchText(e.target.value)}
-                        allowClear
-                        className="w-full sm:w-80 rounded-lg"
-                      />
-                      <Select
-                        placeholder="Lọc theo vai trò"
-                        value={selectedRole}
-                        onChange={(val) => setSelectedRole(val)}
-                        allowClear
-                        className="w-full sm:w-52"
-                        options={[
-                          { label: 'Tất cả vai trò', value: null as any },
-                          { label: 'Khách hàng (CUSTOMER)', value: 'CUSTOMER' },
-                          { label: 'Quán ăn (MERCHANT)', value: 'MERCHANT' },
-                          { label: 'Tài xế (DRIVER)', value: 'DRIVER' },
-                          { label: 'Quản trị viên (ADMIN)', value: 'ADMIN' },
-                        ]}
-                      />
-                      <Select
-                        placeholder="Lọc theo trạng thái"
-                        value={selectedStatus}
-                        onChange={(val) => setSelectedStatus(val)}
-                        allowClear
-                        className="w-full sm:w-48"
-                        options={[
-                          { label: 'Tất cả trạng thái', value: null as any },
-                          { label: 'Đang hoạt động (ACTIVE)', value: 'ACTIVE' },
-                          { label: 'Bị khóa (LOCKED)', value: 'LOCKED' },
-                        ]}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-500 font-medium">
-                      Trang {page + 1} &bull; Hiển thị <strong>{users.length}</strong> / Tổng {totalElements} người dùng
-                    </span>
-                  </div>
+                  <UserFilterBar
+                    searchText={searchText}
+                    onSearchChange={setSearchText}
+                    selectedRole={selectedRole}
+                    onRoleChange={setSelectedRole}
+                    selectedStatus={selectedStatus}
+                    onStatusChange={setSelectedStatus}
+                    currentPage={page + 1}
+                    showingCount={users.length}
+                    totalElements={totalElements}
+                  />
 
-                  {/* User Table */}
-                  <Table
-                    columns={userColumns}
-                    dataSource={users}
-                    rowKey="id"
+                  <UserDataTable
+                    users={users}
                     loading={loading}
-                    scroll={{ x: 950 }}
-                    pagination={{
-                      current: page + 1,
-                      pageSize,
-                      total: totalElements,
-                      showSizeChanger: true,
-                      pageSizeOptions: ['10', '20', '50'],
-                      showTotal: (total) => `Tổng cộng ${total} người dùng`,
-                      onChange: handlePageChange,
+                    page={page}
+                    pageSize={pageSize}
+                    totalElements={totalElements}
+                    onPageChange={handlePageChange}
+                    onEditUser={(user) => {
+                      setSelectedUser(user);
+                      setIsEditModalOpen(true);
                     }}
-                    className="rounded-xl overflow-hidden"
+                    onToggleStatus={handleToggleStatus}
+                    onDeleteUser={handleDeleteUser}
+                    isUserAdmin={isUserAdmin}
                   />
                 </div>
               ),

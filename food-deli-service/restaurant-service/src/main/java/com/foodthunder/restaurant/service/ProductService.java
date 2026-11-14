@@ -35,4 +35,8 @@ public interface ProductService {
     List<ToppingDto> assignToppingsToProduct(Integer productId, List<Integer> toppingIds, Integer requesterUserId, String role);
 
     List<ToppingDto> getProductToppings(Integer productId);
+
+    void deductStock(com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request);
+
+    void restoreStock(com.foodthunder.restaurant.dto.product.DeductStockBatchRequest request);
 }

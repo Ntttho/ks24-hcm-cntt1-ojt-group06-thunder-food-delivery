@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   Card,
@@ -7,9 +7,7 @@ import {
   Input,
   Select,
   Switch,
-  Modal,
   Form,
-  InputNumber,
   Space,
   Tag,
   Popconfirm,
@@ -26,7 +24,6 @@ import {
   DeleteOutlined,
   SyncOutlined,
   TagsOutlined,
-  AppstoreOutlined,
 } from '@ant-design/icons';
 import {
   restaurantApi,
@@ -135,7 +132,7 @@ export const MerchantMenuPage: React.FC = () => {
     setProducts([]);
     loadCategories();
     fetchProducts(0, pageSize, '', null);
-  }, [currentRestaurantId, loadCategories, fetchProducts]);
+  }, [currentRestaurantId, loadCategories, fetchProducts, pageSize]);
 
   // Debounced search / category filter effect for same branch
   useEffect(() => {
@@ -154,7 +151,7 @@ export const MerchantMenuPage: React.FC = () => {
       fetchProducts(0, pageSize, searchText, selectedCategory);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchText, selectedCategory, pageSize]);
+  }, [searchText, selectedCategory, pageSize, currentRestaurantId, fetchProducts]);
 
   const handlePageChange = (newPage: number, newPageSize: number) => {
     const zeroBased = newPage - 1;

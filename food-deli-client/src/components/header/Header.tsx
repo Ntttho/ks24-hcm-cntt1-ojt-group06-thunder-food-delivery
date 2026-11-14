@@ -15,10 +15,6 @@ import {
   MenuOutlined,
   HomeOutlined,
   HistoryOutlined,
-  StarOutlined,
-  AuditOutlined,
-  BarChartOutlined,
-  SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -71,21 +67,6 @@ export const Header: React.FC = () => {
       case 'admin-portal':
         navigate(APP_ROUTES.ADMIN_DASHBOARD);
         break;
-      case 'admin-approvals':
-        navigate(APP_ROUTES.ADMIN_APPROVALS);
-        break;
-      case 'admin-analytics':
-        navigate(APP_ROUTES.ADMIN_ANALYTICS);
-        break;
-      case 'admin-settings':
-        navigate(APP_ROUTES.ADMIN_SETTINGS);
-        break;
-      case 'admin-restaurant-reviews':
-        navigate(APP_ROUTES.ADMIN_RESTAURANT_REVIEWS);
-        break;
-      case 'admin-driver-reviews':
-        navigate(APP_ROUTES.ADMIN_DRIVER_REVIEWS);
-        break;
       case 'logout':
         handleLogoutConfirm();
         break;
@@ -136,34 +117,9 @@ export const Header: React.FC = () => {
       icon: <DashboardOutlined className="text-red-600 text-base" />,
       label: (
         <span className="font-bold text-red-700">
-          Trang Quản trị Hệ thống (Admin Portal)
+          Cổng Quản trị Hệ thống (Admin Portal)
         </span>
       ),
-    });
-    roleSpecificMenuItems.push({
-      key: 'admin-approvals',
-      icon: <AuditOutlined className="text-amber-500 text-base" />,
-      label: <span className="font-bold text-slate-700">Kiểm duyệt Quán & Tài xế</span>,
-    });
-    roleSpecificMenuItems.push({
-      key: 'admin-analytics',
-      icon: <BarChartOutlined className="text-indigo-600 text-base" />,
-      label: <span className="font-bold text-slate-700">Thống kê &amp; Phân tích sàn</span>,
-    });
-    roleSpecificMenuItems.push({
-      key: 'admin-settings',
-      icon: <SettingOutlined className="text-orange-600 text-base" />,
-      label: <span className="font-bold text-slate-700">Cấu hình Hệ thống &amp; Phí Order</span>,
-    });
-    roleSpecificMenuItems.push({
-      key: 'admin-restaurant-reviews',
-      icon: <StarOutlined className="text-orange-500 text-base" />,
-      label: <span className="font-bold text-slate-700">Đánh giá nhà hàng</span>,
-    });
-    roleSpecificMenuItems.push({
-      key: 'admin-driver-reviews',
-      icon: <CarOutlined className="text-blue-600 text-base" />,
-      label: <span className="font-bold text-slate-700">Đánh giá tài xế</span>,
     });
   }
 
@@ -283,7 +239,36 @@ export const Header: React.FC = () => {
         </nav>
 
         {/* Right actions: Cart Badge & User Profile / Login */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Quick Role Portal Direct Buttons */}
+          {isAuthenticated && isAdmin && (
+            <Link
+              to="/admin/dashboard"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 font-bold text-xs border border-red-200 transition-colors shadow-2xs"
+            >
+              <DashboardOutlined />
+              <span>Admin Portal</span>
+            </Link>
+          )}
+          {isAuthenticated && isMerchant && (
+            <Link
+              to={APP_ROUTES.MERCHANT_DASHBOARD}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-100 font-bold text-xs border border-purple-200 transition-colors shadow-2xs"
+            >
+              <ShopOutlined />
+              <span>Merchant Portal</span>
+            </Link>
+          )}
+          {isAuthenticated && isShipper && (
+            <Link
+              to={APP_ROUTES.SHIPPER_DASHBOARD}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs border border-blue-200 transition-colors shadow-2xs"
+            >
+              <CarOutlined />
+              <span>Shipper Hub</span>
+            </Link>
+          )}
+
           {/* Quick Cart Preview Badge Icon */}
           <Link
             to={APP_ROUTES.CART}
@@ -378,11 +363,11 @@ export const Header: React.FC = () => {
             {totalQuantity > 0 && <Tag color="orange">{totalQuantity} món</Tag>}
           </Link>
           <Link
-            to={APP_ROUTES.SHIPPER_DASHBOARD}
+            to={isAuthenticated ? APP_ROUTES.ORDERS : APP_ROUTES.LOGIN}
             onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
+            className="flex items-center gap-2 text-gray-800 font-semibold py-2 hover:text-orange-600"
           >
-            <CarOutlined /> Cổng Tài Xế (Shipper Hub)
+            <HistoryOutlined /> Đơn hàng của tôi
           </Link>
 
           {isAuthenticated ? (
@@ -410,22 +395,13 @@ export const Header: React.FC = () => {
                   </Link>
                 )}
                 {isAdmin && (
-                  <>
-                    <Link
-                      to={APP_ROUTES.ADMIN_ANALYTICS}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-2 text-emerald-700 font-bold py-2 hover:text-emerald-800"
-                    >
-                      <BarChartOutlined /> Thống kê & Tổng thu sàn
-                    </Link>
-                    <Link
-                      to={APP_ROUTES.ADMIN_DASHBOARD}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
-                    >
-                      <DashboardOutlined /> Trang Quản trị (Admin Portal)
-                    </Link>
-                  </>
+                  <Link
+                    to={APP_ROUTES.ADMIN_DASHBOARD}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 text-red-700 font-bold py-2 hover:text-red-800"
+                  >
+                    <DashboardOutlined /> Cổng Quản trị (Admin Portal)
+                  </Link>
                 )}
                 <Link
                   to={APP_ROUTES.PROFILE}

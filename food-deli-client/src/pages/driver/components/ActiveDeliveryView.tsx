@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AlertCircle,
   Bike,
@@ -72,64 +72,32 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
   } | null>(null);
   const [isMapExpanded, setIsMapExpanded] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-  const [chatMessages, setChatMessages] = useState<DriverChatMessage[]>(() =>
-    loadOrderChatMessages(order.id)
-  );
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
 
-  // Đồng bộ lịch sử chat từ Chat Service backend và lắng nghe tin nhắn Realtime qua WebSocket STOMP
+  // Realtime STOMP & API Chat Sync for order
   useEffect(() => {
     if (!order.id) return;
 
-    let isMounted = true;
+    chatApi.getOrderChatHistory(order.id).then((res) => {
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setChatMessages(res.data);
+      } else {
+        setChatMessages(loadOrderChatMessages(order.id));
+      }
+    }).catch(() => {
+      setChatMessages(loadOrderChatMessages(order.id));
+    });
 
-    // 1. Tải lịch sử chat từ Chat Microservice
-    chatApi
-      .getOrderChatHistory(order.id)
-      .then((res) => {
-        if (!isMounted) return;
-        const apiMessages = Array.isArray(res.data) ? res.data : [];
-        if (apiMessages.length > 0) {
-          const formatted: DriverChatMessage[] = apiMessages.map((m) => ({
-            id: String(m.id || `msg_${Date.now()}_${Math.random()}`),
-            orderId: Number(m.orderId),
-            sender: m.senderRole === 'DRIVER' ? 'DRIVER' : 'CUSTOMER',
-            text: m.message,
-            sentAtIso: m.createdAt || new Date().toISOString(),
-          }));
-          setChatMessages(formatted);
-          saveOrderChatMessages(order.id, formatted);
-        }
-      })
-      .catch((err) => {
-        console.warn('Lỗi lấy lịch sử chat cho tài xế:', err);
-      });
-
-    // 2. Kết nối và đăng ký lắng nghe tin nhắn STOMP cho đơn hàng này
     orderLiveTrackingWs.connect(order.id);
 
-    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((incoming: ChatMessage) => {
-      if (Number(incoming.orderId) === Number(order.id)) {
-        setChatMessages((prev) => {
-          const incomingId = String(incoming.id);
-          if (prev.some((m) => m.id === incomingId)) return prev;
-          const next: DriverChatMessage[] = [
-            ...prev,
-            {
-              id: incomingId,
-              orderId: Number(incoming.orderId),
-              sender: incoming.senderRole === 'DRIVER' ? 'DRIVER' : 'CUSTOMER',
-              text: incoming.message,
-              sentAtIso: incoming.createdAt || new Date().toISOString(),
-            },
-          ];
-          saveOrderChatMessages(order.id, next);
-          return next;
-        });
-      }
+    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
     });
 
     return () => {
-      isMounted = false;
       unsubscribe();
     };
   }, [order.id]);
@@ -151,44 +119,22 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Gửi qua WebSocket STOMP và API Backend
-    const driverUserId = Number(order.driverId) || 2;
-    const payload = {
-      orderId: Number(order.id),
-      senderId: driverUserId,
-      senderRole: 'DRIVER',
-      message: trimmed,
-    };
-
-    // Gửi realtime qua STOMP frame nếu có kết nối
-    orderLiveTrackingWs.sendChatMessageViaWs(payload);
+    const localMsg = createDriverChatMessage(order.id, trimmed);
+    setChatMessages((prev) => [...prev, localMsg]);
 
     try {
-      const res = await chatApi.sendMessage(payload);
-      const savedMsgId = res?.data?.id ? String(res.data.id) : `msg_${Date.now()}`;
-      setChatMessages((prev) => {
-        if (prev.some((m) => m.id === savedMsgId)) return prev;
-        const next: DriverChatMessage[] = [
-          ...prev,
-          {
-            id: savedMsgId,
-            orderId: Number(order.id),
-            sender: 'DRIVER',
-            text: trimmed,
-            sentAtIso: res?.data?.createdAt || new Date().toISOString(),
-          },
-        ];
-        saveOrderChatMessages(order.id, next);
-        return next;
+      await chatApi.sendMessage({
+        orderId: order.id,
+        senderRole: 'DRIVER',
+        message: trimmed,
+      });
+      orderLiveTrackingWs.sendChatMessageViaWs({
+        orderId: order.id,
+        senderRole: 'DRIVER',
+        message: trimmed,
       });
     } catch {
-      // Fallback lưu local nếu backend bận
-      const localMsg = createDriverChatMessage(order.id, trimmed);
-      setChatMessages((prev) => {
-        const next = [...prev, localMsg];
-        saveOrderChatMessages(order.id, next);
-        return next;
-      });
+      saveOrderChatMessages(order.id, [...chatMessages, localMsg]);
     }
   };
 

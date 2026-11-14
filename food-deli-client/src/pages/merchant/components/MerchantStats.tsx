@@ -5,11 +5,13 @@ import {
   FireOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  CarOutlined,
 } from '@ant-design/icons';
 
 interface MerchantStatsProps {
   pendingCount: number;
   confirmedCount: number;
+  deliveringCount: number;
   completedCount: number;
   cancelledCount: number;
   activeTab: string;
@@ -19,14 +21,15 @@ interface MerchantStatsProps {
 export const MerchantStats: React.FC<MerchantStatsProps> = ({
   pendingCount,
   confirmedCount,
+  deliveringCount,
   completedCount,
   cancelledCount,
   activeTab,
   onSelectTab,
 }) => {
   return (
-    <Row gutter={[16, 16]}>
-      <Col xs={12} sm={6}>
+    <Row gutter={[12, 12]}>
+      <Col xs={12} sm={8} md={4} className="grow">
         <Card
           className={`rounded-2xl border-amber-200/80 bg-gradient-to-br from-amber-50 to-orange-50/60 shadow-xs cursor-pointer transition-all ${
             activeTab === 'PENDING' ? 'ring-2 ring-amber-400' : ''
@@ -34,7 +37,7 @@ export const MerchantStats: React.FC<MerchantStatsProps> = ({
           onClick={() => onSelectTab('PENDING')}
         >
           <Statistic
-            title={<span className="text-xs font-semibold text-amber-800">Đơn Mới Chờ Nhận</span>}
+            title={<span className="text-xs font-semibold text-amber-800">Đơn Chờ Nhận</span>}
             value={pendingCount}
             valueStyle={{ color: '#d97706', fontWeight: 800 }}
             prefix={<ClockCircleOutlined className="text-amber-500 mr-1" />}
@@ -50,7 +53,7 @@ export const MerchantStats: React.FC<MerchantStatsProps> = ({
         </Card>
       </Col>
 
-      <Col xs={12} sm={6}>
+      <Col xs={12} sm={8} md={4} className="grow">
         <Card
           className={`rounded-2xl border-blue-200/80 bg-gradient-to-br from-blue-50 to-indigo-50/60 shadow-xs cursor-pointer transition-all ${
             activeTab === 'CONFIRMED' ? 'ring-2 ring-blue-400' : ''
@@ -58,7 +61,7 @@ export const MerchantStats: React.FC<MerchantStatsProps> = ({
           onClick={() => onSelectTab('CONFIRMED')}
         >
           <Statistic
-            title={<span className="text-xs font-semibold text-blue-800">Đang Nấu Chuẩn Bị</span>}
+            title={<span className="text-xs font-semibold text-blue-800">Đang Nấu Món</span>}
             value={confirmedCount}
             valueStyle={{ color: '#2563eb', fontWeight: 800 }}
             prefix={<FireOutlined className="text-blue-500 mr-1" />}
@@ -66,7 +69,23 @@ export const MerchantStats: React.FC<MerchantStatsProps> = ({
         </Card>
       </Col>
 
-      <Col xs={12} sm={6}>
+      <Col xs={12} sm={8} md={4} className="grow">
+        <Card
+          className={`rounded-2xl border-cyan-200/80 bg-gradient-to-br from-cyan-50 to-teal-50/60 shadow-xs cursor-pointer transition-all ${
+            activeTab === 'DELIVERING' ? 'ring-2 ring-cyan-400' : ''
+          }`}
+          onClick={() => onSelectTab('DELIVERING')}
+        >
+          <Statistic
+            title={<span className="text-xs font-semibold text-cyan-800">Đang Giao Hàng</span>}
+            value={deliveringCount}
+            valueStyle={{ color: '#0891b2', fontWeight: 800 }}
+            prefix={<CarOutlined className="text-cyan-500 mr-1" />}
+          />
+        </Card>
+      </Col>
+
+      <Col xs={12} sm={8} md={4} className="grow">
         <Card
           className={`rounded-2xl border-emerald-200/80 bg-gradient-to-br from-emerald-50 to-teal-50/60 shadow-xs cursor-pointer transition-all ${
             activeTab === 'COMPLETED' ? 'ring-2 ring-emerald-400' : ''
@@ -82,7 +101,7 @@ export const MerchantStats: React.FC<MerchantStatsProps> = ({
         </Card>
       </Col>
 
-      <Col xs={12} sm={6}>
+      <Col xs={12} sm={8} md={4} className="grow">
         <Card
           className={`rounded-2xl border-rose-200/80 bg-gradient-to-br from-rose-50 to-red-50/60 shadow-xs cursor-pointer transition-all ${
             activeTab === 'CANCELLED' ? 'ring-2 ring-rose-400' : ''

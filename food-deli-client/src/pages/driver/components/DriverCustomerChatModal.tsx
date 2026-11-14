@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Phone, Send, X } from '../icons';
-import { DriverChatMessage, QUICK_CHAT_REPLIES } from '../deliveryHelpers';
+import { QUICK_CHAT_REPLIES } from '../deliveryHelpers';
 import type { DriverOrder } from '@/services/modules/driverApi';
+import type { ChatMessage } from '@/services/modules/chatApi';
 
 interface DriverCustomerChatModalProps {
   open: boolean;
   order: DriverOrder;
-  messages: DriverChatMessage[];
+  messages: ChatMessage[];
   onClose: () => void;
   onSendMessage: (text: string) => void;
 }
@@ -103,8 +104,8 @@ export const DriverCustomerChatModal: React.FC<DriverCustomerChatModalProps> = (
 
         {/* Status Note */}
         <div className="bg-emerald-50 border-b border-emerald-100 px-3.5 py-2 text-[11px] text-emerald-800 leading-snug flex items-center justify-between">
-          <span>Kênh chat trực tiếp đơn <strong>#{order.orderCode}</strong></span>
-          <span className="inline-flex items-center gap-1 font-semibold text-[10px] text-emerald-700">
+          <span>Kênh chat đơn <strong>#{order.orderCode}</strong></span>
+          <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             Realtime STOMP
           </span>
@@ -126,24 +127,28 @@ export const DriverCustomerChatModal: React.FC<DriverCustomerChatModalProps> = (
               </p>
             </div>
           ) : (
-            messages.map((msg) => {
-              const isMe = msg.sender === 'DRIVER';
+            messages.map((msg: any) => {
+              const isDriver = msg.senderRole === 'DRIVER' || msg.sender === 'DRIVER';
+              const text = msg.message || msg.text;
+              const time = msg.createdAt || msg.sentAtIso;
+              const role = msg.senderRole || msg.sender || 'CUSTOMER';
+              const label = isDriver ? 'Bạn' : role === 'MERCHANT' ? 'Quán ăn' : 'Khách hàng';
+
               return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                >
+                <div key={msg.id} className={`flex flex-col ${isDriver ? 'items-end' : 'items-start'}`}>
                   <div
                     className={`text-xs rounded-2xl px-3.5 py-2 max-w-[85%] shadow-xs leading-relaxed ${
-                      isMe
+                      isDriver
                         ? 'bg-emerald-600 text-white rounded-br-sm'
-                        : 'bg-white text-slate-800 border border-slate-200 rounded-bl-sm'
+                        : role === 'MERCHANT'
+                        ? 'bg-orange-50 border border-orange-200 text-orange-900 rounded-bl-sm'
+                        : 'bg-white border border-slate-200 text-slate-800 rounded-bl-sm'
                     }`}
                   >
-                    {msg.text}
+                    {text}
                   </div>
                   <span className="text-[10px] text-slate-400 mt-0.5 px-1">
-                    {isMe ? 'Bạn (Tài xế)' : 'Khách hàng'} • {formatChatTime(msg.sentAtIso)}
+                    {label} • {formatChatTime(time)}
                   </span>
                 </div>
               );

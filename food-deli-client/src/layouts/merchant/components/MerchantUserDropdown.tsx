@@ -7,8 +7,9 @@ import {
   LogoutOutlined,
   ExclamationCircleOutlined,
   ProfileOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { APP_ROUTES } from '@/constants';
 
 interface MerchantUserDropdownProps {
@@ -20,7 +21,11 @@ export const MerchantUserDropdown: React.FC<MerchantUserDropdownProps> = ({
   user,
   onLogout,
 }) => {
-  const navigate = useNavigate();
+  const isAdmin =
+    user?.role === 'ROLE_ADMIN' ||
+    user?.role === 'ADMIN' ||
+    (Array.isArray(user?.roles) &&
+      user.roles.some((r: any) => String(r).includes('ADMIN')));
 
   const handleLogoutConfirm = () => {
     Modal.confirm({
@@ -37,6 +42,20 @@ export const MerchantUserDropdown: React.FC<MerchantUserDropdownProps> = ({
   };
 
   const userMenuItems: MenuProps['items'] = [
+    ...(isAdmin
+      ? [
+          {
+            key: 'admin-portal',
+            icon: <DashboardOutlined className="text-base text-red-500" />,
+            label: (
+              <Link to="/admin/dashboard" className="font-bold text-red-600 py-1 inline-block">
+                Cổng Quản trị (Admin Portal)
+              </Link>
+            ),
+          },
+          { type: 'divider' as const },
+        ]
+      : []),
     {
       key: 'home',
       icon: <HomeOutlined className="text-base text-gray-500" />,

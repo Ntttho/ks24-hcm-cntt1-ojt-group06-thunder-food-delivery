@@ -28,6 +28,7 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
         SELECT DISTINCT s FROM Shop s
         LEFT JOIN s.categories c
         WHERE s.deletedAt IS NULL
+          AND s.approvalStatus = 'APPROVED'
           AND (:search IS NULL OR LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.address) LIKE LOWER(CONCAT('%', :search, '%')))
           AND (:categoryId IS NULL OR c.id = :categoryId)
           AND (:isOpen IS NULL OR s.isOpen = :isOpen)

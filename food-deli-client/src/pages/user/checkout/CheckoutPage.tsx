@@ -214,14 +214,9 @@ export const CheckoutPage: React.FC = () => {
     return orderCostConfig.baseFee + extraKm * orderCostConfig.extraPerKm;
   }, [selectedItems.length, orderCostConfig]);
 
-  const prioritySurcharge =
-    selectedItems.length > 0 && deliverySpeed === 'priority' ? orderCostConfig.priorityFee : 0;
-  const shippingFee = baseShippingFee + prioritySurcharge;
-  const serviceFee = selectedItems.length > 0 ? orderCostConfig.serviceFee : 0;
-  const vatAmount = useMemo(() => {
-    if (selectedItems.length === 0 || orderCostConfig.vatIncluded) return 0;
-    return Math.round(itemsSubtotal * (orderCostConfig.vatRate || 0));
-  }, [selectedItems.length, itemsSubtotal, orderCostConfig]);
+  const shippingFee = baseShippingFee;
+  const serviceFee = 0;
+  const vatAmount = 0;
 
   // Single Voucher Calculation
   const voucherDiscount = useMemo(() => {
@@ -266,13 +261,13 @@ export const CheckoutPage: React.FC = () => {
 
     setOrderState('loading');
     try {
+      const kitchenParts = [kitchenNote.trim(), selectedKitchenChips.join(', ')].filter(Boolean).join(' - ');
       const fullNote = [
-        driverNote ? `Tài xế: ${driverNote}` : '',
-        kitchenNote ? `Quán ăn: ${kitchenNote}` : '',
-        selectedKitchenChips.length > 0 ? `Yêu cầu: ${selectedKitchenChips.join(', ')}` : '',
+        kitchenParts ? `[Quán: ${kitchenParts}]` : '',
+        driverNote.trim() ? `[Tài xế: ${driverNote.trim()}]` : '',
       ]
         .filter(Boolean)
-        .join(' | ');
+        .join(' • ');
 
       const createPayload: CreateOrderPayload = {
         restaurantId: Number(activeRestaurantId) || 1,
