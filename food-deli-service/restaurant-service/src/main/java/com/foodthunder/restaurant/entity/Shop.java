@@ -47,11 +47,11 @@ public class Shop {
 
     @Column(name = "is_open")
     @Builder.Default
-    private Boolean isOpen = true;
+    private Boolean isOpen = false;
 
     @Column(name = "is_open_today", nullable = false)
     @Builder.Default
-    private Boolean isOpenToday = true;
+    private Boolean isOpenToday = false;
 
     @Column(name = "temporary_closed_reason", columnDefinition = "TEXT")
     private String temporaryClosedReason;
@@ -68,7 +68,7 @@ public class Shop {
 
     @Column(name = "approval_status", length = 20)
     @Builder.Default
-    private String approvalStatus = "APPROVED";
+    private String approvalStatus = "PENDING";
 
     @Column(name = "approved_by")
     private Integer approvedBy;

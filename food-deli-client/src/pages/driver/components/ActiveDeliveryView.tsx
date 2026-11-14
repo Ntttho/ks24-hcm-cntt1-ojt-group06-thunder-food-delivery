@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   AlertCircle,
   Bike,
@@ -26,6 +26,8 @@ import {
   saveOrderChatMessages,
 } from '../deliveryHelpers';
 import { DriverCustomerChatModal } from './DriverCustomerChatModal';
+import { chatApi, type ChatMessage } from '@/services/modules/chatApi';
+import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 
 interface ActiveDeliveryViewProps {
   order: DriverOrder;
@@ -70,9 +72,35 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
   } | null>(null);
   const [isMapExpanded, setIsMapExpanded] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
-  const [chatMessages, setChatMessages] = useState<DriverChatMessage[]>(() =>
-    loadOrderChatMessages(order.id)
-  );
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+
+  // Realtime STOMP & API Chat Sync for order
+  useEffect(() => {
+    if (!order.id) return;
+
+    chatApi.getOrderChatHistory(order.id).then((res) => {
+      if (res && res.data && Array.isArray(res.data) && res.data.length > 0) {
+        setChatMessages(res.data);
+      } else {
+        setChatMessages(loadOrderChatMessages(order.id));
+      }
+    }).catch(() => {
+      setChatMessages(loadOrderChatMessages(order.id));
+    });
+
+    orderLiveTrackingWs.connect(order.id);
+
+    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
+      setChatMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [order.id]);
 
   // Tự động đồng bộ tab bản đồ theo mốc hiện tại (Mốc 1: Quán ăn, Mốc 2: Khách hàng)
   const mapFocus: RouteMapFocus =
@@ -87,13 +115,24 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
     setIsMapExpanded(true);
   };
 
-  const handleSendChatMessage = (text: string) => {
-    const newMsg = createDriverChatMessage(order.id, text);
-    setChatMessages((prev) => {
-      const next = [...prev, newMsg];
-      saveOrderChatMessages(order.id, next);
-      return next;
-    });
+  const handleSendChatMessage = async (text: string) => {
+    const localMsg = createDriverChatMessage(order.id, text);
+    setChatMessages((prev) => [...prev, localMsg]);
+
+    try {
+      await chatApi.sendMessage({
+        orderId: order.id,
+        senderRole: 'DRIVER',
+        message: text,
+      });
+      orderLiveTrackingWs.sendChatMessageViaWs({
+        orderId: order.id,
+        senderRole: 'DRIVER',
+        message: text,
+      });
+    } catch {
+      saveOrderChatMessages(order.id, [...chatMessages, localMsg]);
+    }
   };
 
   const pickupDirectionsUrl = useMemo(

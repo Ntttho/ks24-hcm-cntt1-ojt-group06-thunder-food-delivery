@@ -16,23 +16,23 @@ interface CheckoutPriceSummaryProps {
 export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   itemsSubtotal,
   shippingFee,
-  serviceFee,
-  vatAmount = 0,
+  serviceFee: _serviceFee,
+  vatAmount: _vatAmount = 0,
   vatIncluded = true,
   totalDiscount,
   originalTotal,
   finalTotal,
   itemCount = 1,
-  paymentMethodDiscount = 0,
+  paymentMethodDiscount: _paymentMethodDiscount = 0,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-2.5">
       <div className="flex items-center justify-between pb-2 border-b border-gray-100">
         <span className="text-sm text-gray-900 font-extrabold">
-          Chi tiết hóa đơn
+          Chi tiết thanh toán
         </span>
-        <span className="text-xs text-gray-400 font-medium">
-          {vatIncluded ? 'Đã bao gồm VAT' : 'Chưa bao gồm VAT'}
+        <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
+          {vatIncluded ? 'Giá đã gồm thuế' : 'Giao nhanh'}
         </span>
       </div>
 
@@ -49,24 +49,6 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
           {shippingFee.toLocaleString('vi-VN')}đ
         </span>
       </div>
-
-      {serviceFee > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-600">
-          <span>Phí dịch vụ &amp; đóng gói</span>
-          <span className="text-gray-900 font-semibold">
-            {serviceFee.toLocaleString('vi-VN')}đ
-          </span>
-        </div>
-      )}
-
-      {!vatIncluded && vatAmount > 0 && (
-        <div className="flex items-center justify-between text-xs text-gray-600">
-          <span>Thuế VAT</span>
-          <span className="text-gray-900 font-semibold">
-            {vatAmount.toLocaleString('vi-VN')}đ
-          </span>
-        </div>
-      )}
 
       {totalDiscount > 0 && (
         <div className="flex items-center justify-between text-xs text-orange-600 font-semibold">

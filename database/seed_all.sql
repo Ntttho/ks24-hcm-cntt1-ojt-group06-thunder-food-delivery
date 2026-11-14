@@ -260,6 +260,7 @@ CREATE TABLE `orders` (
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
   `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
   `receiver_address` TEXT,                -- Snapshot dữ liệu lúc đặt đơn
+  `note` TEXT DEFAULT NULL,               -- Ghi chú của khách cho Quán ăn & Tài xế
   `receiver_lat` DOUBLE DEFAULT NULL,
   `receiver_lng` DOUBLE DEFAULT NULL,
   `distance_km` DOUBLE DEFAULT NULL,
@@ -470,7 +471,7 @@ CREATE TABLE `reviews` (
 CREATE TABLE `chat_messages` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `sender_id` INT NOT NULL,               -- [Logical FK] trỏ sang auth-service: users.id
-  `shop_id` INT NOT NULL,                 -- [Logical FK] trỏ sang restaurant-service: restaurants.id
+  `shop_id` INT DEFAULT NULL,             -- [Logical FK] trỏ sang restaurant-service: restaurants.id (cho phép NULL khi chat khách-tài xế)
   `order_id` INT DEFAULT NULL,            -- [Logical FK] trỏ sang order-service: orders.id
   `message` VARCHAR(1000) NOT NULL,
   `sender_role` VARCHAR(20) NOT NULL,

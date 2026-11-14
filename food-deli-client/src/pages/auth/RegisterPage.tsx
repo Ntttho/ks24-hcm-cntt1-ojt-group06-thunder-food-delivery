@@ -14,6 +14,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
+import { getRoleDefaultPath } from '@/utils/navigation';
 import type { RegisterRequest } from '@/types';
 import { PasswordStrengthMeter } from './components/PasswordStrengthMeter';
 import { SocialAuthButtons } from './components/SocialAuthButtons';
@@ -79,11 +80,7 @@ export const RegisterPage: React.FC = () => {
 
       await register(payload);
       message.success('Đăng ký tài khoản thành công! Bạn có thể bắt đầu sử dụng ngay.');
-      if (selectedRole === 'MERCHANT') {
-        navigate('/merchant');
-      } else {
-        navigate(APP_ROUTES.HOME);
-      }
+      navigate(getRoleDefaultPath(selectedRole), { replace: true });
     } catch {
       // Handled in Redux and displayed via Alert
     }

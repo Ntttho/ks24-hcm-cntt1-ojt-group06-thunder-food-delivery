@@ -34,6 +34,7 @@ import {
   DriverReviewModal,
   OrderChatDrawer,
 } from './components';
+import { GoogleMapRouteView } from '@/components/map/GoogleMapRouteView';
 
 const { Title, Text } = Typography;
 
@@ -125,6 +126,7 @@ export const OrderDetailPage: React.FC = () => {
             driverName: data.driverName || (data.driverId ? 'Nguyễn Tuấn Tài (Tài xế Thunder)' : undefined),
             driverPhone: data.driverPhone || (data.driverId ? '0912345678' : undefined),
             receiverAddress: data.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
+            note: (data as any).note || '',
             distanceKm: Number(data.distanceKm || 2.1),
             subtotalAmount: Number(data.subtotalAmount || 0),
             shippingFee: Number(data.shippingFee || 16000),
@@ -438,6 +440,20 @@ export const OrderDetailPage: React.FC = () => {
           statusCode={order.statusCode}
         />
 
+        {/* Live Interactive Map Route with Simulation */}
+        <GoogleMapRouteView
+          restaurantName={order.restaurantName}
+          restaurantAddress={order.restaurantName}
+          restaurantLat={10.7769}
+          restaurantLng={106.7009}
+          customerName={order.customerName}
+          customerAddress={order.receiverAddress}
+          customerLat={order.receiverLat || 10.7925}
+          customerLng={order.receiverLng || 106.7214}
+          isDelivering={order.statusCode === 'DELIVERING' || order.statusCode === 'DRIVER_ACCEPTED'}
+          orderCode={order.orderCode}
+        />
+
         {/* 4. Driver & Restaurant Contact Cards */}
         <OrderContactCards
           driverName={order.driverName}
@@ -463,6 +479,12 @@ export const OrderDetailPage: React.FC = () => {
             <PhoneOutlined />
             <span>{order.customerPhone || '0987654321'}</span>
           </div>
+          {(order as any).note && (
+            <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-start gap-1.5 text-xs text-amber-900 bg-amber-50/80 p-2.5 rounded-xl">
+              <span className="font-extrabold text-amber-700 shrink-0">📝 Ghi chú:</span>
+              <span className="font-medium">{(order as any).note}</span>
+            </div>
+          )}
         </div>
 
         {/* 6. Items & Pricing Breakdown */}

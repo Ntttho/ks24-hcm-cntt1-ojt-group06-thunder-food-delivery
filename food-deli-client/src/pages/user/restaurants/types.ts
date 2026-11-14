@@ -22,6 +22,9 @@ export interface FoodItem {
   category: string;
   isPopular?: boolean;
   isNew?: boolean;
+  isAvailable?: boolean;
+  currentQuantity?: number;
+  defaultQuantity?: number;
   soldCount?: number;
   customizationGroups?: CustomizationGroup[];
 }

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import type { UserRole } from '@/types';
 import { normalizeRole } from '@/utils/jwt';
+import { getRoleDefaultPath, getRoleDisplayName } from '@/utils/navigation';
 
 interface ProtectedRouteProps {
   children: React.ReactElement;
@@ -61,6 +62,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           ? 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Cổng làm việc này chỉ dành riêng cho Đối tác Tài xế (Driver / Shipper).'
           : 'Tài khoản của bạn không có quyền truy cập vào phân hệ này. Khu vực này chỉ dành riêng cho Đối tác Quán ăn (Merchant) hoặc Quản trị viên (Admin).';
 
+        const userHomePath = getRoleDefaultPath(user?.role || role);
+        const roleName = getRoleDisplayName(user?.role || role);
+
         return (
           <div className="min-h-[70vh] flex items-center justify-center p-6 bg-slate-50">
             <Result
@@ -68,18 +72,27 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               title="403 - Quyền truy cập bị từ chối"
               subTitle={forbiddenMessage}
               extra={
-                <Link to={APP_ROUTES.HOME}>
-                  <Button type="primary" className="bg-orange-500 hover:bg-orange-600 font-bold rounded-xl shadow-xs">
-                    Quay về Trang chủ
-                  </Button>
-                </Link>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Link to={userHomePath}>
+                    <Button type="primary" className="bg-orange-500 hover:bg-orange-600 font-bold rounded-xl shadow-xs">
+                      Về trang chính ({roleName})
+                    </Button>
+                  </Link>
+                  {userHomePath !== APP_ROUTES.HOME && (
+                    <Link to={APP_ROUTES.HOME}>
+                      <Button className="font-semibold rounded-xl">
+                        Về Trang chủ đặt món
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               }
             />
           </div>
         );
       }
 
-      return <Navigate to={APP_ROUTES.HOME} replace />;
+      return <Navigate to={getRoleDefaultPath(user?.role || role)} replace />;
     }
   }
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
+import { ShopeeStyleChatDrawer } from '@/components/chat/ShopeeStyleChatDrawer';
 
 export const MainLayout: React.FC = () => {
   return (
@@ -11,6 +12,7 @@ export const MainLayout: React.FC = () => {
         <Outlet />
       </main>
       <Footer />
+      <ShopeeStyleChatDrawer />
     </div>
   );
 };

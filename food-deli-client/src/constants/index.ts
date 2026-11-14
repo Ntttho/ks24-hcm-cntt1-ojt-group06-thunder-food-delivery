@@ -26,7 +26,7 @@ export const APP_ROUTES = {
   ADDRESSES: '/profile/addresses',
   ADDRESS_MANAGEMENT: '/addresses',
   ADMIN_LOGIN: '/admin/login',
-  ADMIN_DASHBOARD: '/admin/users',
+  ADMIN_DASHBOARD: '/admin/dashboard',
   MERCHANT_DASHBOARD: '/merchant',
   ADMIN_RESTAURANT_REVIEWS: '/admin/reviews/restaurants',
   ADMIN_DRIVER_REVIEWS: '/admin/reviews/drivers',

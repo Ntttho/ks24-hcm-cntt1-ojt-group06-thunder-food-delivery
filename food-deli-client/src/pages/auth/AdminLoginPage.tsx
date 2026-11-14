@@ -11,11 +11,12 @@ import {
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
+import { getRoleDefaultPath } from '@/utils/navigation';
 
 export const AdminLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, isLoading, error, clearError, isAuthenticated, isAdmin } = useAuth();
+  const { login, isLoading, error, clearError, isAuthenticated, isAdmin, user } = useAuth();
   const [form] = Form.useForm();
   const [rememberMe, setRememberMe] = useState<boolean>(true);
 
@@ -31,12 +32,16 @@ export const AdminLoginPage: React.FC = () => {
       ? `${fromState.pathname}${fromState.search || ''}`
       : fromQuery) || APP_ROUTES.ADMIN_DASHBOARD;
 
-  // Auto-redirect if already authenticated as Admin
+  // Auto-redirect if already authenticated: Admin về dashboard, role khác về trang chính của họ
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
-      navigate(fromLocation, { replace: true });
+    if (isAuthenticated) {
+      if (isAdmin) {
+        navigate(fromLocation, { replace: true });
+      } else if (user) {
+        navigate(getRoleDefaultPath(user.role), { replace: true });
+      }
     }
-  }, [isAuthenticated, isAdmin, fromLocation, navigate]);
+  }, [isAuthenticated, isAdmin, user, fromLocation, navigate]);
 
   // Phone / Email validation
   const validateIdentifier = (_: any, value: string) => {

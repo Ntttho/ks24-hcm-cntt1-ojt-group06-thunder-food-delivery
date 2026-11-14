@@ -13,7 +13,9 @@ import {
 import type { RestaurantChangeRequestItem } from '@/services/modules/adminApprovalApi';
 
 interface RestaurantChangeRequestDetailModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
+  open?: boolean;
+  visible?: boolean;
   request: RestaurantChangeRequestItem | null;
   onClose: () => void;
   onApprove: (id: number) => void;
@@ -22,11 +24,14 @@ interface RestaurantChangeRequestDetailModalProps {
 
 export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeRequestDetailModalProps> = ({
   isOpen,
+  open,
+  visible,
   request,
   onClose,
   onApprove,
   onReject,
 }) => {
+  const modalOpen = open ?? isOpen ?? visible ?? false;
   const [showRawJson, setShowRawJson] = useState<boolean>(false);
 
   if (!request) return null;
@@ -54,7 +59,7 @@ export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeReques
 
   return (
     <Modal
-      open={isOpen}
+      open={modalOpen}
       onCancel={onClose}
       title={
         <div className="flex items-center gap-2 text-slate-800">

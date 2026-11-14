@@ -11,7 +11,7 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
   deliverySpeed,
   onSelectDeliverySpeed,
   distance = '1.8 km',
-  priorityFee = 5000,
+  priorityFee: _priorityFee = 5000,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-3">
@@ -55,12 +55,12 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
                 </span>
               </div>
               <span className="text-[11px] text-gray-500 mt-0.5">
-                15 - 25 phút • Giao trực tiếp không ghép đơn
+                15 - 25 phút • Giao trực tiếp tận nơi
               </span>
             </div>
           </div>
-          <span className="text-xs text-orange-600 font-bold">
-            +{priorityFee.toLocaleString('vi-VN')}đ
+          <span className="text-xs text-emerald-600 font-bold">
+            Miễn phụ thu
           </span>
         </label>
 

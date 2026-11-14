@@ -4,7 +4,6 @@ import {
   ShopOutlined,
   EnvironmentOutlined,
   ClockCircleOutlined,
-  PictureOutlined,
   AppstoreAddOutlined,
   ThunderboltFilled,
   CheckCircleOutlined,

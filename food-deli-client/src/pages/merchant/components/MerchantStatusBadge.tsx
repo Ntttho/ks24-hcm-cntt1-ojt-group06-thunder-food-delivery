@@ -7,6 +7,7 @@ import {
   FireOutlined,
   DollarOutlined,
   CreditCardOutlined,
+  CarOutlined,
 } from '@ant-design/icons';
 
 interface StatusBadgeProps {
@@ -25,6 +26,24 @@ export const MerchantStatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
       return (
         <Tag color="processing" className="font-semibold px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1">
           <FireOutlined /> Đang nấu (CONFIRMED)
+        </Tag>
+      );
+    case 'DRIVER_ACCEPTED':
+      return (
+        <Tag color="cyan" className="font-semibold px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1">
+          <CarOutlined /> Tài xế đã nhận (DRIVER_ACCEPTED)
+        </Tag>
+      );
+    case 'PICKING_UP':
+      return (
+        <Tag color="cyan" className="font-semibold px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1">
+          <CarOutlined /> Tài xế đang lấy món (PICKING_UP)
+        </Tag>
+      );
+    case 'DELIVERING':
+      return (
+        <Tag color="cyan" className="font-semibold px-2.5 py-0.5 rounded-full text-xs flex items-center gap-1">
+          <CarOutlined /> Đang giao tới khách (DELIVERING)
         </Tag>
       );
     case 'COMPLETED':

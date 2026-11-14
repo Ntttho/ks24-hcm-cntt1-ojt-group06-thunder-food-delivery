@@ -39,8 +39,16 @@ export const MerchantShopDropdown: React.FC<MerchantShopDropdownProps> = ({
       icon: <ShopOutlined className="text-orange-500 text-base" />,
       label: (
         <div className="flex items-center justify-between gap-3 py-1.5 min-w-[240px]">
-          <div className="flex flex-col min-w-0 max-w-[200px]">
-            <span className="font-bold text-gray-800 text-xs truncate">{shop.name}</span>
+          <div className="flex flex-col min-w-0 max-w-[180px]">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-gray-800 text-xs truncate">{shop.name}</span>
+              {shop.approvalStatus === 'PENDING' && (
+                <Tag color="warning" className="text-[10px] font-bold px-1 py-0 m-0">Chờ duyệt</Tag>
+              )}
+              {shop.approvalStatus === 'REJECTED' && (
+                <Tag color="error" className="text-[10px] font-bold px-1 py-0 m-0">Bị từ chối</Tag>
+              )}
+            </div>
             <span className="text-[11px] text-gray-400 truncate">{shop.address}</span>
           </div>
           {Number(activeRestaurant?.id) === Number(shop.id) && (
@@ -82,12 +90,22 @@ export const MerchantShopDropdown: React.FC<MerchantShopDropdownProps> = ({
           </span>
         </div>
 
-        <Tag
-          color={isOpen ? 'success' : 'default'}
-          className="ml-1 text-[11px] font-bold shrink-0 rounded-md"
-        >
-          {isOpen ? 'Đang mở cửa' : 'Tạm nghỉ'}
-        </Tag>
+        {activeRestaurant.approvalStatus === 'PENDING' ? (
+          <Tag color="warning" className="ml-1 text-[11px] font-bold shrink-0 rounded-md">
+            Chờ duyệt
+          </Tag>
+        ) : activeRestaurant.approvalStatus === 'REJECTED' ? (
+          <Tag color="error" className="ml-1 text-[11px] font-bold shrink-0 rounded-md">
+            Bị từ chối
+          </Tag>
+        ) : (
+          <Tag
+            color={isOpen ? 'success' : 'default'}
+            className="ml-1 text-[11px] font-bold shrink-0 rounded-md"
+          >
+            {isOpen ? 'Đang mở cửa' : 'Tạm nghỉ'}
+          </Tag>
+        )}
       </div>
     </Dropdown>
   );

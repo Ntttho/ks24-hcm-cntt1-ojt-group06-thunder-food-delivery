@@ -79,6 +79,18 @@ public class RestaurantClientFallbackFactory implements FallbackFactory<Restaura
                         .build();
                 return ResponseEntity.ok(ApiResponse.success("Fallback restaurant-service analytics counts", fallbackData));
             }
+
+            @Override
+            public ResponseEntity<ApiResponse<Void>> deductStock(com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest request) {
+                log.error("Fallback triggered for deductStock, cause: {}", cause != null ? cause.getMessage() : "unknown");
+                throw new com.foodthunder.order.exception.BadRequestException("Không thể kết nối đến kho món ăn để trừ số lượng: " + (cause != null ? cause.getMessage() : ""));
+            }
+
+            @Override
+            public ResponseEntity<ApiResponse<Void>> restoreStock(com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest request) {
+                log.warn("Fallback triggered for restoreStock, cause: {}", cause != null ? cause.getMessage() : "unknown");
+                return ResponseEntity.ok(ApiResponse.success("Fallback restoreStock", null));
+            }
         };
     }
 }
