@@ -116,19 +116,22 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
   };
 
   const handleSendChatMessage = async (text: string) => {
-    const localMsg = createDriverChatMessage(order.id, text);
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    const localMsg = createDriverChatMessage(order.id, trimmed);
     setChatMessages((prev) => [...prev, localMsg]);
 
     try {
       await chatApi.sendMessage({
         orderId: order.id,
         senderRole: 'DRIVER',
-        message: text,
+        message: trimmed,
       });
       orderLiveTrackingWs.sendChatMessageViaWs({
         orderId: order.id,
         senderRole: 'DRIVER',
-        message: text,
+        message: trimmed,
       });
     } catch {
       saveOrderChatMessages(order.id, [...chatMessages, localMsg]);
