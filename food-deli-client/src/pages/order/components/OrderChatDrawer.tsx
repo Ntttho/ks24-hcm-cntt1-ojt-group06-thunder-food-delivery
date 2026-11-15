@@ -24,14 +24,15 @@ import { useAuth } from '@/hooks/useAuth';
 interface OrderChatDrawerProps {
   isOpen: boolean;
   onClose: () => void;
-  orderId: number;
+  orderId?: number;
   orderCode?: string;
+  shopId?: number;
   driverName?: string;
   driverPhone?: string;
   restaurantName?: string;
 }
 
-const QUICK_REPLIES = [
+const ORDER_QUICK_REPLIES = [
   'Tôi đang đợi ở sảnh chung cư/tòa nhà',
   'Giao lên tận cửa phòng giúp tôi nhé',
   'Khi đến nơi vui lòng gọi hoặc nháy máy nhé',
@@ -39,11 +40,19 @@ const QUICK_REPLIES = [
   'Món ăn có nước súp, shipper đi cẩn thận giúp mình nhé',
 ];
 
+const SHOP_QUICK_REPLIES = [
+  'Quán cho mình hỏi món này còn không ạ?',
+  'Món này có cay lắm không quán ơi?',
+  'Quán chuẩn bị món trong khoảng bao lâu ạ?',
+  'Món này có kèm nước chấm không quán?',
+];
+
 export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
   isOpen,
   onClose,
   orderId,
   orderCode,
+  shopId,
   driverName = 'Tài xế giao hàng',
   driverPhone,
   restaurantName,
@@ -55,19 +64,39 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
   const [sending, setSending] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const isShopOnly = !orderId && Boolean(shopId);
+  const activeQuickReplies = isShopOnly ? SHOP_QUICK_REPLIES : ORDER_QUICK_REPLIES;
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // 1. Fetch initial chat history
+  // 1. Fetch initial chat history & mark as read
   useEffect(() => {
-    if (!isOpen || !orderId) return;
+    if (!isOpen || (!orderId && !shopId)) return;
 
     let isMounted = true;
     setLoading(true);
 
-    chatApi
-      .getOrderChatHistory(orderId)
+    const currentUserRole = user?.role || 'CUSTOMER';
+
+    // Mark as read immediately when opening
+    if (orderId) {
+      chatApi.markOrderChatAsRead(orderId, currentUserRole);
+      orderLiveTrackingWs.sendMarkReadViaWs(orderId, undefined, currentUserRole);
+    } else if (shopId) {
+      chatApi.markShopChatAsRead(shopId, currentUserRole);
+      orderLiveTrackingWs.sendMarkReadViaWs(undefined, shopId, currentUserRole);
+    }
+
+    // Connect to WebSocket channel
+    orderLiveTrackingWs.connect(orderId || null, shopId || null);
+
+    const fetchHistory = orderId
+      ? chatApi.getOrderChatHistory(orderId)
+      : chatApi.getShopChatHistory(shopId!);
+
+    fetchHistory
       .then((res) => {
         if (isMounted) {
           const list = Array.isArray(res.data) ? res.data : [];
@@ -83,24 +112,33 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
       });
 
     // 2. Subscribe to STOMP WebSocket incoming messages
-    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((incoming) => {
-      if (Number(incoming.orderId) === Number(orderId)) {
+    const unsubscribeChat = orderLiveTrackingWs.subscribeChatMessages((incoming) => {
+      const matchOrder = orderId && Number(incoming.orderId) === Number(orderId);
+      const matchShop = shopId && Number(incoming.shopId) === Number(shopId);
+
+      if (matchOrder || matchShop) {
         setMessages((prev) => {
-          // Avoid duplicate by id
           if (incoming.id && prev.some((m) => m.id === incoming.id)) {
             return prev;
           }
           return [...prev, incoming];
         });
         setTimeout(scrollToBottom, 100);
+
+        // Mark incoming message as read since drawer is currently open
+        if (orderId) {
+          chatApi.markOrderChatAsRead(orderId, currentUserRole);
+        } else if (shopId) {
+          chatApi.markShopChatAsRead(shopId, currentUserRole);
+        }
       }
     });
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      unsubscribeChat();
     };
-  }, [isOpen, orderId]);
+  }, [isOpen, orderId, shopId, user?.role]);
 
   useEffect(() => {
     scrollToBottom();
@@ -115,14 +153,12 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
     const currentRole = user?.role || 'CUSTOMER';
 
     const payload = {
-      orderId,
+      orderId: orderId || undefined,
+      shopId: shopId || undefined,
       senderId,
       senderRole: currentRole,
       message: text,
     };
-
-    // Broadcast immediately via WS frame if connected
-    orderLiveTrackingWs.sendChatMessageViaWs(payload);
 
     try {
       const res = await chatApi.sendMessage(payload);
@@ -154,10 +190,16 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
             </span>
             <div>
               <div className="font-extrabold text-sm text-gray-900">
-                Trao đổi đơn {orderCode ? `#${orderCode}` : `#${orderId}`}
+                {orderCode
+                  ? `Trao đổi đơn #${orderCode}`
+                  : orderId
+                  ? `Trao đổi đơn #${orderId}`
+                  : `Tư vấn quán ${restaurantName || 'Ăn uống'}`}
               </div>
               <div className="text-xs text-gray-500 font-medium">
-                Khách hàng &bull; Tài xế {driverName}
+                {isShopOnly
+                  ? 'Hỏi đáp thực đơn & dặn dò trực tiếp với quán'
+                  : `Khách hàng • ${restaurantName ? `${restaurantName} • ` : ''}Tài xế ${driverName}`}
               </div>
             </div>
           </div>
@@ -175,7 +217,7 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
         <div className="space-y-3 p-1">
           {/* Quick Replies Rail */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-            {QUICK_REPLIES.map((reply, idx) => (
+            {activeQuickReplies.map((reply, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -190,7 +232,11 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
           {/* Chat input form */}
           <div className="flex items-center gap-2">
             <Input
-              placeholder="Nhắn tin dặn dò tài xế, ghi chú điểm hẹn..."
+              placeholder={
+                isShopOnly
+                  ? 'Nhập câu hỏi tư vấn về món ăn, khẩu vị...'
+                  : 'Nhắn tin dặn dò tài xế, quán ăn...'
+              }
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               onPressEnter={() => handleSend()}
@@ -221,42 +267,51 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
           </div>
           <div>
             <h4 className="font-extrabold text-gray-800 text-sm mb-1">
-              Bắt đầu trò chuyện với tài xế
+              {isShopOnly ? 'Trò chuyện trực tiếp với Quán' : 'Bắt đầu trao đổi tin nhắn'}
             </h4>
             <p className="text-xs text-gray-500 max-w-xs">
-              Bạn có thể dặn dò điểm hẹn nhận món, thông báo vị trí chính xác hoặc chọn nhanh các câu trả lời bên dưới.
+              {isShopOnly
+                ? 'Bạn có thể hỏi quán về thành phần món ăn, độ cay hoặc các lưu ý đặc biệt trước khi đặt hàng.'
+                : 'Bạn có thể dặn dò điểm hẹn nhận món, ghi chú cho bếp hoặc chọn nhanh các câu trả lời bên dưới.'}
             </p>
           </div>
         </div>
       ) : (
         <div className="space-y-3 pb-2">
           {messages.map((m, idx) => {
+            const currentUserId = Number(user?.id);
+            const currentUserRole = user?.role;
             const isMe =
-              m.senderRole === 'CUSTOMER' ||
-              (user?.id && Number(m.senderId) === Number(user.id));
+              Boolean(currentUserId && Number(m.senderId) === currentUserId) ||
+              Boolean(currentUserRole && m.senderRole === currentUserRole);
+
+            const getSenderTitle = () => {
+              if (isMe) {
+                if (currentUserRole === 'MERCHANT') return 'Bạn (Quán ăn)';
+                if (currentUserRole === 'DRIVER') return 'Bạn (Tài xế)';
+                return 'Bạn (Khách hàng)';
+              }
+              if (m.senderRole === 'DRIVER') return driverName || 'Tài xế';
+              if (m.senderRole === 'MERCHANT') return restaurantName || 'Quán ăn';
+              return 'Khách hàng';
+            };
+
+            const getOtherAvatar = () => {
+              if (m.senderRole === 'DRIVER') {
+                return <Avatar size={30} className="bg-blue-600 shrink-0" icon={<CarOutlined />} />;
+              }
+              if (m.senderRole === 'MERCHANT') {
+                return <Avatar size={30} className="bg-orange-500 shrink-0" icon={<ShopOutlined />} />;
+              }
+              return <Avatar size={30} className="bg-emerald-600 shrink-0" icon={<UserOutlined />} />;
+            };
 
             return (
               <div
                 key={m.id || idx}
                 className={`flex gap-2.5 items-end ${isMe ? 'justify-end' : 'justify-start'}`}
               >
-                {!isMe && (
-                  <Avatar
-                    size={30}
-                    className={
-                      m.senderRole === 'DRIVER'
-                        ? 'bg-blue-600 shrink-0'
-                        : 'bg-orange-500 shrink-0'
-                    }
-                    icon={
-                      m.senderRole === 'DRIVER' ? (
-                        <CarOutlined />
-                      ) : (
-                        <ShopOutlined />
-                      )
-                    }
-                  />
-                )}
+                {!isMe && getOtherAvatar()}
 
                 <div
                   className={`max-w-[75%] rounded-2xl p-3 text-xs shadow-2xs ${
@@ -266,13 +321,7 @@ export const OrderChatDrawer: React.FC<OrderChatDrawerProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-1.5 mb-1 text-[10px] opacity-80">
-                    <span className="font-bold">
-                      {isMe
-                        ? 'Bạn (Khách hàng)'
-                        : m.senderRole === 'DRIVER'
-                        ? driverName
-                        : restaurantName || 'Quán ăn'}
-                    </span>
+                    <span className="font-bold">{getSenderTitle()}</span>
                     <span>&bull;</span>
                     <span>
                       {m.createdAt

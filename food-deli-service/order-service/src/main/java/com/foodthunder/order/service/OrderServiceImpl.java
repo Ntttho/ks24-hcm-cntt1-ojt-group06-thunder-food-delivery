@@ -832,6 +832,20 @@ public class OrderServiceImpl implements OrderService {
                 } catch (Exception ignored) {}
             }
 
+            // 4. When order is CONFIRMED (ready for driver pickup), broadcast to driver available pool
+            if (order.getStatus() != null && OrderStatus.CONFIRMED.equalsIgnoreCase(order.getStatus().getCode())) {
+                String driverAvailableDestination = "/topic/drivers/available-orders";
+                if (messagingTemplate != null) {
+                    messagingTemplate.convertAndSend(driverAvailableDestination, response);
+                }
+                if (notificationClient != null) {
+                    try {
+                        notificationClient.broadcastEvent(new com.foodthunder.order.client.NotificationClient.BroadcastRequest(driverAvailableDestination, response));
+                    } catch (Exception ignored) {}
+                }
+                log.info("Broadcasted CONFIRMED order {} to driver available channel {}", order.getOrderCode(), driverAvailableDestination);
+            }
+
             log.info("Broadcasted realtime order {} to {} and {}", order.getOrderCode(), destination, orderTrackingDestination);
         } catch (Exception e) {
             log.warn("Failed to broadcast WebSocket order message: {}", e.getMessage());

@@ -19,6 +19,7 @@ interface GoogleMapRouteViewProps {
   customerAddress?: string;
   customerLat?: number | null;
   customerLng?: number | null;
+  driverLiveCoords?: { lat: number; lng: number } | null;
   isDelivering?: boolean;
   orderCode?: string;
 }
@@ -32,10 +33,11 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
   customerAddress,
   customerLat,
   customerLng,
+  driverLiveCoords,
   isDelivering = false,
   orderCode,
 }) => {
-  const { currentDriverLocation, remainingDistanceKm, remainingMinutes, progressPercent, isArrived } =
+  const { currentDriverLocation, remainingDistanceKm: simDist, remainingMinutes: simMins, progressPercent: simProgress, isArrived } =
     useDriverSimulation({
       restaurantLat,
       restaurantLng,
@@ -50,6 +52,23 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
     customerLat,
     customerLng
   );
+
+  // If live GPS coordinates received from WebSocket, prioritize real calculations
+  const effectiveDistanceKm = driverLiveCoords
+    ? calculateHaversineDistance(driverLiveCoords.lat, driverLiveCoords.lng, customerLat, customerLng)
+    : simDist;
+
+  const effectiveMinutes = driverLiveCoords
+    ? Math.max(5, Math.round(effectiveDistanceKm * 3.5 + 5))
+    : simMins;
+
+  const effectiveProgress = driverLiveCoords
+    ? Math.min(100, Math.max(0, Math.round(((totalDistance - effectiveDistanceKm) / (totalDistance || 1)) * 100)))
+    : simProgress;
+
+  const remainingDistanceKm = effectiveDistanceKm;
+  const remainingMinutes = effectiveMinutes;
+  const progressPercent = effectiveProgress;
 
   const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
     restaurantAddress || `${restaurantLat || 10.7769},${restaurantLng || 106.7009}`

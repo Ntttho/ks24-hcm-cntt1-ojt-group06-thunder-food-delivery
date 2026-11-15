@@ -50,6 +50,11 @@ export const MerchantToppingPage: React.FC = () => {
   const [searchText, setSearchText] = useState<string>('');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
+  // Full-restaurant accurate stats
+  const [totalActiveCount, setTotalActiveCount] = useState<number>(0);
+  const [totalOutOfStockCount, setTotalOutOfStockCount] = useState<number>(0);
+  const [allToppingsCount, setAllToppingsCount] = useState<number>(0);
+
   // Server-side Pagination states
   const [page, setPage] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -60,16 +65,21 @@ export const MerchantToppingPage: React.FC = () => {
   const [editingTopping, setEditingTopping] = useState<ToppingItem | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Load distinct groups from all toppings
+  // Load distinct groups and accurate full stats from all toppings of the restaurant
   const loadGroups = useCallback(async () => {
     try {
       const res = await restaurantApi.getAllToppings(currentRestaurantId);
-      const list = Array.isArray(res.data) ? res.data : ((res.data as any)?.content || []);
+      const list: ToppingItem[] = Array.isArray(res.data) ? res.data : ((res.data as any)?.content || []);
       const set = new Set<string>();
+      let active = 0;
       list.forEach((t: ToppingItem) => {
         if (t.groupName) set.add(t.groupName.trim());
+        if (t.isAvailable) active++;
       });
       setDistinctGroups(Array.from(set));
+      setTotalActiveCount(active);
+      setTotalOutOfStockCount(list.length - active);
+      setAllToppingsCount(list.length);
     } catch {
       // fallback
     }
@@ -132,10 +142,6 @@ export const MerchantToppingPage: React.FC = () => {
     fetchToppings(zeroBased, newPageSize, searchText, selectedGroup);
   };
 
-  // Stats
-  const activeCount = useMemo(() => toppings.filter((t) => t.isAvailable).length, [toppings]);
-  const outOfStockCount = toppings.length - activeCount;
-
   // Toggle isAvailable status
   const handleToggleStatus = async (topping: ToppingItem, checked: boolean) => {
     try {
@@ -148,6 +154,8 @@ export const MerchantToppingPage: React.FC = () => {
           item.id === topping.id ? { ...item, isAvailable: checked } : item
         )
       );
+      setTotalActiveCount((prev) => (checked ? prev + 1 : Math.max(0, prev - 1)));
+      setTotalOutOfStockCount((prev) => (checked ? Math.max(0, prev - 1) : prev + 1));
     } catch {
       message.error('Lỗi khi cập nhật trạng thái topping');
     }
@@ -343,7 +351,7 @@ export const MerchantToppingPage: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
             <div className="text-xs text-slate-400 font-semibold uppercase">Tổng Topping</div>
-            <div className="text-2xl font-black text-slate-800 mt-1">{totalElements}</div>
+            <div className="text-2xl font-black text-slate-800 mt-1">{allToppingsCount || totalElements}</div>
             <div className="text-[11px] text-slate-500 mt-0.5">Tất cả các lựa chọn</div>
           </Card>
         </Col>
@@ -356,16 +364,16 @@ export const MerchantToppingPage: React.FC = () => {
         </Col>
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Đang phục vụ (Trang này)</div>
-            <div className="text-2xl font-black text-emerald-600 mt-1">{activeCount}</div>
-            <div className="text-[11px] text-emerald-600/80 mt-0.5">Khách có thể chọn</div>
+            <div className="text-xs text-slate-400 font-semibold uppercase">Đang phục vụ</div>
+            <div className="text-2xl font-black text-emerald-600 mt-1">{totalActiveCount}</div>
+            <div className="text-[11px] text-emerald-600/80 mt-0.5">Khách có thể chọn trên menu</div>
           </Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card className="rounded-2xl border-slate-200 shadow-2xs">
-            <div className="text-xs text-slate-400 font-semibold uppercase">Tạm hết hàng (Trang này)</div>
-            <div className="text-2xl font-black text-rose-500 mt-1">{outOfStockCount}</div>
-            <div className="text-[11px] text-rose-500/80 mt-0.5">Đã tắt trên menu</div>
+            <div className="text-xs text-slate-400 font-semibold uppercase">Tạm hết hàng</div>
+            <div className="text-2xl font-black text-rose-500 mt-1">{totalOutOfStockCount}</div>
+            <div className="text-[11px] text-rose-500/80 mt-0.5">Đã tắt trên menu quán</div>
           </Card>
         </Col>
       </Row>

@@ -1,6 +1,7 @@
 package com.foodthunder.delivery.concurrency;
 
 import com.foodthunder.common.dto.response.ApiResponse;
+import com.foodthunder.delivery.client.NotificationClient;
 import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
 import com.foodthunder.delivery.dto.response.AcceptOrderResponse;
@@ -47,6 +48,9 @@ class DeliveryConcurrencyTest {
 
     @MockBean
     private OrderClient orderClient;
+
+    @MockBean
+    private NotificationClient notificationClient;
 
     private static final Long TEST_ORDER_ID = 888L;
     private static final Integer DRIVER_1 = 201;

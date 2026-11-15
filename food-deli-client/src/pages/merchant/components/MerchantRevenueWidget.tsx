@@ -31,6 +31,34 @@ interface MerchantRevenueWidgetProps {
   restaurantName?: string;
 }
 
+const formatYAxisTick = (val: number) => {
+  if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+  if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
+  return String(val);
+};
+
+const CustomTooltip: React.FC<any> = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white/95 backdrop-blur-xs p-2.5 rounded-xl shadow-md border border-orange-100 text-xs space-y-1 min-w-[150px]">
+        <div className="font-bold text-gray-800 border-b border-gray-100 pb-1">
+          {data.label || label}
+        </div>
+        <div className="flex justify-between text-orange-600 font-semibold">
+          <span>Doanh thu:</span>
+          <span>{formatCurrency(data.revenue)}</span>
+        </div>
+        <div className="flex justify-between text-emerald-600">
+          <span>Đơn hoàn thành:</span>
+          <span className="font-bold">{data.orderCount} đơn</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export const MerchantRevenueWidget: React.FC<MerchantRevenueWidgetProps> = ({
   restaurantId,
   restaurantName,
@@ -61,34 +89,6 @@ export const MerchantRevenueWidget: React.FC<MerchantRevenueWidgetProps> = ({
   useEffect(() => {
     fetchWidgetData();
   }, [fetchWidgetData]);
-
-  const formatYAxisTick = (val: number) => {
-    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
-    if (val >= 1000) return `${(val / 1000).toFixed(0)}k`;
-    return String(val);
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white/95 backdrop-blur-xs p-2.5 rounded-xl shadow-md border border-orange-100 text-xs space-y-1 min-w-[150px]">
-          <div className="font-bold text-gray-800 border-b border-gray-100 pb-1">
-            {data.label || label}
-          </div>
-          <div className="flex justify-between text-orange-600 font-semibold">
-            <span>Doanh thu:</span>
-            <span>{formatCurrency(data.revenue)}</span>
-          </div>
-          <div className="flex justify-between text-emerald-600">
-            <span>Đơn hoàn thành:</span>
-            <span className="font-bold">{data.orderCount} đơn</span>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <Card

@@ -116,11 +116,14 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 <span className="text-red-500 font-bold">*</span>
               </div>
             }
-            rules={[{ required: true, message: 'Vui lòng nhập giá bán' }]}
+            rules={[
+              { required: true, message: 'Vui lòng nhập giá bán' },
+              { type: 'number', min: 1000, message: 'Giá bán món ăn tối thiểu là 1,000 VNĐ' },
+            ]}
             className="!mb-0"
           >
             <InputNumber
-              min={0}
+              min={1000}
               step={5000}
               formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
               parser={(value) => (value ? Number(value.replace(/\$\s?|(,*)/g, '')) : 0) as any}

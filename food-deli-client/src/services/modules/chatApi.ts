@@ -3,7 +3,7 @@ import type { ApiResponse } from '@/types';
 
 export interface ChatMessage {
   id: number;
-  orderId: number;
+  orderId?: number;
   senderId: number;
   shopId?: number;
   senderRole: string; // 'CUSTOMER' | 'DRIVER' | 'MERCHANT'
@@ -13,7 +13,7 @@ export interface ChatMessage {
 }
 
 export interface SendMessagePayload {
-  orderId: number;
+  orderId?: number;
   senderId?: number;
   shopId?: number;
   senderRole?: string;
@@ -89,6 +89,90 @@ export const chatApi = {
         data: newMsg,
         timestamp: new Date().toISOString(),
       };
+    }
+  },
+
+  /**
+   * Lấy lịch sử chat của một quán ăn (Chat tư vấn trước đơn)
+   * GET /api/v1/chat/shops/{shopId}
+   */
+  getShopChatHistory: async (shopId: number | string): Promise<ApiResponse<ChatMessage[]>> => {
+    try {
+      const res = await apiClient.get<ApiResponse<ChatMessage[]> | ChatMessage[]>(`/chat/shops/${shopId}`);
+      if (res && 'data' in res && Array.isArray((res as any).data)) {
+        return res as ApiResponse<ChatMessage[]>;
+      }
+      return {
+        status: 200,
+        message: 'Success',
+        data: Array.isArray(res) ? res : [],
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      return {
+        status: 200,
+        message: 'Fallback empty list',
+        data: [],
+        timestamp: new Date().toISOString(),
+      };
+    }
+  },
+
+  /**
+   * Lấy số lượng tin nhắn chưa đọc của đơn hàng
+   * GET /api/v1/chat/orders/{orderId}/unread-count?role=CUSTOMER
+   */
+  getOrderUnreadCount: async (orderId: number | string, role: string = 'CUSTOMER'): Promise<number> => {
+    try {
+      const res = await apiClient.get<ApiResponse<number>>(`/chat/orders/${orderId}/unread-count`, {
+        params: { role },
+      });
+      return Number(res?.data) || 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
+   * Đánh dấu toàn bộ tin nhắn trong đơn hàng là đã đọc
+   * PUT /api/v1/chat/orders/{orderId}/read?readerRole=CUSTOMER
+   */
+  markOrderChatAsRead: async (orderId: number | string, readerRole: string = 'CUSTOMER'): Promise<void> => {
+    try {
+      await apiClient.put(`/chat/orders/${orderId}/read`, null, {
+        params: { readerRole },
+      });
+    } catch {
+      // Non-blocking
+    }
+  },
+
+  /**
+   * Lấy số lượng tin nhắn chưa đọc của quán
+   * GET /api/v1/chat/shops/{shopId}/unread-count?role=MERCHANT
+   */
+  getShopUnreadCount: async (shopId: number | string, role: string = 'MERCHANT'): Promise<number> => {
+    try {
+      const res = await apiClient.get<ApiResponse<number>>(`/chat/shops/${shopId}/unread-count`, {
+        params: { role },
+      });
+      return Number(res?.data) || 0;
+    } catch {
+      return 0;
+    }
+  },
+
+  /**
+   * Đánh dấu toàn bộ tin nhắn trong quán là đã đọc
+   * PUT /api/v1/chat/shops/{shopId}/read?readerRole=MERCHANT
+   */
+  markShopChatAsRead: async (shopId: number | string, readerRole: string = 'MERCHANT'): Promise<void> => {
+    try {
+      await apiClient.put(`/chat/shops/${shopId}/read`, null, {
+        params: { readerRole },
+      });
+    } catch {
+      // Non-blocking
     }
   },
 };

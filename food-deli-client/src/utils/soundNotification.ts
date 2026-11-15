@@ -22,6 +22,19 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
+// Global User Interaction Listener to immediately unlock AudioContext Autoplay
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('click', unlockAudio, { once: true, passive: true });
+  window.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+  window.addEventListener('keydown', unlockAudio, { once: true, passive: true });
+}
+
 const SOUND_STORAGE_KEY = 'thunder_merchant_sound_enabled';
 
 export const soundManager = {
@@ -107,6 +120,58 @@ export const soundManager = {
       return true;
     } catch (err) {
       console.warn('Cannot play synthesized order chime:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Synthesize a gentle two-tone message chime ("Ting!") for incoming chat messages
+   * Tone 1: 587.33 Hz (D5), Tone 2: 880.00 Hz (A5)
+   */
+  playMessageChime(): boolean {
+    if (!this.isEnabled()) return false;
+
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return false;
+
+      const now = ctx.currentTime;
+
+      // --- Tone 1 (Warm initial ding) ---
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(587.33, now); // D5
+
+      gain1.gain.setValueAtTime(0.001, now);
+      gain1.gain.linearRampToValueAtTime(0.25, now + 0.02);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+
+      osc1.start(now);
+      osc1.stop(now + 0.2);
+
+      // --- Tone 2 (Crisp high finish after 80ms) ---
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(880.0, now + 0.08); // A5
+
+      gain2.gain.setValueAtTime(0.001, now + 0.08);
+      gain2.gain.linearRampToValueAtTime(0.3, now + 0.1);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+
+      osc2.start(now + 0.08);
+      osc2.stop(now + 0.4);
+
+      return true;
+    } catch (err) {
+      console.warn('Cannot play synthesized message chime:', err);
       return false;
     }
   },

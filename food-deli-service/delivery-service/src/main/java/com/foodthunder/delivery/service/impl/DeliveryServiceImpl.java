@@ -1,6 +1,7 @@
 package com.foodthunder.delivery.service.impl;
 
 import com.foodthunder.common.dto.response.ApiResponse;
+import com.foodthunder.delivery.client.NotificationClient;
 import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
 import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
@@ -42,6 +43,7 @@ public class DeliveryServiceImpl implements DeliveryService {
     private final DriverOfferRepository driverOfferRepository;
     private final DriverPenaltyRepository driverPenaltyRepository;
     private final OrderClient orderClient;
+    private final NotificationClient notificationClient;
 
     @Override
     @Transactional
@@ -201,7 +203,20 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .build();
 
         DriverLocation saved = driverLocationRepository.save(location);
-        return mapToDriverLocationResponse(saved);
+        DriverLocationResponse response = mapToDriverLocationResponse(saved);
+
+        // Realtime WebSocket broadcast to customer live tracking: /topic/orders/{orderId}/location
+        if (request.getOrderId() != null && notificationClient != null) {
+            try {
+                String topic = "/topic/orders/" + request.getOrderId() + "/location";
+                notificationClient.broadcastEvent(new NotificationClient.BroadcastRequest(topic, response));
+                log.debug("Broadcasted live driver location to topic {}", topic);
+            } catch (Exception ex) {
+                log.warn("Failed to broadcast driver location via WebSocket: {}", ex.getMessage());
+            }
+        }
+
+        return response;
     }
 
     @Override

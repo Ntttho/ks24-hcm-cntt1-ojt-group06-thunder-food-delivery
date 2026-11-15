@@ -20,7 +20,13 @@ public class OrderResponse {
     private String customerName;
     private String customerPhone;
     private Integer restaurantId;
+    private String restaurantName;
+    private String restaurantAddress;
+    private Double restaurantLat;
+    private Double restaurantLng;
     private Integer driverId;
+    private String driverName;
+    private String driverPhone;
     private Integer voucherId;
     private String receiverAddress;
     private String note;

@@ -81,6 +81,8 @@ export const API_ENDPOINTS = {
     ACCEPT: (orderId: number | string) => `/delivery/orders/${orderId}/accept`,
     UPDATE_STATUS: (orderId: number | string) => `/delivery/orders/${orderId}/status`,
     EARNINGS: '/delivery/earnings',
+    LOCATION: '/delivery/location',
+    ORDER_LOCATION: (orderId: number | string) => `/delivery/orders/${orderId}/location`,
   },
   // Review Service
   REVIEWS: {

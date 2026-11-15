@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import {
   Card,
   Rate,
@@ -24,43 +25,48 @@ import {
 } from '@ant-design/icons';
 import { reviewApi, type ReviewItemDto, type ReviewSummaryDto } from '@/services/api/reviewApi';
 import { restaurantApi } from '@/services/modules/restaurantApi';
+import { useAuth } from '@/hooks/useAuth';
 
 export const MerchantReviewPage: React.FC = () => {
+  const { user } = useAuth();
+  const outletContext = useOutletContext<{ restaurantId?: number; activeRestaurant?: any }>();
+  const restaurantId = outletContext?.restaurantId || (user as any)?.restaurantId || 1;
+
   const [reviews, setReviews] = useState<ReviewItemDto[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [summary, setSummary] = useState<ReviewSummaryDto | null>(null);
 
   // Filter states
-  const [restaurantId, setRestaurantId] = useState<number>(1);
   const [foodItems, setFoodItems] = useState<{ id: number; name: string }[]>([]);
   const [selectedFoodItemId, setSelectedFoodItemId] = useState<number | undefined>(undefined);
   const [selectedRating, setSelectedRating] = useState<number | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
 
   // Pagination states
   const [page, setPage] = useState<number>(1);
   const [pageSize] = useState<number>(10);
   const [totalElements, setTotalElements] = useState<number>(0);
 
-  // 1. Fetch initial merchant restaurant info and food items
+  // Debounce search term by 400ms
   useEffect(() => {
-    const initData = async () => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Fetch food items for the currently selected restaurant branch
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFoodItems = async () => {
       try {
-        const res = await restaurantApi.getMyRestaurants();
-        const restaurants: any[] = Array.isArray(res?.data)
-          ? res.data
-          : (res?.data as any)?.content || [];
+        const foodRes = await restaurantApi.getProductsByRestaurant(restaurantId);
+        const rawFoods: any[] = Array.isArray(foodRes?.data)
+          ? foodRes.data
+          : (foodRes?.data as any)?.content || [];
 
-        if (restaurants.length > 0) {
-          const currentRestId = Number(restaurants[0].id);
-          setRestaurantId(currentRestId);
-
-          // Fetch food items for filtering
-          const foodRes = await restaurantApi.getProductsByRestaurant(currentRestId);
-          const rawFoods: any[] = Array.isArray(foodRes?.data)
-            ? foodRes.data
-            : (foodRes?.data as any)?.content || [];
-
+        if (isMounted) {
           setFoodItems(
             rawFoods.map((f: any) => ({
               id: Number(f.id),
@@ -68,19 +74,29 @@ export const MerchantReviewPage: React.FC = () => {
             }))
           );
         }
-      } catch (err) {
-        // Fallback default restaurant ID 1
-        setRestaurantId(1);
+      } catch {
+        if (isMounted) setFoodItems([]);
       }
     };
 
-    initData();
-  }, []);
+    // Reset filters when branch changes
+    setSelectedFoodItemId(undefined);
+    setSelectedRating(undefined);
+    setSearchTerm('');
+    setDebouncedSearch('');
+    setPage(1);
 
-  // 2. Fetch reviews and summary based on filters
+    fetchFoodItems();
+    return () => {
+      isMounted = false;
+    };
+  }, [restaurantId]);
+
+  // Fetch reviews and summary based on branch and filters
   useEffect(() => {
     if (!restaurantId) return;
 
+    let isMounted = true;
     const fetchReviewsAndSummary = async () => {
       setLoading(true);
       try {
@@ -89,30 +105,38 @@ export const MerchantReviewPage: React.FC = () => {
             restaurantId,
             foodItemId: selectedFoodItemId,
             rating: selectedRating,
-            keyword: searchTerm.trim() || undefined,
+            keyword: debouncedSearch.trim() || undefined,
             page: page - 1,
             size: pageSize,
           }),
           reviewApi.getRestaurantSummary(restaurantId),
         ]);
 
-        if (revRes.status === 'fulfilled' && revRes.value?.data) {
-          setReviews(revRes.value.data.content || []);
-          setTotalElements(revRes.value.data.totalElements || 0);
-        }
+        if (isMounted) {
+          if (revRes.status === 'fulfilled' && revRes.value?.data) {
+            setReviews(revRes.value.data.content || []);
+            setTotalElements(revRes.value.data.totalElements || 0);
+          } else {
+            setReviews([]);
+            setTotalElements(0);
+          }
 
-        if (sumRes.status === 'fulfilled' && sumRes.value?.data) {
-          setSummary(sumRes.value.data);
+          if (sumRes.status === 'fulfilled' && sumRes.value?.data) {
+            setSummary(sumRes.value.data);
+          }
         }
       } catch (err) {
         console.error('Failed to load merchant reviews', err);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchReviewsAndSummary();
-  }, [restaurantId, selectedFoodItemId, selectedRating, searchTerm, page]);
+    return () => {
+      isMounted = false;
+    };
+  }, [restaurantId, selectedFoodItemId, selectedRating, debouncedSearch, page, pageSize]);
 
   return (
     <div className="space-y-6">
@@ -121,7 +145,14 @@ export const MerchantReviewPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
             <MessageOutlined className="text-orange-500" />
-            <span>Quản Lý Đánh Giá & Nhận Xét</span>
+            <span>
+              Quản Lý Đánh Giá & Nhận Xét
+              {outletContext?.activeRestaurant?.name && (
+                <span className="text-orange-600 font-extrabold text-lg ml-2">
+                  &bull; {outletContext.activeRestaurant.name}
+                </span>
+              )}
+            </span>
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             Theo dõi phản hồi chân thực từ khách hàng để không ngừng nâng cao chất lượng món ăn và dịch vụ.

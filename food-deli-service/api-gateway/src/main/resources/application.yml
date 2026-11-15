@@ -34,7 +34,7 @@ spring:
 
         # 3b. Realtime WebSocket Hub Route (STOMP for Merchant, Driver & Customer)
         - id: chat-notification-ws-route
-          uri: lb:ws://chat-notification-service
+          uri: lb://chat-notification-service
           predicates:
             - Path=/ws,/ws/**,/ws-food-deli,/ws-food-deli/**
 

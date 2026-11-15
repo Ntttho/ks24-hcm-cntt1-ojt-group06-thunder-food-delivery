@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { message, Tabs, Empty, Spin, Button } from 'antd';
+import { message, Tabs, Empty, Spin, Button, FloatButton } from 'antd';
 import {
   AppstoreOutlined,
   CommentOutlined,
   InfoCircleOutlined,
   ArrowLeftOutlined,
   ReloadOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAppSelector } from '@/hooks/useAppSelector';
@@ -18,6 +19,7 @@ import {
   RestaurantCartDrawer,
   FoodCustomizationModal,
 } from './components';
+import { OrderChatDrawer } from '@/pages/order/components/OrderChatDrawer';
 import { RestaurantReviewSection } from '../restaurant-reviews';
 import { restaurantApi } from '@/services/modules/restaurantApi';
 import { APP_ROUTES } from '@/constants';
@@ -43,6 +45,9 @@ export const RestaurantDetailPage: React.FC = () => {
   // Customization State
   const [selectedFoodForCustomization, setSelectedFoodForCustomization] = useState<FoodItem | null>(null);
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+
+  // Shop Chat Consultation State
+  const [isShopChatOpen, setIsShopChatOpen] = useState(false);
 
   /**
    * Fetch Store Detail & Menu Items from Backend
@@ -375,6 +380,26 @@ export const RestaurantDetailPage: React.FC = () => {
         totalQuantity={cartState.totalQuantity}
         totalAmount={cartState.totalAmount}
       />
+
+      {/* 5. Pre-order Consultation Chat Drawer with Restaurant */}
+      {store && (
+        <>
+          <FloatButton
+            icon={<MessageOutlined />}
+            type="primary"
+            tooltip={`Nhắn tin hỏi quán ${store.name}`}
+            style={{ right: 24, bottom: 96 }}
+            className="shadow-lg hover:scale-105 transition-transform"
+            onClick={() => setIsShopChatOpen(true)}
+          />
+          <OrderChatDrawer
+            isOpen={isShopChatOpen}
+            onClose={() => setIsShopChatOpen(false)}
+            shopId={Number(store.id)}
+            restaurantName={store.name}
+          />
+        </>
+      )}
 
       {/* 6. Food Customization Modal */}
       <FoodCustomizationModal

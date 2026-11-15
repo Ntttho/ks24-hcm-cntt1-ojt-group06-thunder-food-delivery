@@ -264,12 +264,8 @@ export const MerchantMenuPage: React.FC = () => {
 
       if (editingProduct) {
         // Update product
-        try {
-          await restaurantApi.updateProduct(editingProduct.id, payload);
-          message.success(`Đã cập nhật món "${payload.name}" thành công`);
-        } catch {
-          message.success(`Đã cập nhật thông tin món "${payload.name}"`);
-        }
+        await restaurantApi.updateProduct(editingProduct.id, payload);
+        message.success(`Đã cập nhật món "${payload.name}" thành công`);
         setProducts((prev) =>
           prev.map((item) =>
             item.id === editingProduct.id
@@ -285,16 +281,9 @@ export const MerchantMenuPage: React.FC = () => {
         );
       } else {
         // Create product
-        let createdId = Date.now();
-        try {
-          const res = await restaurantApi.createProduct(payload);
-          if (res && res.data) {
-            createdId = res.data.id;
-          }
-          message.success(`Thêm món mới "${payload.name}" thành công`);
-        } catch {
-          message.success(`Đã tạo món mới "${payload.name}"`);
-        }
+        const res = await restaurantApi.createProduct(payload);
+        const createdId = res?.data?.id || Date.now();
+        message.success(`Thêm món mới "${payload.name}" thành công`);
 
         const newProduct: ProductItem = {
           id: createdId,
@@ -312,12 +301,22 @@ export const MerchantMenuPage: React.FC = () => {
             'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
         };
         setProducts((prev) => [newProduct, ...prev]);
+        setTotalElements((prev) => prev + 1);
       }
 
       setIsModalOpen(false);
       setEditingProduct(null);
-    } catch {
-      // Form validation failed
+    } catch (err: any) {
+      if (err?.errorFields) {
+        // Antd form validation error, do not toast
+        return;
+      }
+      const errorMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        'Có lỗi xảy ra khi lưu món ăn!';
+      message.error(errorMsg);
     } finally {
       setSubmitting(false);
     }

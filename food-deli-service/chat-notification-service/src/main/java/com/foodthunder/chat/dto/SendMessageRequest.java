@@ -11,7 +11,6 @@ import lombok.*;
 @Builder
 public class SendMessageRequest {
 
-    @NotNull(message = "Mã đơn hàng không được để trống")
     private Long orderId;
 
     private Long senderId;
