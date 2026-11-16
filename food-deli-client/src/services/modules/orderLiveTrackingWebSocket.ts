@@ -196,6 +196,10 @@ class OrderLiveTrackingWebSocketService {
     const orderSub = `SUBSCRIBE\nid:sub-order-${this.currentOrderId}\ndestination:/topic/orders/${this.currentOrderId}\n\n\0`;
     this.socket.send(orderSub);
 
+    // Kênh chung /topic/orders để bắt sự kiện broadcast toàn cục (OrderStatusUpdatedEvent)
+    const ordersGlobalSub = `SUBSCRIBE\nid:sub-orders-all\ndestination:/topic/orders\n\n\0`;
+    this.socket.send(ordersGlobalSub);
+
     // 2. [TASK 3] Đăng ký kênh chat trao đổi của đơn hàng: /topic/chat/{orderId}
     // Khi Khách/Quán/Tài xế nhắn tin, server sẽ bắn vào kênh này
     const chatSub = `SUBSCRIBE\nid:sub-chat-${this.currentOrderId}\ndestination:/topic/chat/${this.currentOrderId}\n\n\0`;
@@ -238,10 +242,21 @@ class OrderLiveTrackingWebSocketService {
   // --------------------------------------------------------------------------
 
   // Phát cho các component đang theo dõi đơn hàng (TASK 2)
-  private notifyOrderListeners(data: Partial<CustomerOrder>) {
+  private notifyOrderListeners(data: any) {
+    if (!data) return;
+
+    // Chuẩn hóa payload từ backend (hỗ trợ cả wrapper data, order, event payload)
+    const normalizedData = data.data || data.order || data.payload || data;
+    
+    // Nếu tin nhắn có orderId hoặc id, chỉ notify nếu trùng khớp với đơn hàng đang theo dõi (hoặc không có id)
+    const incomingOrderId = normalizedData.orderId || normalizedData.id;
+    if (incomingOrderId && this.currentOrderId && String(incomingOrderId) !== String(this.currentOrderId)) {
+      return;
+    }
+
     this.orderListeners.forEach((fn) => {
       try {
-        fn(data); // Gọi callback truyền dữ liệu mới vào React State
+        fn(normalizedData); // Gọi callback truyền dữ liệu mới vào React State
       } catch (err) {
         console.error('Error in order listener:', err);
       }

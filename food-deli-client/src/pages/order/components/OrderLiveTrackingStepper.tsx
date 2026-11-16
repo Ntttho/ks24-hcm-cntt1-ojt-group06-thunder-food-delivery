@@ -7,6 +7,7 @@ interface OrderLiveTrackingStepperProps {
   statusText: string;
   isError: boolean;
   statusCode?: string;
+  animationKey?: number;
 }
 
 export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> = ({
@@ -14,21 +15,34 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
   statusText,
   isError,
   statusCode,
+  animationKey = 0,
 }) => {
   const isCompleted = statusCode === 'DELIVERED' || statusCode === 'COMPLETED';
 
   return (
     <div className="py-2">
-      <div className="bg-orange-50/70 border border-orange-100 rounded-2xl p-4 mb-6 flex items-center justify-between">
+      <div
+        key={`status-banner-${animationKey}`}
+        className="bg-orange-50/70 border border-orange-100 rounded-2xl p-4 mb-6 flex items-center justify-between transition-all duration-500 hover:shadow-xs"
+      >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs relative">
             <ClockCircleOutlined />
+            {!isCompleted && !isError && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
+              </span>
+            )}
           </div>
           <div>
-            <div className="text-xs font-bold text-orange-800 uppercase tracking-wider">
-              Trạng thái thời gian thực
+            <div className="text-xs font-bold text-orange-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>Trạng thái thời gian thực</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-ping"></span>
             </div>
-            <div className="font-bold text-gray-900 text-base">{statusText}</div>
+            <div className="font-bold text-gray-900 text-base transition-all duration-300">
+              {statusText}
+            </div>
           </div>
         </div>
         {!isError && !isCompleted && statusCode !== 'AWAITING_PAYMENT' && (
@@ -41,10 +55,11 @@ export const OrderLiveTrackingStepper: React.FC<OrderLiveTrackingStepperProps> =
 
       {/* Live Stepper 5 bước tự động nhảy trạng thái */}
       <Steps
+        key={`stepper-${animationKey}`}
         current={current}
         status={isError ? 'error' : undefined}
         responsive
-        className="font-medium"
+        className="font-medium transition-all duration-500"
         items={[
           {
             title: 'Chờ nhận',

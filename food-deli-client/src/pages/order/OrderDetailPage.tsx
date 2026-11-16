@@ -103,6 +103,7 @@ export const OrderDetailPage: React.FC = () => {
   const [restaurantReviewed, setRestaurantReviewed] = useState<boolean>(false);
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
+  const [statusAnimationKey, setStatusAnimationKey] = useState<number>(0);
 
   // 1. Initial Order Fetch
   useEffect(() => {
@@ -240,15 +241,37 @@ export const OrderDetailPage: React.FC = () => {
     const unsubscribe = orderLiveTrackingWs.subscribeOrderUpdates((updated: any) => {
       setOrder((prev) => {
         if (!prev) return prev;
-        const rawCode = updated.statusCode || updated.status || updated.code;
+        const rawCode =
+          updated.statusCode ||
+          updated.status ||
+          updated.code ||
+          updated.newStatus ||
+          updated.targetStatus;
         const newStatusCode = (rawCode ? String(rawCode) : prev.statusCode).toUpperCase();
-        const newStatusLabel = ORDER_STATUS_LABELS[newStatusCode] || updated.statusLabel || prev.statusLabel;
+        const newStatusLabel =
+          ORDER_STATUS_LABELS[newStatusCode] || updated.statusLabel || prev.statusLabel;
 
-        message.info({
-          content: `Cập nhật trạng thái đơn: ${newStatusLabel}`,
+        // Kích hoạt hiệu ứng animation cho badge & stepper
+        setStatusAnimationKey((k) => k + 1);
+
+        message.success({
+          content: `⚡ Tiến trình đơn hàng vừa cập nhật: ${newStatusLabel}`,
           key: 'order-status-update',
-          duration: 3,
+          duration: 4,
         });
+
+        // Tự động kiểm tra / mở khóa quyền đánh giá khi đơn chuyển sang COMPLETED / DELIVERED
+        if (['DELIVERED', 'COMPLETED'].includes(newStatusCode)) {
+          reviewApi
+            .getOrderReviewStatus(prev.id)
+            .then((reviewRes) => {
+              if (reviewRes?.data) {
+                if (reviewRes.data.isRestaurantReviewed) setRestaurantReviewed(true);
+                if (reviewRes.data.isDriverReviewed) setDriverReviewed(true);
+              }
+            })
+            .catch(() => {});
+        }
 
         return {
           ...prev,
@@ -422,13 +445,32 @@ export const OrderDetailPage: React.FC = () => {
             )}
 
             {isError ? (
-              <Tag color="error" className="text-sm py-1 px-3 font-bold rounded-lg">
+              <Tag
+                key={`badge-${statusAnimationKey}`}
+                color="error"
+                className="text-sm py-1.5 px-3.5 font-bold rounded-xl shadow-xs transition-all duration-500 scale-100 hover:scale-105"
+              >
                 {order.statusLabel}
               </Tag>
-            ) : (
-              <Tag color="green" className="text-sm py-1 px-3 font-bold rounded-lg animate-pulse">
-                {order.statusLabel || 'Đang giao hàng'}
+            ) : isCompleted ? (
+              <Tag
+                key={`badge-${statusAnimationKey}`}
+                color="success"
+                className="text-sm py-1.5 px-3.5 font-bold rounded-xl shadow-xs transition-all duration-500 animate-bounce"
+              >
+                🎉 {order.statusLabel || 'Giao thành công'}
               </Tag>
+            ) : (
+              <div
+                key={`badge-${statusAnimationKey}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-800 border border-emerald-300 shadow-xs transition-all duration-500"
+              >
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span>{order.statusLabel || 'Đang giao hàng'}</span>
+              </div>
             )}
           </div>
         </div>
@@ -439,6 +481,7 @@ export const OrderDetailPage: React.FC = () => {
           statusText={statusText}
           isError={isError}
           statusCode={order.statusCode}
+          animationKey={statusAnimationKey}
         />
 
         {/* Live Interactive Map Route with Simulation */}

@@ -7,6 +7,7 @@ import { restaurantApi } from '@/services/modules/restaurantApi';
 import { CustomerOrderCard, OrderFilterBar } from './components';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
+import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 
 const { Title, Text } = Typography;
 
@@ -139,6 +140,42 @@ export const OrdersPage: React.FC = () => {
   useEffect(() => {
     fetchMyOrders();
   }, [fetchMyOrders]);
+
+  // Lắng nghe cập nhật trạng thái thời gian thực cho danh sách đơn hàng
+  useEffect(() => {
+    orderLiveTrackingWs.connect('all');
+
+    const unsubscribe = orderLiveTrackingWs.subscribeOrderUpdates((updatedOrder: any) => {
+      const targetId = updatedOrder.id || updatedOrder.orderId;
+      if (!targetId) return;
+
+      const rawCode =
+        updatedOrder.statusCode ||
+        updatedOrder.status ||
+        updatedOrder.code ||
+        updatedOrder.newStatus ||
+        updatedOrder.targetStatus;
+      const newStatusCode = rawCode ? String(rawCode).toUpperCase() : undefined;
+
+      setOrders((prev) =>
+        prev.map((o) => {
+          if (o.id === targetId || String(o.id) === String(targetId)) {
+            return {
+              ...o,
+              ...updatedOrder,
+              statusCode: newStatusCode || o.statusCode,
+              statusLabel: updatedOrder.statusLabel || o.statusLabel,
+            };
+          }
+          return o;
+        })
+      );
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // Tab Filtering & Search by Restaurant Name / Order Code / Dish Name
   const filteredOrders = useMemo(() => {
