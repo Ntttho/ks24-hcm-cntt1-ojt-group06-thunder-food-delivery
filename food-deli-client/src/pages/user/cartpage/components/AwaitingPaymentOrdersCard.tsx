@@ -36,7 +36,7 @@ export const AwaitingPaymentOrdersCard: React.FC<AwaitingPaymentOrdersCardProps>
       const res = await paymentApi.generateSepayQr({
         orderId: order.id,
         amount: Number(order.totalAmount || 0),
-        orderInfo: `FOODDELI ORD${order.id}`,
+        orderInfo: `FDL${order.id < 100 ? String(order.id).padStart(3, '0') : order.id}`,
       });
       setSepayQrData(res.data);
     } catch {
