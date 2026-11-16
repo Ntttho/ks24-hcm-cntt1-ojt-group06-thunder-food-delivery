@@ -105,11 +105,18 @@ export const API_ENDPOINTS = {
     ORDER_STATUS: (orderId: number | string) => `/payments/orders/${orderId}/status`,
     COD: '/payments/cod',
   },
+  // Banner & Marketing
+  BANNERS: {
+    LIST: '/banners',
+    ACTIVE: '/banners/active',
+    DETAIL: (id: number | string) => `/banners/${id}`,
+  },
   // Admin Portal & Approvals (SP3-ADM-02, SP3-ADM-03 & SP3-ADM-05)
   ADMIN: {
     ANALYTICS_SUMMARY: '/admin/analytics/summary',
     SYSTEM_SETTINGS: '/admin/system-settings',
     SETTINGS: '/admin/settings',
+    BANNERS: '/admin/banners',
     CHANGE_REQUESTS: '/restaurants/change-requests',
     CHANGE_REQUEST_DETAIL: (id: number | string) => `/restaurants/change-requests/${id}`,
     APPROVE_CHANGE_REQUEST: (id: number | string) => `/restaurants/change-requests/${id}/approve`,

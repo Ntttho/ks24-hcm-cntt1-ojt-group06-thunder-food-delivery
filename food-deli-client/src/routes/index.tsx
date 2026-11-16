@@ -24,6 +24,7 @@ import {
   AdminUserPage,
   AdminApprovalPage,
   AdminAnalyticsPage,
+  AdminBannerPage,
   AdminSystemSettingsPage,
   ShipperHubPage,
   ShipperHistoryPage,
@@ -150,6 +151,10 @@ export const router = createBrowserRouter([
       {
         path: 'analytics',
         element: <AdminAnalyticsPage />,
+      },
+      {
+        path: 'banners',
+        element: <AdminBannerPage />,
       },
       {
         path: 'users',

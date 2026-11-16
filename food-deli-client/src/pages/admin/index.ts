@@ -4,4 +4,5 @@ export * from './AdminAnalyticsPage';
 export * from './AdminSystemSettingsPage';
 export * from './AdminReviewManagementPage';
 export * from './AdminSettingsPage';
+export * from './AdminBannerPage';
 export * from './components';
