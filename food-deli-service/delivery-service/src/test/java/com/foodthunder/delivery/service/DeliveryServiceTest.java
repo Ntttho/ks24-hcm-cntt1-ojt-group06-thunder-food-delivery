@@ -1,6 +1,7 @@
 package com.foodthunder.delivery.service;
 
 import com.foodthunder.common.dto.response.ApiResponse;
+import com.foodthunder.delivery.client.NotificationClient;
 import com.foodthunder.delivery.client.OrderClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
 import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
@@ -58,6 +59,9 @@ class DeliveryServiceTest {
 
     @Mock
     private OrderClient orderClient;
+
+    @Mock
+    private NotificationClient notificationClient;
 
     @InjectMocks
     private DeliveryServiceImpl deliveryService;

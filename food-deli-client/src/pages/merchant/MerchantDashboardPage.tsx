@@ -15,6 +15,7 @@ import {
 import { SearchOutlined } from '@ant-design/icons';
 import { orderApi, type MerchantOrder } from '@/services/modules/orderApi';
 import { merchantWebSocket } from '@/services/modules/merchantWebSocket';
+import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { soundManager } from '@/utils/soundNotification';
 import { formatCurrency } from '@/utils/formatters';
 import { useAuth } from '@/hooks/useAuth';
@@ -163,23 +164,9 @@ export const MerchantDashboardPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchText, pageSize, activeTab]);
 
-  // Switch tab handler with activity toast notification
+  // Switch tab handler
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    const tabLabels: Record<string, string> = {
-      ALL: 'Tất cả đơn hàng',
-      PENDING: 'Đơn mới chờ nhận',
-      CONFIRMED: 'Đang nấu chuẩn bị',
-      DELIVERING: 'Đang giao hàng',
-      COMPLETED: 'Đã hoàn thành',
-      CANCELLED: 'Đã hủy',
-    };
-    notification.info({
-      message: `Đang xem: ${tabLabels[newTab] || newTab}`,
-      description: `Đã lọc danh sách theo trạng thái ${tabLabels[newTab] || newTab}.`,
-      duration: 1.5,
-      placement: 'bottomRight',
-    });
     setPage(0);
     fetchOrders(false, 0, pageSize, searchText, newTab);
   };
@@ -264,7 +251,34 @@ export const MerchantDashboardPage: React.FC = () => {
       handleTabChange('PENDING');
     });
 
-    // 4. Fallback Polling (Every 15s) for Double Safety
+    // 4. Connect Live Tracking WebSocket for realtime Shop Chat notifications
+    const unsubShop = orderLiveTrackingWs.subscribeShop(currentRestaurantId);
+    const unsubChat = orderLiveTrackingWs.subscribeShopChatMessages((incomingMsg) => {
+      if (incomingMsg.senderRole !== 'MERCHANT') {
+        soundManager.playMessageChime();
+        const roleLabel = incomingMsg.senderRole === 'CUSTOMER' ? 'Khách hàng' : 'Tài xế';
+        notification.info({
+          message: `💬 Tin nhắn mới từ ${roleLabel}`,
+          description: incomingMsg.message,
+          placement: 'topRight',
+          duration: 4,
+          btn: incomingMsg.orderId ? (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                const target = orders.find((o) => o.id === incomingMsg.orderId);
+                if (target) setChatOrder(target);
+              }}
+            >
+              Trả lời
+            </Button>
+          ) : undefined,
+        });
+      }
+    });
+
+    // 5. Fallback Polling (Every 15s) for Double Safety
     const pollInterval = setInterval(() => {
       const p = currentParamsRef.current;
       fetchOrders(true, p.page, p.pageSize, p.searchText, p.activeTab);
@@ -274,6 +288,8 @@ export const MerchantDashboardPage: React.FC = () => {
     return () => {
       unsubStatus();
       unsubOrder();
+      unsubShop();
+      unsubChat();
       clearInterval(pollInterval);
       merchantWebSocket.disconnect();
     };
@@ -583,6 +599,7 @@ export const MerchantDashboardPage: React.FC = () => {
           onClose={() => setChatOrder(null)}
           orderId={chatOrder.id}
           orderCode={chatOrder.orderCode}
+          shopId={chatOrder.restaurantId || currentRestaurantId}
           driverName={chatOrder.driverName || (chatOrder.driverId ? `Tài xế #${chatOrder.driverId}` : undefined)}
           driverPhone={chatOrder.driverPhone}
           restaurantName={outletContext?.activeRestaurant?.name}

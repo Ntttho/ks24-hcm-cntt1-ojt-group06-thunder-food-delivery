@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Button, Input, Tag, Spin } from 'antd';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Button, Input, Tag, Spin, Badge, notification } from 'antd';
 import {
   MessageOutlined,
   CloseOutlined,
@@ -15,6 +16,7 @@ import { chatApi, type ChatMessage } from '@/services/modules/chatApi';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { useAuth } from '@/hooks/useAuth';
 import { formatDate } from '@/utils/formatters';
+import { soundManager } from '@/utils/soundNotification';
 
 const QUICK_REPLIES = [
   'Đơn hàng của tôi đã chuẩn bị xong chưa ạ?',
@@ -25,10 +27,12 @@ const QUICK_REPLIES = [
 
 export const ShopeeStyleChatDrawer: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [recentOrders, setRecentOrders] = useState<CustomerOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState<boolean>(false);
   const [selectedOrder, setSelectedOrder] = useState<CustomerOrder | null>(null);
+  const [totalUnreadCount, setTotalUnreadCount] = useState<number>(0);
 
   // Chat message state for active room
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -37,28 +41,96 @@ export const ShopeeStyleChatDrawer: React.FC = () => {
   const [sending, setSending] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch recent orders for conversation list
+  // Hide the floating pill on order detail page to avoid overlapping the order's own float button
+  const isOrderDetailPage = location.pathname.startsWith('/orders/');
+
+  // 1. Fetch recent orders when authenticated and subscribe active orders to WebSocket
+  const fetchRecentOrders = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await orderApi.getMyOrders({ page: 0, size: 10 });
+      if (res && res.data && Array.isArray(res.data.content)) {
+        const orders = res.data.content;
+        setRecentOrders(orders);
+
+        // Auto subscribe all active orders to WebSocket for global real-time notifications
+        orders
+          .filter((o: CustomerOrder) => o.statusCode !== 'COMPLETED' && o.statusCode !== 'CANCELLED')
+          .forEach((o: CustomerOrder) => {
+            orderLiveTrackingWs.subscribeOrder(o.id);
+          });
+      }
+    } catch {
+      // ignore
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
-    if (!isAuthenticated || !isOpen) return;
+    fetchRecentOrders();
+  }, [fetchRecentOrders, user?.id]);
 
-    setLoadingOrders(true);
-    orderApi
-      .getMyOrders({ page: 0, size: 10 })
-      .then((res) => {
-        if (res && res.data && Array.isArray(res.data.content)) {
-          setRecentOrders(res.data.content);
+  // 2. Global Chat Listener: Realtime Notifications across all active customer orders
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
+      // If message is from Merchant or Driver
+      if (newMsg.senderRole !== 'CUSTOMER') {
+        soundManager.playMessageChime();
+        setTotalUnreadCount((prev) => prev + 1);
+
+        // Show popup toast if chat drawer is closed or user is viewing another order
+        if (!isOpen || selectedOrder?.id !== newMsg.orderId) {
+          const senderLabel = newMsg.senderRole === 'DRIVER' ? '🛵 Tài xế' : '🏪 Quán ăn';
+          notification.info({
+            message: `💬 Tin nhắn từ ${senderLabel}`,
+            description: newMsg.message,
+            placement: 'bottomRight',
+            duration: 4.5,
+            btn: newMsg.orderId ? (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => {
+                  const target = recentOrders.find((o) => o.id === newMsg.orderId);
+                  if (target) {
+                    setSelectedOrder(target);
+                    setIsOpen(true);
+                  }
+                }}
+              >
+                Mở chat
+              </Button>
+            ) : undefined,
+          });
         }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingOrders(false));
-  }, [isAuthenticated, isOpen, user?.id]);
+      }
 
-  // Connect to STOMP WebSocket for selected order
+      // If active chat room matches this message, append it safely
+      if (selectedOrder && Number(selectedOrder.id) === Number(newMsg.orderId)) {
+        setMessages((prev) => {
+          if (newMsg.id && prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [isAuthenticated, isOpen, selectedOrder, recentOrders]);
+
+  // 3. Connect & load messages when a specific order room is selected
   useEffect(() => {
     if (!selectedOrder) return;
 
     const orderId = selectedOrder.id;
     setLoadingMessages(true);
+    setTotalUnreadCount(0);
+
+    // Mark as read immediately on open
+    chatApi.markOrderChatAsRead(orderId, 'CUSTOMER');
+    orderLiveTrackingWs.sendMarkReadViaWs(orderId, undefined, 'CUSTOMER');
 
     chatApi
       .getOrderChatHistory(orderId)
@@ -70,17 +142,10 @@ export const ShopeeStyleChatDrawer: React.FC = () => {
       .catch(() => setMessages([]))
       .finally(() => setLoadingMessages(false));
 
-    orderLiveTrackingWs.connect(orderId);
-
-    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === newMsg.id)) return prev;
-        return [...prev, newMsg];
-      });
-    });
+    const unsubOrder = orderLiveTrackingWs.subscribeOrder(orderId);
 
     return () => {
-      unsubscribe();
+      unsubOrder();
     };
   }, [selectedOrder]);
 
@@ -97,34 +162,34 @@ export const ShopeeStyleChatDrawer: React.FC = () => {
     setSending(true);
     const userRole = (user as any)?.role || 'CUSTOMER';
 
-    const localMsg: ChatMessage = {
-      id: Date.now(),
-      orderId: Number(selectedOrder.id),
-      senderId: user?.id ? Number(user.id) : 1,
-      senderRole: userRole,
-      message: text,
-      createdAt: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, localMsg]);
     if (!textToSend) setInputText('');
 
     try {
-      await chatApi.sendMessage({
+      const res = await chatApi.sendMessage({
         orderId: Number(selectedOrder.id),
+        shopId: Number(selectedOrder.restaurantId) || undefined,
         senderId: user?.id ? Number(user.id) : 1,
         senderRole: userRole,
         message: text,
       });
 
-      orderLiveTrackingWs.sendChatMessageViaWs({
+      if (res && res.data) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === res.data.id)) return prev;
+          return [...prev, res.data];
+        });
+      }
+    } catch {
+      // Local fallback on error
+      const localMsg: ChatMessage = {
+        id: Date.now(),
         orderId: Number(selectedOrder.id),
         senderId: user?.id ? Number(user.id) : 1,
         senderRole: userRole,
         message: text,
-      });
-    } catch {
-      // Local fallback already in state
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, localMsg]);
     } finally {
       setSending(false);
     }
@@ -132,20 +197,26 @@ export const ShopeeStyleChatDrawer: React.FC = () => {
 
   return (
     <>
-      {/* Floating Shopee-Style Chat Trigger Pill */}
-      {!isOpen && (
+      {/* Floating Shopee-Style Chat Trigger Pill (hidden on order detail to prevent overlap) */}
+      {!isOpen && !isOrderDetailPage && (
         <div className="fixed bottom-6 right-6 z-40">
-          <button
-            onClick={() => setIsOpen(true)}
-            className="flex items-center gap-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold px-5 py-3 rounded-full shadow-xl hover:shadow-2xl active:scale-95 transition-all cursor-pointer border-2 border-white/80"
-          >
-            <div className="relative">
-              <MessageOutlined className="text-xl" />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-ping"></span>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full"></span>
-            </div>
-            <span className="text-sm">Chat Đơn Hàng</span>
-          </button>
+          <Badge count={totalUnreadCount} overflowCount={9} offset={[-4, 4]}>
+            <button
+              onClick={() => {
+                setIsOpen(true);
+                setTotalUnreadCount(0);
+              }}
+              className="flex items-center gap-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold px-5 py-3 rounded-full shadow-xl hover:shadow-2xl active:scale-95 transition-all cursor-pointer border-2 border-white/80"
+            >
+              <div className="relative">
+                <MessageOutlined className="text-xl" />
+                {totalUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-400 rounded-full animate-ping"></span>
+                )}
+              </div>
+              <span className="text-sm">Chat Đơn Hàng</span>
+            </button>
+          </Badge>
         </div>
       )}
 

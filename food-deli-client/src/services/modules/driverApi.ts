@@ -896,4 +896,20 @@ export const driverApi = {
     const dashboard = await driverApi.getHistoryDashboard(params);
     return dashboard.trips;
   },
+
+  // 9. Cập nhật vị trí GPS tài xế thời gian thực
+  updateLocation: async (data: {
+    latitude: number;
+    longitude: number;
+    heading?: number;
+    speedKmh?: number;
+    orderId?: number;
+  }): Promise<ApiResponse<any>> => {
+    return apiClient.post(API_ENDPOINTS.DELIVERY.LOCATION, data);
+  },
+
+  // 10. Tra cứu vị trí GPS hiện tại của tài xế đang giao đơn
+  getOrderDriverLocation: async (orderId: number | string): Promise<ApiResponse<any>> => {
+    return apiClient.get(API_ENDPOINTS.DELIVERY.ORDER_LOCATION(orderId));
+  },
 };

@@ -112,6 +112,20 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
               <EnvironmentOutlined className="mt-0.5 text-orange-500 flex-shrink-0" />
               <span className="line-clamp-2">{order.receiverAddress}</span>
             </div>
+            {(Boolean(order.distanceKm) || Boolean(order.driverName)) && (
+              <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 pt-0.5">
+                {Boolean(order.distanceKm) && (
+                  <Tag color="cyan" className="rounded-md m-0 text-[10px]">
+                    📍 Cách quán: {order.distanceKm} km
+                  </Tag>
+                )}
+                {Boolean(order.driverName) && (
+                  <Tag color="green" className="rounded-md m-0 text-[10px]">
+                    🛵 Shipper: {order.driverName}
+                  </Tag>
+                )}
+              </div>
+            )}
           </div>
         </Col>
 

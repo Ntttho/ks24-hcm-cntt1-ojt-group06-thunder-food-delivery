@@ -7,8 +7,9 @@ import {
   Typography,
   Tooltip,
   FloatButton,
-  message,
+  Badge,
   notification,
+  message,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -24,6 +25,8 @@ import {
 } from '@ant-design/icons';
 import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
+import { chatApi } from '@/services/modules/chatApi';
+import { soundManager } from '@/utils/soundNotification';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
@@ -105,6 +108,8 @@ export const OrderDetailPage: React.FC = () => {
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [statusAnimationKey, setStatusAnimationKey] = useState<number>(0);
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
+  const [driverLiveCoords, setDriverLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // 1. Initial Order Fetch
   useEffect(() => {
@@ -124,10 +129,15 @@ export const OrderDetailPage: React.FC = () => {
             customerPhone: data.customerPhone || '0987654321',
             restaurantId: Number(data.restaurantId || 1),
             restaurantName: data.restaurantName || `Nhà hàng #${data.restaurantId}`,
+            restaurantAddress: data.restaurantAddress || data.restaurantName,
+            restaurantLat: data.restaurantLat ? Number(data.restaurantLat) : 10.7769,
+            restaurantLng: data.restaurantLng ? Number(data.restaurantLng) : 106.7009,
             driverId: data.driverId ? Number(data.driverId) : undefined,
             driverName: data.driverName || (data.driverId ? 'Nguyễn Tuấn Tài (Tài xế Thunder)' : undefined),
             driverPhone: data.driverPhone || (data.driverId ? '0912345678' : undefined),
             receiverAddress: data.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
+            receiverLat: data.receiverLat ? Number(data.receiverLat) : 10.7925,
+            receiverLng: data.receiverLng ? Number(data.receiverLng) : 106.7214,
             note: (data as any).note || '',
             distanceKm: Number(data.distanceKm || 2.1),
             subtotalAmount: Number(data.subtotalAmount || 0),
@@ -154,6 +164,11 @@ export const OrderDetailPage: React.FC = () => {
             })),
           };
           setOrder(mappedOrder);
+
+          // Check unread chat count
+          chatApi.getOrderUnreadCount(mappedOrder.id, 'CUSTOMER').then((count) => {
+            setUnreadChatCount(count);
+          }).catch(() => {});
 
           // Check review status
           if (['DELIVERED', 'COMPLETED'].includes(statusCode)) {
@@ -307,8 +322,39 @@ export const OrderDetailPage: React.FC = () => {
       });
     });
 
+    // Realtime GPS updates for moving driver bike
+    const unsubLocation = orderLiveTrackingWs.subscribeDriverLocation((loc) => {
+      if (loc && loc.latitude && loc.longitude) {
+        setDriverLiveCoords({ lat: loc.latitude, lng: loc.longitude });
+      }
+    });
+
+    // Realtime Chat messages listener (Sound + Badge + Notification when closed)
+    const unsubChat = orderLiveTrackingWs.subscribeChatMessages((incoming) => {
+      if (Number(incoming.orderId) === Number(id)) {
+        if (incoming.senderRole !== 'CUSTOMER') {
+          soundManager.playMessageChime();
+          setUnreadChatCount((prev) => prev + 1);
+          notification.info({
+            message: incoming.senderRole === 'DRIVER' 
+              ? 'Tin nhắn từ Tài xế'
+              : 'Tin nhắn từ Quán ăn',
+            description: incoming.message,
+            placement: 'bottomRight',
+            duration: 4.5,
+            onClick: () => {
+              setIsChatOpen(true);
+              setUnreadChatCount(0);
+            },
+          });
+        }
+      }
+    });
+
     return () => {
       unsubscribe();
+      unsubLocation();
+      unsubChat();
       orderLiveTrackingWs.disconnect();
     };
   }, [id]);
@@ -561,16 +607,17 @@ export const OrderDetailPage: React.FC = () => {
           </div>
         )}
 
-        {/* Live Interactive Map Route with Simulation */}
+        {/* Live Interactive Map Route with Simulation & Realtime GPS */}
         <GoogleMapRouteView
           restaurantName={order.restaurantName}
-          restaurantAddress={order.restaurantName}
-          restaurantLat={10.7769}
-          restaurantLng={106.7009}
+          restaurantAddress={order.restaurantAddress || order.restaurantName}
+          restaurantLat={order.restaurantLat || 10.7769}
+          restaurantLng={order.restaurantLng || 106.7009}
           customerName={order.customerName}
           customerAddress={order.receiverAddress}
           customerLat={order.receiverLat || 10.7925}
           customerLng={order.receiverLng || 106.7214}
+          driverLiveCoords={driverLiveCoords}
           isDelivering={order.statusCode === 'DELIVERING' || order.statusCode === 'DRIVER_ACCEPTED'}
           orderCode={order.orderCode}
         />
@@ -621,13 +668,20 @@ export const OrderDetailPage: React.FC = () => {
       </div>
 
       {/* Floating Action Button for Realtime Chat */}
-      <FloatButton
-        icon={<MessageOutlined />}
-        type="primary"
-        tooltip="Nhắn tin với tài xế"
-        style={{ right: 24, bottom: 24 }}
-        onClick={() => setIsChatOpen(true)}
-      />
+      <div className="fixed right-6 bottom-6 z-40">
+        <Badge count={unreadChatCount} overflowCount={9} offset={[-6, 6]}>
+          <FloatButton
+            icon={<MessageOutlined />}
+            type="primary"
+            tooltip={unreadChatCount > 0 ? `${unreadChatCount} tin nhắn mới chưa đọc` : "Nhắn tin trao đổi đơn hàng"}
+            style={{ position: 'relative', right: 0, bottom: 0 }}
+            onClick={() => {
+              setIsChatOpen(true);
+              setUnreadChatCount(0);
+            }}
+          />
+        </Badge>
+      </div>
 
       {/* Real-time Customer-Driver Chat Drawer with Quick Replies */}
       {order && (
@@ -636,6 +690,7 @@ export const OrderDetailPage: React.FC = () => {
           onClose={() => setIsChatOpen(false)}
           orderId={order.id}
           orderCode={order.orderCode}
+          shopId={order.restaurantId}
           driverName={order.driverName}
           driverPhone={order.driverPhone}
           restaurantName={order.restaurantName}

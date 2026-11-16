@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { message, Modal, Tag, Input, Dropdown, type MenuProps } from 'antd';
+import { message, Modal, Tag, Input, Dropdown, notification, type MenuProps } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
@@ -34,7 +34,31 @@ import {
   DriverWalletSummary,
   DriverReviewSummary,
 } from '@/services/modules/driverApi';
+import { driverWebSocket } from '@/services/modules/driverWebSocket';
+import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
+import { soundManager } from '@/utils/soundNotification';
 import { APP_ROUTES } from '@/constants';
+
+const playNewOrderChime = () => {
+  try {
+    const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtxClass) return;
+    const audioCtx = new AudioCtxClass();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.15); // A5
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+  } catch {
+    // AudioContext blocked before gesture
+  }
+};
 
 const formatTimeOnly = (iso?: string): string => {
   if (!iso) return '';
@@ -194,6 +218,10 @@ export const ShipperHubPage: React.FC = () => {
   // Completed trip celebration modal
   const [completedOrderSummary, setCompletedOrderSummary] = useState<DriverOrder | null>(null);
 
+  // Urgent Realtime New Order Alert Modal (Chuẩn testing_realtime_flow)
+  const [urgentOrderAlert, setUrgentOrderAlert] = useState<DriverOrder | null>(null);
+  const [alertCountdown, setAlertCountdown] = useState<number>(30);
+
   const loadWalletSummary = useCallback(async () => {
     setLoadingWallet(true);
     try {
@@ -231,6 +259,30 @@ export const ShipperHubPage: React.FC = () => {
     };
   }, [user?.id]);
 
+  // 1b. Realtime Chat Listener across all tabs for Driver's active delivery
+  useEffect(() => {
+    if (!currentOrder?.id) return;
+
+    const unsubOrder = orderLiveTrackingWs.subscribeOrder(currentOrder.id);
+    const unsubChat = orderLiveTrackingWs.subscribeChatMessages((incomingMsg) => {
+      if (incomingMsg.senderRole !== 'DRIVER' && Number(incomingMsg.orderId) === Number(currentOrder.id)) {
+        soundManager.playMessageChime();
+        const sender = incomingMsg.senderRole === 'CUSTOMER' ? 'Khách hàng' : 'Quán ăn';
+        notification.info({
+          message: `💬 Tin nhắn từ ${sender}`,
+          description: incomingMsg.message,
+          placement: 'topRight',
+          duration: 5,
+        });
+      }
+    });
+
+    return () => {
+      unsubOrder();
+      unsubChat();
+    };
+  }, [currentOrder?.id]);
+
   // 2. Hàm dò đơn chưa có người giao hàng (status = CONFIRMED, driverId = null)
   const fetchAvailableOrders = useCallback(
     async (options?: { showSpinner?: boolean; resetDismissed?: boolean }) => {
@@ -258,7 +310,7 @@ export const ShipperHubPage: React.FC = () => {
     []
   );
 
-  // 3. Tự động dò đơn hàng định kỳ mỗi 6 giây khi Online và rảnh
+  // 3. Tự động dò đơn hàng định kỳ mỗi 6 giây khi Online và rảnh (kết hợp WebSocket realtime)
   useEffect(() => {
     if (loadingInitial || !isOnline || currentOrder || activeTab !== 'deliveries') {
       return;
@@ -267,10 +319,65 @@ export const ShipperHubPage: React.FC = () => {
     fetchAvailableOrders({ showSpinner: true });
     const interval = setInterval(() => {
       fetchAvailableOrders({ showSpinner: false });
-    }, 6000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, [loadingInitial, isOnline, currentOrder, activeTab, fetchAvailableOrders]);
+
+  // 3b. Realtime Driver WebSocket Subscription (/topic/drivers/available-orders)
+  useEffect(() => {
+    if (loadingInitial || !isOnline || currentOrder || activeTab !== 'deliveries') {
+      return;
+    }
+
+    driverWebSocket.connect();
+
+    const unsubscribe = driverWebSocket.subscribeAvailableOrders((rawOrder: any) => {
+      if (!rawOrder || !rawOrder.id) return;
+      const orderId = Number(rawOrder.id);
+      if (dismissedOrderIdsRef.current.has(orderId)) return;
+
+      driverApi.getAvailableOrders().then((freshOrders) => {
+        const found = freshOrders.find((o) => Number(o.id) === orderId);
+        if (found) {
+          const dist = calculateHaversineDistance(
+            driverCoords.lat,
+            driverCoords.lng,
+            found.restaurantLat || 10.7769,
+            found.restaurantLng || 106.7009
+          );
+          if (radarRadius >= 999 || dist <= radarRadius) {
+            setAvailableOrders((prev) => {
+              if (prev.some((o) => o.id === found.id)) return prev;
+              return [found, ...prev];
+            });
+            playNewOrderChime();
+            setUrgentOrderAlert(found);
+            setAlertCountdown(30);
+          }
+        }
+      }).catch(() => {});
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [loadingInitial, isOnline, currentOrder, activeTab, driverCoords, radarRadius]);
+
+  // Đếm ngược tự động đóng thông báo đơn khẩn cấp
+  useEffect(() => {
+    if (!urgentOrderAlert) return;
+    const timer = setInterval(() => {
+      setAlertCountdown((prev) => {
+        if (prev <= 1) {
+          setUrgentOrderAlert(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [urgentOrderAlert]);
 
   // 4. Tải dữ liệu đánh giá thật khi tài xế mở tab Đánh giá
   useEffect(() => {
@@ -855,6 +962,85 @@ export const ShipperHubPage: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* Urgent New Order Alert Modal (Chuẩn testing_realtime_flow) */}
+      <Modal
+        open={!!urgentOrderAlert}
+        onCancel={() => setUrgentOrderAlert(null)}
+        footer={null}
+        centered
+        closable={false}
+        width={420}
+        styles={{ body: { padding: 0 } }}
+      >
+        {urgentOrderAlert && (
+          <div className="bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 text-white rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <span className="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+                <span>🚨 CÓ ĐƠN MỚI GẦN BẠN</span>
+              </span>
+              <span className="text-amber-300 font-black text-sm bg-black/30 px-2.5 py-1 rounded-xl">
+                ⏳ {alertCountdown}s
+              </span>
+            </div>
+
+            <h3 className="text-xl font-black text-white leading-tight mb-1">
+              #{urgentOrderAlert.orderCode}
+            </h3>
+            <p className="text-emerald-200 text-xs font-bold mb-4">
+              🏪 {urgentOrderAlert.restaurantName}
+            </p>
+
+            <div className="bg-white/10 rounded-2xl p-4 space-y-2 mb-5 backdrop-blur-sm border border-white/10 text-xs">
+              <div className="flex justify-between items-center text-slate-200">
+                <span>Khoảng cách đến quán:</span>
+                <span className="font-extrabold text-white text-sm">
+                  {calculateHaversineDistance(
+                    driverCoords.lat,
+                    driverCoords.lng,
+                    urgentOrderAlert.restaurantLat || 10.7769,
+                    urgentOrderAlert.restaurantLng || 106.7009
+                  )} km
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-slate-200">
+                <span>Khoảng cách giao hàng:</span>
+                <span className="font-extrabold text-white text-sm">{urgentOrderAlert.distanceKm} km</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-200 border-t border-white/10 pt-2">
+                <span>Thu nhập cuốc xe:</span>
+                <span className="font-black text-amber-400 text-base">
+                  +{urgentOrderAlert.shippingFee.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-300 truncate">
+                📍 Giao: {urgentOrderAlert.receiverAddress}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setUrgentOrderAlert(null)}
+                className="py-3 rounded-2xl font-bold text-xs bg-white/15 hover:bg-white/25 text-white transition-all cursor-pointer"
+              >
+                Bỏ qua
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = urgentOrderAlert;
+                  setUrgentOrderAlert(null);
+                  handleAcceptOrder(target);
+                }}
+                className="py-3 rounded-2xl font-black text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>NHẬN ĐƠN NGAY 🛵</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

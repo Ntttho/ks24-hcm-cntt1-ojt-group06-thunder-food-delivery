@@ -69,13 +69,82 @@ public class ChatController {
     }
 
     /**
+     * GET /api/v1/chat/orders/{orderId}/unread-count
+     * Lấy số tin nhắn chưa đọc của đơn hàng
+     */
+    @GetMapping("/orders/{orderId}/unread-count")
+    public ResponseEntity<ApiResponse<Long>> getOrderUnreadCount(
+            @PathVariable Long orderId,
+            @RequestParam(required = false, defaultValue = "CUSTOMER") String role
+    ) {
+        long count = chatService.getOrderUnreadCount(orderId, role);
+        return ResponseEntity.ok(ApiResponse.success("Lấy số tin nhắn chưa đọc thành công", count));
+    }
+
+    /**
+     * PUT /api/v1/chat/orders/{orderId}/read
+     * Đánh dấu toàn bộ tin nhắn trong đơn hàng là đã đọc
+     */
+    @PutMapping("/orders/{orderId}/read")
+    public ResponseEntity<ApiResponse<Void>> markOrderChatAsRead(
+            @PathVariable Long orderId,
+            @RequestParam(required = false, defaultValue = "CUSTOMER") String readerRole
+    ) {
+        chatService.markOrderChatAsRead(orderId, readerRole);
+        return ResponseEntity.ok(ApiResponse.success("Đánh dấu đã đọc thành công", null));
+    }
+
+    /**
+     * GET /api/v1/chat/shops/{shopId}/unread-count
+     * Lấy số tin nhắn chưa đọc của quán ăn
+     */
+    @GetMapping("/shops/{shopId}/unread-count")
+    public ResponseEntity<ApiResponse<Long>> getShopUnreadCount(
+            @PathVariable Long shopId,
+            @RequestParam(required = false, defaultValue = "MERCHANT") String role
+    ) {
+        long count = chatService.getShopUnreadCount(shopId, role);
+        return ResponseEntity.ok(ApiResponse.success("Lấy số tin nhắn chưa đọc của quán thành công", count));
+    }
+
+    /**
+     * PUT /api/v1/chat/shops/{shopId}/read
+     * Đánh dấu toàn bộ tin nhắn trong quán là đã đọc
+     */
+    @PutMapping("/shops/{shopId}/read")
+    public ResponseEntity<ApiResponse<Void>> markShopChatAsRead(
+            @PathVariable Long shopId,
+            @RequestParam(required = false, defaultValue = "MERCHANT") String readerRole
+    ) {
+        chatService.markShopChatAsRead(shopId, readerRole);
+        return ResponseEntity.ok(ApiResponse.success("Đánh dấu đã đọc tin quán thành công", null));
+    }
+
+    /**
      * WebSocket Message Handler: /app/chat.send
      * Nhận tin nhắn gửi trực tiếp qua giao thức STOMP
      */
     @MessageMapping({"/chat.send", "/chat.sendMessage"})
     public void sendViaSocket(@Payload SendMessageRequest request) {
-        log.info("Received WebSocket chat message via STOMP for orderId: {}", request.getOrderId());
+        log.info("Received WebSocket chat message via STOMP for orderId: {}, shopId: {}", 
+                request.getOrderId(), request.getShopId());
         chatService.sendMessage(request);
+    }
+
+    /**
+     * WebSocket Message Handler: /app/chat.markRead
+     * Nhận sự kiện đánh dấu đã đọc qua STOMP
+     */
+    @MessageMapping({"/chat.markRead", "/chat.read"})
+    public void markReadViaSocket(@Payload com.foodthunder.chat.dto.MarkReadRequest request) {
+        log.info("Received WebSocket mark-read via STOMP for orderId: {}, shopId: {}", 
+                request.getOrderId(), request.getShopId());
+        if (request.getOrderId() != null) {
+            chatService.markOrderChatAsRead(request.getOrderId(), request.getReaderRole());
+        }
+        if (request.getShopId() != null) {
+            chatService.markShopChatAsRead(request.getShopId(), request.getReaderRole());
+        }
     }
 }
 

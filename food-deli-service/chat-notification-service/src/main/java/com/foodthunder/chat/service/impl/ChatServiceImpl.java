@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -43,10 +44,17 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatMessageDto sendMessage(SendMessageRequest request) {
+        Long resolvedShopId = request.getShopId();
+        if (resolvedShopId == null && request.getOrderId() != null) {
+            resolvedShopId = chatMessageRepository.findFirstByOrderIdAndShopIdIsNotNull(request.getOrderId())
+                    .map(ChatMessage::getShopId)
+                    .orElse(null);
+        }
+
         ChatMessage message = ChatMessage.builder()
                 .orderId(request.getOrderId())
                 .senderId(request.getSenderId() != null ? request.getSenderId() : 1L)
-                .shopId(request.getShopId())
+                .shopId(resolvedShopId)
                 .senderRole(request.getSenderRole() != null ? request.getSenderRole().toUpperCase() : "CUSTOMER")
                 .message(request.getMessage())
                 .isRead(false)
@@ -57,19 +65,80 @@ public class ChatServiceImpl implements ChatService {
 
         // Realtime broadcast to 2-way STOMP topic: /topic/chat/{orderId}
         try {
-            String destination = "/topic/chat/" + request.getOrderId();
-            messagingTemplate.convertAndSend(destination, dto);
-            log.info("Broadcasted chat message {} to {}", saved.getId(), destination);
+            if (request.getOrderId() != null) {
+                String destination = "/topic/chat/" + request.getOrderId();
+                messagingTemplate.convertAndSend(destination, dto);
+                log.info("Broadcasted chat message {} to {}", saved.getId(), destination);
+            }
 
-            // Also broadcast to shop channel if shopId is provided
-            if (request.getShopId() != null) {
-                messagingTemplate.convertAndSend("/topic/shop/" + request.getShopId(), dto);
+            // Also broadcast to shop channel if shopId is resolved
+            if (resolvedShopId != null) {
+                messagingTemplate.convertAndSend("/topic/shop/" + resolvedShopId, dto);
+                log.info("Broadcasted chat message {} to shop channel /topic/shop/{}", saved.getId(), resolvedShopId);
             }
         } catch (Exception e) {
             log.warn("Failed to broadcast chat message via WebSocket: {}", e.getMessage());
         }
 
         return dto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getOrderUnreadCount(Long orderId, String readerRole) {
+        if (orderId == null) return 0;
+        String role = readerRole != null ? readerRole.toUpperCase() : "CUSTOMER";
+        return chatMessageRepository.countByOrderIdAndSenderRoleNotAndIsReadFalse(orderId, role);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getShopUnreadCount(Long shopId, String readerRole) {
+        if (shopId == null) return 0;
+        String role = readerRole != null ? readerRole.toUpperCase() : "MERCHANT";
+        return chatMessageRepository.countByShopIdAndSenderRoleNotAndIsReadFalse(shopId, role);
+    }
+
+    @Override
+    @Transactional
+    public void markOrderChatAsRead(Long orderId, String readerRole) {
+        if (orderId == null) return;
+        String role = readerRole != null ? readerRole.toUpperCase() : "CUSTOMER";
+        List<ChatMessage> unreadMessages = chatMessageRepository.findByOrderIdAndSenderRoleNotAndIsReadFalse(orderId, role);
+        if (!unreadMessages.isEmpty()) {
+            unreadMessages.forEach(m -> m.setIsRead(true));
+            chatMessageRepository.saveAll(unreadMessages);
+            log.info("Marked {} messages as read for order {}", unreadMessages.size(), orderId);
+
+            // Broadcast read event to /topic/chat/{orderId}/read
+            try {
+                messagingTemplate.convertAndSend("/topic/chat/" + orderId + "/read", 
+                        Map.of("orderId", orderId, "readerRole", role, "status", "READ"));
+            } catch (Exception e) {
+                log.warn("Failed to broadcast read event: {}", e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void markShopChatAsRead(Long shopId, String readerRole) {
+        if (shopId == null) return;
+        String role = readerRole != null ? readerRole.toUpperCase() : "MERCHANT";
+        List<ChatMessage> unreadMessages = chatMessageRepository.findByShopIdAndSenderRoleNotAndIsReadFalse(shopId, role);
+        if (!unreadMessages.isEmpty()) {
+            unreadMessages.forEach(m -> m.setIsRead(true));
+            chatMessageRepository.saveAll(unreadMessages);
+            log.info("Marked {} messages as read for shop {}", unreadMessages.size(), shopId);
+
+            // Broadcast read event to /topic/shop/{shopId}/read
+            try {
+                messagingTemplate.convertAndSend("/topic/shop/" + shopId + "/read", 
+                        Map.of("shopId", shopId, "readerRole", role, "status", "READ"));
+            } catch (Exception e) {
+                log.warn("Failed to broadcast shop read event: {}", e.getMessage());
+            }
+        }
     }
 
     @Override

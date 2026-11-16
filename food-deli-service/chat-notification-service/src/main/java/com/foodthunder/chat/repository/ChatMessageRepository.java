@@ -10,5 +10,13 @@ import java.util.List;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
     List<ChatMessage> findByOrderIdOrderByCreatedAtAsc(Long orderId);
     List<ChatMessage> findByShopIdOrderByCreatedAtAsc(Long shopId);
+
+    java.util.Optional<ChatMessage> findFirstByOrderIdAndShopIdIsNotNull(Long orderId);
+
+    long countByOrderIdAndSenderRoleNotAndIsReadFalse(Long orderId, String senderRole);
+    long countByShopIdAndSenderRoleNotAndIsReadFalse(Long shopId, String senderRole);
+
+    List<ChatMessage> findByOrderIdAndSenderRoleNotAndIsReadFalse(Long orderId, String senderRole);
+    List<ChatMessage> findByShopIdAndSenderRoleNotAndIsReadFalse(Long shopId, String senderRole);
 }
 

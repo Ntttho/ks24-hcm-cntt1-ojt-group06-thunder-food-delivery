@@ -5,6 +5,15 @@ import type { ChatMessage, SendMessagePayload } from './chatApi';
 // 1. ĐỊNH NGHĨA KIỂU HÀM LẮNG NGHE (LISTENER TYPES)
 // ============================================================================
 
+export interface DriverLiveLocationPayload {
+  driverId: number;
+  orderId: number;
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  speedKmh?: number;
+}
+
 /**
  * Hàm nhận dữ liệu cập nhật trạng thái đơn hàng (Dành cho TASK 2 - Live Tracking)
  * Ví dụ: Khi đơn hàng đổi sang 'CONFIRMED' hay 'DELIVERING', hàm này sẽ được gọi.
@@ -16,6 +25,8 @@ export type OrderLiveUpdateListener = (updatedOrder: Partial<CustomerOrder>) => 
  * Ví dụ: Khi Quán hoặc Tài xế gửi tin nhắn mới, hàm này sẽ được gọi.
  */
 export type ChatLiveMessageListener = (message: ChatMessage) => void;
+export type DriverLiveLocationListener = (location: DriverLiveLocationPayload) => void;
+export type ChatReadReceiptListener = (data: { orderId?: number; shopId?: number; readerRole?: string; status?: string }) => void;
 
 // ============================================================================
 // 2. CLASS DỊCH VỤ QUẢN LÝ WEBSOCKET (SERVICE CLASS)
@@ -24,76 +35,66 @@ export type ChatLiveMessageListener = (message: ChatMessage) => void;
 /**
  * Lớp dịch vụ quản lý toàn bộ kết nối WebSocket thời gian thực (Real-time).
  * - Sử dụng giao thức STOMP chạy trên nền WebSocket chuẩn của trình duyệt.
- * - Tự động định tuyến qua API Gateway cổng 8080.
+ * - Tự động định tuyến qua API Gateway cổng 8080 (/ws).
  * - Hỗ trợ Heartbeat (giữ kết nối sống) và Auto-Reconnect (tự kết nối lại khi rớt mạng).
  */
 class OrderLiveTrackingWebSocketService {
-  // Biến lưu đối tượng WebSocket gốc của trình duyệt
   private socket: WebSocket | null = null;
-
-  // Lưu mã ID của đơn hàng đang được xem hiện tại (ví dụ: 10, 101,...)
   private currentOrderId: number | string | null = null;
+  private subscribedOrders: Set<number | string> = new Set();
+  private subscribedShops: Set<number | string> = new Set();
+  private activeSubIds: Set<string> = new Set();
 
-  // Tập hợp (Set) chứa các hàm đang lắng nghe cập nhật đơn hàng (TASK 2)
   private orderListeners: Set<OrderLiveUpdateListener> = new Set();
-
-  // Tập hợp (Set) chứa các hàm đang lắng nghe tin nhắn chat mới (TASK 3)
   private chatListeners: Set<ChatLiveMessageListener> = new Set();
+  private shopChatListeners: Set<ChatLiveMessageListener> = new Set();
+  private locationListeners: Set<DriverLiveLocationListener> = new Set();
+  private readListeners: Set<ChatReadReceiptListener> = new Set();
 
-  // Bộ đếm giờ gửi "nhịp tim" (Heartbeat) định kỳ để giữ kết nối không bị đóng
   private heartbeatTimer: any = null;
-
-  // Bộ đếm giờ tự động thử kết nối lại khi bị mất mạng
   private reconnectTimer: any = null;
-
-  // Cờ đánh dấu: Người dùng chủ động tắt (thoát trang) hay do mạng bị rớt ngoài ý muốn?
   private isExplicitlyClosed: boolean = false;
-
-  // Cờ báo trạng thái: Đã kết nối thành công tới máy chủ hay chưa?
   private isConnected: boolean = false;
 
   // --------------------------------------------------------------------------
   // HÀM MỞ KẾT NỐI ĐẾN SERVER (CONNECT)
   // --------------------------------------------------------------------------
-  public connect(orderId: number | string) {
-    this.currentOrderId = orderId;
-    this.isExplicitlyClosed = false; // Đặt lại cờ: không phải người dùng chủ động tắt
+  public connect(orderId?: number | string | null, shopId?: number | string | null) {
+    if (orderId) {
+      this.subscribedOrders.add(orderId);
+      this.currentOrderId = orderId;
+    }
+    if (shopId) {
+      this.subscribedShops.add(shopId);
+    }
+    this.isExplicitlyClosed = false;
 
     // Nếu socket đã đang mở hoặc đang trong quá trình kết nối:
-    // Chỉ cần đăng ký lại kênh (Subscribe) cho orderId mới mà không cần tạo socket mới
+    // Gửi tiếp các frames đăng ký kênh mới
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       this.sendSubscriptionFrames();
       return;
     }
 
-    // Xóa bộ đếm kết nối lại cũ nếu có
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
-    // Xác định giao thức: Nếu web chạy https: thì dùng wss:, chạy http: thì dùng ws:
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
-    // Đường dẫn kết nối luôn đi qua API Gateway cổng 8080 (/ws)
-    // Gateway sẽ tự động chuyển tiếp gói tin tới chat-notification-service (cổng 8087)
     const wsUrl = isLocalhost ? 'ws://localhost:8080/ws' : `${protocol}//${window.location.host}/ws`;
 
     try {
-      // 1. Khởi tạo đối tượng WebSocket chuẩn của trình duyệt
       this.socket = new WebSocket(wsUrl);
 
       // SỰ KIỆN 1: KHI KẾT NỐI VỪA MỞ THÀNH CÔNG (ONOPEN)
       this.socket.onopen = () => {
         this.isConnected = true;
 
-        // Gửi gói tin bắt tay (Frame CONNECT) theo chuẩn giao thức STOMP
         const connectFrame = 'CONNECT\naccept-version:1.2,1.1,1.0\nheart-beat:10000,10000\n\n\0';
         this.socket?.send(connectFrame);
 
-        // Bật nhịp tim (Heartbeat): Cứ 15 giây gửi 1 ký tự xuống dòng '\n'
-        // để báo cho server biết trình duyệt vẫn đang hoạt động, không bị ngắt kết nối
         this.heartbeatTimer = setInterval(() => {
           if (this.socket?.readyState === WebSocket.OPEN) {
             this.socket.send('\n');
@@ -104,43 +105,42 @@ class OrderLiveTrackingWebSocketService {
       // SỰ KIỆN 2: KHI NHẬN ĐƯỢC DỮ LIỆU TỪ SERVER GỬI VỀ (ONMESSAGE)
       this.socket.onmessage = (event) => {
         const raw = event.data;
-        // Bỏ qua nếu dữ liệu rỗng hoặc chỉ là tín hiệu nhịp tim
         if (!raw || raw === '\n' || raw === '\r\n') return;
 
         if (typeof raw === 'string') {
-          // Trường hợp A: Server xác nhận đã kết nối STOMP thành công
           if (raw.startsWith('CONNECTED')) {
-            // Ngay lập tức gửi các lệnh đăng ký kênh (Subscribe)
             this.sendSubscriptionFrames();
-          }
-          // Trường hợp B: Server gửi dữ liệu nội dung (Frame MESSAGE)
-          else if (raw.startsWith('MESSAGE')) {
+          } else if (raw.startsWith('MESSAGE')) {
             const doubleNewlineIndex = raw.indexOf('\n\n');
             if (doubleNewlineIndex !== -1) {
               const headersPart = raw.slice(0, doubleNewlineIndex);
-              // Lấy phần thân dữ liệu JSON (body) và loại bỏ ký tự kết thúc frame (\0)
               const body = raw.slice(doubleNewlineIndex + 2).replace(/\0$/, '').trim();
               try {
                 const parsed = JSON.parse(body);
 
-                // Nếu tin nhắn thuộc kênh Chat (/topic/chat/) -> Báo cho TASK 3
-                if (headersPart.includes(`/topic/chat/`)) {
+                // Phân loại sự kiện theo kênh hoặc thuộc tính
+                if (headersPart.includes('/read') || parsed.status === 'READ') {
+                  this.notifyReadListeners(parsed);
+                } else if (headersPart.includes(`/location`)) {
+                  this.notifyLocationListeners(parsed);
+                } else if (headersPart.includes(`/topic/shop/`)) {
+                  this.notifyShopChatListeners(parsed);
                   this.notifyChatListeners(parsed);
-                }
-                // Ngược lại nếu thuộc kênh Đơn hàng (/topic/orders/) -> Báo cho TASK 2
-                else {
+                } else if (headersPart.includes(`/topic/chat/`)) {
+                  this.notifyChatListeners(parsed);
+                } else {
                   this.notifyOrderListeners(parsed);
                 }
               } catch (e) {
                 console.warn('Failed to parse STOMP message:', e);
               }
             }
-          }
-          // Trường hợp C: Dữ liệu dạng JSON trực tiếp (dự phòng)
-          else {
+          } else {
             try {
               const parsed = JSON.parse(raw);
-              if (parsed.message && parsed.senderRole) {
+              if (parsed.latitude && parsed.longitude && parsed.driverId) {
+                this.notifyLocationListeners(parsed);
+              } else if (parsed.message && parsed.senderRole) {
                 this.notifyChatListeners(parsed);
               } else {
                 this.notifyOrderListeners(parsed);
@@ -154,28 +154,25 @@ class OrderLiveTrackingWebSocketService {
 
       // SỰ KIỆN 3: XỬ LÝ LỖI (ONERROR)
       this.socket.onerror = () => {
-        // Xử lý âm thầm để không làm tràn thông báo đỏ ở Console trình duyệt
+        // Handled silently to prevent browser console error noise
       };
 
       // SỰ KIỆN 4: KHI KẾT NỐI BỊ ĐÓNG (ONCLOSE)
       this.socket.onclose = () => {
         this.isConnected = false;
-
-        // Xóa bộ đếm nhịp tim vì kết nối đã đóng
+        this.activeSubIds.clear();
         if (this.heartbeatTimer) {
           clearInterval(this.heartbeatTimer);
           this.heartbeatTimer = null;
         }
 
-        // TỰ ĐỘNG KẾT NỐI LẠI (AUTO-RECONNECT):
-        // Nếu không phải do người dùng chủ động tắt trang (isExplicitlyClosed = false)
-        // thì hẹn giờ sau 4 giây sẽ tự động thử kết nối lại
+        // Tự động kết nối lại nếu không phải do người dùng chủ động thoát
         if (!this.isExplicitlyClosed) {
           this.reconnectTimer = setTimeout(() => {
-            if (this.currentOrderId) {
-              this.connect(this.currentOrderId);
+            if (this.subscribedOrders.size > 0 || this.subscribedShops.size > 0 || this.currentOrderId) {
+              this.connect();
             }
-          }, 4000);
+          }, 3500);
         }
       };
     } catch {
@@ -187,49 +184,88 @@ class OrderLiveTrackingWebSocketService {
   // HÀM GỬI LỆNH ĐĂNG KÝ KÊNH (SUBSCRIBE CHANNELS)
   // --------------------------------------------------------------------------
   private sendSubscriptionFrames() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.currentOrderId) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    // 1. [TASK 2] Đăng ký kênh cập nhật tiến trình đơn hàng: /topic/orders/{orderId}
-    // Khi Quán hoặc Shipper đổi trạng thái đơn, server sẽ bắn vào kênh này
-    const orderSub = `SUBSCRIBE\nid:sub-order-${this.currentOrderId}\ndestination:/topic/orders/${this.currentOrderId}\n\n\0`;
-    this.socket.send(orderSub);
+    // Đăng ký kênh toàn cục orders để lắng nghe broadcast
+    const globalOrderSubId = 'sub-orders-all';
+    if (!this.activeSubIds.has(globalOrderSubId)) {
+      this.socket.send(`SUBSCRIBE\nid:${globalOrderSubId}\ndestination:/topic/orders\n\n\0`);
+      this.activeSubIds.add(globalOrderSubId);
+    }
 
-    // Kênh chung /topic/orders để bắt sự kiện broadcast toàn cục (OrderStatusUpdatedEvent)
-    const ordersGlobalSub = `SUBSCRIBE\nid:sub-orders-all\ndestination:/topic/orders\n\n\0`;
-    this.socket.send(ordersGlobalSub);
+    // Đăng ký kênh receipt toàn cục
+    const receiptsSubId = 'sub-chat-receipts';
+    if (!this.activeSubIds.has(receiptsSubId)) {
+      this.socket.send(`SUBSCRIBE\nid:${receiptsSubId}\ndestination:/topic/chat/receipts\n\n\0`);
+      this.activeSubIds.add(receiptsSubId);
+    }
 
-    // 2. [TASK 3] Đăng ký kênh chat trao đổi của đơn hàng: /topic/chat/{orderId}
-    // Khi Khách/Quán/Tài xế nhắn tin, server sẽ bắn vào kênh này
-    const chatSub = `SUBSCRIBE\nid:sub-chat-${this.currentOrderId}\ndestination:/topic/chat/${this.currentOrderId}\n\n\0`;
-    this.socket.send(chatSub);
+    // 1. Subscribe to all active orders
+    this.subscribedOrders.forEach((orderId) => {
+      const orderSubId = `sub-order-${orderId}`;
+      if (!this.activeSubIds.has(orderSubId)) {
+        this.socket?.send(`SUBSCRIBE\nid:${orderSubId}\ndestination:/topic/orders/${orderId}\n\n\0`);
+        this.activeSubIds.add(orderSubId);
+      }
+
+      const chatSubId = `sub-chat-${orderId}`;
+      if (!this.activeSubIds.has(chatSubId)) {
+        this.socket?.send(`SUBSCRIBE\nid:${chatSubId}\ndestination:/topic/chat/${orderId}\n\n\0`);
+        this.activeSubIds.add(chatSubId);
+      }
+
+      const locSubId = `sub-loc-${orderId}`;
+      if (!this.activeSubIds.has(locSubId)) {
+        this.socket?.send(`SUBSCRIBE\nid:${locSubId}\ndestination:/topic/orders/${orderId}/location\n\n\0`);
+        this.activeSubIds.add(locSubId);
+      }
+    });
+
+    // 2. Subscribe to all active shop channels
+    this.subscribedShops.forEach((shopId) => {
+      const shopSubId = `sub-shop-${shopId}`;
+      if (!this.activeSubIds.has(shopSubId)) {
+        this.socket?.send(`SUBSCRIBE\nid:${shopSubId}\ndestination:/topic/shop/${shopId}\n\n\0`);
+        this.activeSubIds.add(shopSubId);
+      }
+    });
   }
 
-  // --------------------------------------------------------------------------
-  // [TASK 2] HÀM CHO COMPONENT REACT ĐĂNG KÝ THEO DÕI ĐƠN HÀNG
-  // --------------------------------------------------------------------------
-  /**
-   * Component OrderDetailPage.tsx sẽ gọi hàm này để lắng nghe trạng thái đơn.
-   * @param listener Hàm callback sẽ nhận dữ liệu đơn hàng mới.
-   * @returns Hàm hủy đăng ký (unsubscribe) để dọn dẹp khi thoát component.
-   */
+  public subscribeOrder(orderId: number | string): () => void {
+    this.subscribedOrders.add(orderId);
+    this.connect(orderId);
+    return () => {
+      this.subscribedOrders.delete(orderId);
+      const chatSubId = `sub-chat-${orderId}`;
+      if (this.socket && this.socket.readyState === WebSocket.OPEN && this.activeSubIds.has(chatSubId)) {
+        this.socket.send(`UNSUBSCRIBE\nid:${chatSubId}\n\n\0`);
+        this.activeSubIds.delete(chatSubId);
+      }
+    };
+  }
+
+  public subscribeShop(shopId: number | string): () => void {
+    this.subscribedShops.add(shopId);
+    this.connect(null, shopId);
+    return () => {
+      this.subscribedShops.delete(shopId);
+      const shopSubId = `sub-shop-${shopId}`;
+      if (this.socket && this.socket.readyState === WebSocket.OPEN && this.activeSubIds.has(shopSubId)) {
+        this.socket.send(`UNSUBSCRIBE\nid:${shopSubId}\n\n\0`);
+        this.activeSubIds.delete(shopSubId);
+      }
+    };
+  }
+
   public subscribeOrderUpdates(listener: OrderLiveUpdateListener): () => void {
     this.orderListeners.add(listener);
-    // Trả về hàm hủy đăng ký để gọi trong return của useEffect
     return () => {
       this.orderListeners.delete(listener);
     };
   }
 
-  // --------------------------------------------------------------------------
-  // [TASK 3] HÀM CHO COMPONENT REACT ĐĂNG KÝ NHẬN TIN NHẮN CHAT
-  // --------------------------------------------------------------------------
-  /**
-   * Component OrderChatDrawer.tsx sẽ gọi hàm này để nhận tin nhắn mới.
-   * @param listener Hàm callback sẽ nhận tin nhắn chat mới.
-   * @returns Hàm hủy đăng ký (unsubscribe)
-   */
   public subscribeChatMessages(listener: ChatLiveMessageListener): () => void {
     this.chatListeners.add(listener);
     return () => {
@@ -237,96 +273,139 @@ class OrderLiveTrackingWebSocketService {
     };
   }
 
-  // --------------------------------------------------------------------------
-  // HÀM NỘI BỘ: PHÁT DỮ LIỆU ĐẾN TẤT CẢ CÁC LISTENER ĐANG LẮNG NGHE
-  // --------------------------------------------------------------------------
+  public subscribeShopChatMessages(listener: ChatLiveMessageListener): () => void {
+    this.shopChatListeners.add(listener);
+    return () => {
+      this.shopChatListeners.delete(listener);
+    };
+  }
 
-  // Phát cho các component đang theo dõi đơn hàng (TASK 2)
+  public subscribeDriverLocation(listener: DriverLiveLocationListener): () => void {
+    this.locationListeners.add(listener);
+    return () => {
+      this.locationListeners.delete(listener);
+    };
+  }
+
+  public subscribeReadReceipts(listener: ChatReadReceiptListener): () => void {
+    this.readListeners.add(listener);
+    return () => {
+      this.readListeners.delete(listener);
+    };
+  }
+
   private notifyOrderListeners(data: any) {
     if (!data) return;
 
     // Chuẩn hóa payload từ backend (hỗ trợ cả wrapper data, order, event payload)
     const normalizedData = data.data || data.order || data.payload || data;
-    
-    // Nếu tin nhắn có orderId hoặc id, chỉ notify nếu trùng khớp với đơn hàng đang theo dõi (hoặc không có id)
+
+    // Nếu tin nhắn có orderId hoặc id và ta đang giới hạn danh sách đơn, kiểm tra xem có khớp không
     const incomingOrderId = normalizedData.orderId || normalizedData.id;
-    if (incomingOrderId && this.currentOrderId && String(incomingOrderId) !== String(this.currentOrderId)) {
-      return;
+    if (incomingOrderId && this.subscribedOrders.size > 0) {
+      const match =
+        this.subscribedOrders.has(incomingOrderId) ||
+        this.subscribedOrders.has(Number(incomingOrderId)) ||
+        this.subscribedOrders.has(String(incomingOrderId));
+      if (!match) {
+        return;
+      }
     }
 
     this.orderListeners.forEach((fn) => {
       try {
-        fn(normalizedData); // Gọi callback truyền dữ liệu mới vào React State
+        fn(normalizedData);
       } catch (err) {
         console.error('Error in order listener:', err);
       }
     });
   }
 
-  // Phát cho các component đang mở khung chat (TASK 3)
   private notifyChatListeners(data: ChatMessage) {
     this.chatListeners.forEach((fn) => {
       try {
-        fn(data); // Gọi callback thêm tin nhắn mới vào danh sách chat
+        fn(data);
       } catch (err) {
         console.error('Error in chat listener:', err);
       }
     });
   }
 
-  // --------------------------------------------------------------------------
-  // [TASK 3] HÀM GỬI TIN NHẮN CHAT QUA WEBSOCKET STOMP (SEND FRAME)
-  // --------------------------------------------------------------------------
-  /**
-   * Đóng gói tin nhắn thành Frame SEND chuẩn STOMP và gửi lên Server.
-   * Đích đến: /app/chat.send (sẽ được ChatController bắt bằng @MessageMapping)
-   */
+  private notifyShopChatListeners(data: ChatMessage) {
+    this.shopChatListeners.forEach((fn) => {
+      try {
+        fn(data);
+      } catch (err) {
+        console.error('Error in shop chat listener:', err);
+      }
+    });
+  }
+
+  private notifyLocationListeners(data: DriverLiveLocationPayload) {
+    this.locationListeners.forEach((fn) => {
+      try {
+        fn(data);
+      } catch (err) {
+        console.error('Error in location listener:', err);
+      }
+    });
+  }
+
+  private notifyReadListeners(data: { orderId?: number; shopId?: number; readerRole?: string; status?: string }) {
+    this.readListeners.forEach((fn) => {
+      try {
+        fn(data);
+      } catch (err) {
+        console.error('Error in read listener:', err);
+      }
+    });
+  }
+
   public sendChatMessageViaWs(payload: SendMessagePayload) {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       const body = JSON.stringify(payload);
-      // Tạo frame STOMP SEND với đầy đủ tiêu đề và nội dung JSON
       const sendFrame = `SEND\ndestination:/app/chat.send\ncontent-type:application/json\ncontent-length:${body.length}\n\n${body}\0`;
       this.socket.send(sendFrame);
     }
   }
 
-  // --------------------------------------------------------------------------
-  // HÀM NGẮT KẾT NỐI VÀ DỌN DẸP BỘ NHỚ (CLEANUP / DISCONNECT)
-  // --------------------------------------------------------------------------
-  /**
-   * Được gọi khi người dùng rời khỏi trang chi tiết đơn hàng.
-   * Giúp dọn dẹp kết nối, xóa bộ đếm giờ, chống rò rỉ RAM (Memory Leak).
-   */
-  public disconnect() {
-    this.isExplicitlyClosed = true; // Đánh dấu là người dùng chủ động thoát, không tự kết nối lại nữa
+  public sendMarkReadViaWs(orderId?: number, shopId?: number, readerRole?: string) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      const body = JSON.stringify({ orderId, shopId, readerRole });
+      const sendFrame = `SEND\ndestination:/app/chat.markRead\ncontent-type:application/json\ncontent-length:${body.length}\n\n${body}\0`;
+      this.socket.send(sendFrame);
+    }
+  }
 
-    // Xóa bộ đếm kết nối lại
+  public disconnect() {
+    this.isExplicitlyClosed = true;
+
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
-    // Dừng gửi nhịp tim
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
     }
 
-    // Đóng socket và hủy tham chiếu
     if (this.socket) {
       this.socket.close();
       this.socket = null;
     }
 
-    // Xóa sạch danh sách các hàm lắng nghe
+    this.activeSubIds.clear();
+    this.subscribedOrders.clear();
+    this.subscribedShops.clear();
+    this.currentOrderId = null;
     this.orderListeners.clear();
     this.chatListeners.clear();
-    this.currentOrderId = null;
+    this.shopChatListeners.clear();
+    this.locationListeners.clear();
+    this.readListeners.clear();
   }
 }
 
-// ============================================================================
-// 3. XUẤT RA DƯỚI DẠNG SINGLETON (DUY NHẤT 1 THỂ HIỆN DÙNG CHUNG TOÀN ỨNG DỤNG)
-// ============================================================================
 export const orderLiveTrackingWs = new OrderLiveTrackingWebSocketService();
 export default orderLiveTrackingWs;

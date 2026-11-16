@@ -14,7 +14,8 @@ import {
   Package,
   Phone,
 } from '../icons';
-import { DriverOrder } from '@/services/modules/driverApi';
+import { DriverOrder, driverApi } from '@/services/modules/driverApi';
+import { GoogleMapRouteView } from '@/components/map/GoogleMapRouteView';
 import {
   RouteMapFocus,
   DriverChatMessage,
@@ -28,6 +29,7 @@ import {
 import { DriverCustomerChatModal } from './DriverCustomerChatModal';
 import { chatApi, type ChatMessage } from '@/services/modules/chatApi';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
+import { soundManager } from '@/utils/soundNotification';
 
 interface ActiveDeliveryViewProps {
   order: DriverOrder;
@@ -95,12 +97,41 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
         if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
       });
+      if (newMsg.senderRole !== 'DRIVER') {
+        soundManager.playMessageChime();
+      }
     });
 
     return () => {
       unsubscribe();
     };
   }, [order.id]);
+
+  // Realtime GPS broadcast to server & customer tracking when DELIVERING
+  useEffect(() => {
+    if (!order.id || stageInfo.stage !== 'DELIVERING') return;
+
+    const pushLocation = () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            driverApi.updateLocation({
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              heading: pos.coords.heading || 0,
+              speedKmh: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24,
+              orderId: order.id,
+            }).catch(() => {});
+          },
+          () => {}
+        );
+      }
+    };
+
+    pushLocation();
+    const timer = setInterval(pushLocation, 3500);
+    return () => clearInterval(timer);
+  }, [order.id, stageInfo.stage]);
 
   // Tự động đồng bộ tab bản đồ theo mốc hiện tại (Mốc 1: Quán ăn, Mốc 2: Khách hàng)
   const mapFocus: RouteMapFocus =
@@ -123,16 +154,25 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
     setChatMessages((prev) => [...prev, localMsg]);
 
     try {
-      await chatApi.sendMessage({
+      const res = await chatApi.sendMessage({
         orderId: order.id,
+        shopId: order.restaurantId,
         senderRole: 'DRIVER',
         message: trimmed,
       });
       orderLiveTrackingWs.sendChatMessageViaWs({
         orderId: order.id,
+        shopId: order.restaurantId,
         senderRole: 'DRIVER',
         message: trimmed,
       });
+      if (res && res.data) {
+        setChatMessages((prev) => {
+          const filtered = prev.filter((m) => m.id !== localMsg.id);
+          if (filtered.some((m) => m.id === res.data.id)) return filtered;
+          return [...filtered, res.data];
+        });
+      }
     } catch {
       saveOrderChatMessages(order.id, [...chatMessages, localMsg]);
     }
@@ -325,20 +365,19 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
         </div>
 
         {isMapExpanded && (
-          <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100">
-            {mapEmbedUrl ? (
-              <iframe
-                title={`Bản đồ giao hàng đơn ${order.orderCode}`}
-                src={mapEmbedUrl}
-                className="w-full h-48 border-0 block"
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-            ) : (
-              <div className="h-36 flex items-center justify-center text-xs text-slate-500 p-4 text-center">
-                Chưa có tọa độ hoặc địa chỉ chi tiết để hiển thị bản đồ.
-              </div>
-            )}
+          <div className="rounded-2xl overflow-hidden shadow-md">
+            <GoogleMapRouteView
+              restaurantName={order.restaurantName}
+              restaurantAddress={order.restaurantAddress}
+              restaurantLat={order.restaurantLat || 10.7769}
+              restaurantLng={order.restaurantLng || 106.7009}
+              customerName={order.receiverName}
+              customerAddress={order.receiverAddress}
+              customerLat={order.receiverLat || 10.7925}
+              customerLng={order.receiverLng || 106.7214}
+              isDelivering={isDeliveringStage}
+              orderCode={order.orderCode}
+            />
           </div>
         )}
 

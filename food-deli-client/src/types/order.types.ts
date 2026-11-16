@@ -50,6 +50,9 @@ export interface CustomerOrder {
   customerPhone?: string;
   restaurantId: number;
   restaurantName?: string;
+  restaurantAddress?: string;
+  restaurantLat?: number;
+  restaurantLng?: number;
   driverId?: number;
   driverName?: string;
   driverPhone?: string;

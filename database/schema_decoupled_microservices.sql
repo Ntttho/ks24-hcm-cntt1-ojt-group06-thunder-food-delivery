@@ -490,12 +490,12 @@ INSERT INTO `roles` (`id`, `name`) VALUES
 
 -- 2. Users (Password: 123456)
 INSERT INTO `users` (`id`, `phone`, `password`, `full_name`, `rating_avg`, `created_at`, `deleted_at`) VALUES
-(1, '0900000001', '123456', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
-(2, '0900000002', '123456', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
-(3, '0900000003', '123456', 'Le Van C', '4.70', '2026-06-10 08:08:00', NULL),
-(4, '0900000004', '123456', 'Pham Thi D', '4.88', '2026-06-10 08:08:00', NULL),
-(5, '0900000005', '123456', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
-(6, '0944495653', '123456', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
+(1, '0900000001', '$2a$10$tFzqYb.rxAZWJ4ggv1I2XOnr1zkXQDmXoI48V5TxspPkr93B33F6a', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
+(2, '0900000002', '$2a$10$5WGj8RuHVMH4FwpZkTSkGOssJKqG6oefZLlpzM8kkjgWclazmcttO', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
+(3, '0900000003', '$2a$10$CmbVVephSjEcxKDbxtsbG.2/nQ0q9.poRcUsCIPDxpf20nIheLWle', 'Le Van C', '4.70', '2026-06-10 08:08:00', NULL),
+(4, '0900000004', '$2a$10$DnzFJhBXWPHqNyHgpceR2.7LG4yNcJK4.dxswiFV5We.pee7RD8qG', 'Pham Thi D', '4.88', '2026-06-10 08:08:00', NULL),
+(5, '0900000000', '$2a$10$TP0RsDH.JXTLrDqcrg9fwe5XGxEgGRyYXxgCWztamYLIl1URYiNfO', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
+(6, '0944495653', '$2a$10$ExCfal4mIKRCNd8Q/4apLedkozCHtu5zfIqCZI2SxKUJyd9yTOxLi', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
 
 -- 3. User Roles
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
