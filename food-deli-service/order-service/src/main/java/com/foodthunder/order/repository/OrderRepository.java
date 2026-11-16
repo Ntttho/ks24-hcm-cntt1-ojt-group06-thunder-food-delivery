@@ -84,4 +84,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate
     );
+
+    @Query("SELECT o FROM Order o WHERE UPPER(o.status.code) = UPPER(:statusCode) AND o.createdAt <= :threshold AND o.deletedAt IS NULL")
+    List<Order> findByStatusCodeAndCreatedAtBefore(
+            @Param("statusCode") String statusCode,
+            @Param("threshold") java.time.LocalDateTime threshold
+    );
 }

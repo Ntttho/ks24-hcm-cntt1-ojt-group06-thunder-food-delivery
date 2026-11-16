@@ -33,6 +33,7 @@ export const SepayQrPaymentModal: React.FC<SepayQrPaymentModalProps> = ({
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const [isChecking, setIsChecking] = useState<boolean>(false);
+  const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [isPaidSuccess, setIsPaidSuccess] = useState<boolean>(false);
   const [cancelling, setCancelling] = useState<boolean>(false);
 
@@ -169,12 +170,30 @@ export const SepayQrPaymentModal: React.FC<SepayQrPaymentModalProps> = ({
     }
   };
 
+  // Sandbox simulation test button
+  const handleSimulateSuccess = async () => {
+    setIsSimulating(true);
+    try {
+      const res = await paymentApi.simulateSuccess(orderId);
+      if (res.status === 200 || res.status === 201) {
+        await handleSuccess();
+      } else {
+        message.error(res.message || 'Lỗi giả lập thanh toán');
+      }
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || 'Không thể giả lập thanh toán lúc này');
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   const bankName = qrData?.bankName || 'ACB';
   const accountNo = qrData?.accountNo || '17532841';
   const accountName = qrData?.accountName || 'NGUYEN TA THO';
-  const paymentContent = qrData?.paymentContent || `FOODDELI ORD${orderId}`;
+  const paymentContent =
+    qrData?.paymentContent || `FDL${orderId < 100 ? String(orderId).padStart(3, '0') : orderId}`;
   const amountToPay = qrData?.amount || totalAmount;
   const qrUrl =
     qrData?.qrCodeUrl ||
@@ -319,6 +338,15 @@ export const SepayQrPaymentModal: React.FC<SepayQrPaymentModalProps> = ({
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2 pt-1">
+              <Button
+                type="dashed"
+                loading={isSimulating}
+                onClick={handleSimulateSuccess}
+                className="w-full text-emerald-700 border-emerald-400 hover:border-emerald-500 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 font-bold rounded-xl h-10 flex items-center justify-center gap-1.5"
+              >
+                ⚡ Xác nhận thanh toán nhanh (Sandbox / Demo)
+              </Button>
+
               <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   type="primary"

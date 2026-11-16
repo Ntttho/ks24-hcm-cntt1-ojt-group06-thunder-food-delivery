@@ -41,9 +41,9 @@ public class VietQrConfig {
     private String webhookSecret = "foodthunder_webhook_secret_key";
 
     /**
-     * Tiền tố nội dung chuyển khoản định danh đơn hàng (mặc định: FOODDELI).
+     * Tiền tố nội dung chuyển khoản định danh đơn hàng (mặc định: FDL).
      */
-    private String orderPrefix = "FOODDELI";
+    private String orderPrefix = "FDL";
 
     /**
      * Client ID nếu đăng ký VietQR Open API.

@@ -42,4 +42,9 @@ public interface PaymentService {
      * Khởi tạo giao dịch thanh toán tiền mặt (COD)
      */
     PaymentResponseDto createCodPayment(Long orderId, BigDecimal amount, String idempotencyKey);
+
+    /**
+     * Giả lập thanh toán thành công (dành cho môi trường Sandbox / Demo)
+     */
+    PaymentResponseDto simulatePaymentSuccess(Long orderId);
 }

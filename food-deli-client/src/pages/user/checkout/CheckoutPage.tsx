@@ -372,8 +372,8 @@ export const CheckoutPage: React.FC = () => {
         try {
           const qrRes = await paymentApi.generateSepayQr({
             orderId,
-            amount: authoritativeTotal,
-            orderInfo: `FOODDELI ORD${orderId}`,
+            amount: finalTotal,
+            orderInfo: `FDL${orderId < 100 ? String(orderId).padStart(3, '0') : orderId}`,
           });
           setSepayQrData(qrRes.data);
         } catch (qrErr) {

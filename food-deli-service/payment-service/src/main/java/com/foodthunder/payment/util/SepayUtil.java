@@ -43,29 +43,37 @@ public final class SepayUtil {
 
     /**
      * Sinh cú pháp nội dung chuyển khoản định danh đơn hàng:
-     * Ví dụ: FOODDELI ORD123
+     * Tiền tố FDL + tối thiểu 3 chữ số theo quy tắc SePay Dashboard:
+     * Ví dụ: Đơn #1 -> FDL001, Đơn #15 -> FDL015, Đơn #123 -> FDL123
      */
     public static String buildPaymentContent(String prefix, Long orderId) {
-        String cleanPrefix = (prefix == null || prefix.isBlank()) ? "FOODDELI" : prefix.trim();
-        return cleanPrefix + " ORD" + orderId;
+        String cleanPrefix = (prefix == null || prefix.isBlank()) ? "FDL" : prefix.trim().toUpperCase();
+        if (orderId == null) {
+            return cleanPrefix;
+        }
+        if (orderId < 100) {
+            return String.format("%s%03d", cleanPrefix, orderId);
+        }
+        return cleanPrefix + orderId;
     }
 
     /**
-     * Trích xuất mã đơn hàng (orderId) từ nội dung chuyển khoản của SePay Webhook.
-     * Hỗ trợ các trường hợp SePay chuyển tiếp:
-     * - "FOODDELI ORD123"
-     * - "ND: CHUYEN TIEN FOODDELI ORD123 MA GD 87219"
-     * - "FOODDELI123" hoặc "ORD123"
+     * Trích xuất mã đơn hàng (orderId) từ nội dung chuyển khoản hoặc mã nhận diện của SePay Webhook.
+     * Hỗ trợ các trường hợp:
+     * - "FDL001", "FDL123", "FDL 123", "FDL_123"
+     * - "FOODDELI ORD123", "FOODDELI 123"
+     * - "ND: CHUYEN TIEN FDL001 MA GD 87219"
+     * - "ORD123" hoặc "ORD 123"
      */
     public static Long extractOrderId(String transactionContent, String prefix) {
         if (transactionContent == null || transactionContent.isBlank()) {
             return null;
         }
 
-        String safePrefix = (prefix == null || prefix.isBlank()) ? "FOODDELI" : prefix.trim();
+        String safePrefix = (prefix == null || prefix.isBlank()) ? "FDL" : prefix.trim();
 
-        // 1. Tìm theo tiền tố định danh (FOODDELI ORD123 / FOODDELI 123)
-        Pattern prefixPattern = Pattern.compile(Pattern.quote(safePrefix) + "[\\s_:-]*ORD?(\\d+)", Pattern.CASE_INSENSITIVE);
+        // 1. Tìm theo tiền tố định danh (FDL / FOODDELI / prefix) kèm chữ số
+        Pattern prefixPattern = Pattern.compile("(?:FDL|FOODDELI|" + Pattern.quote(safePrefix) + ")[\\s_:-]*(?:ORD)?[\\s_:-]*(\\d+)", Pattern.CASE_INSENSITIVE);
         Matcher prefixMatcher = prefixPattern.matcher(transactionContent);
         if (prefixMatcher.find()) {
             try {

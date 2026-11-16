@@ -46,6 +46,13 @@ export const paymentApi = {
   },
 
   /**
+   * Giả lập thanh toán đơn hàng thành công (dành cho môi trường Sandbox / Demo)
+   */
+  simulateSuccess: async (orderId: number | string): Promise<ApiResponse<PaymentStatusResponse>> => {
+    return apiClient.post(`/payments/orders/${orderId}/simulate-success`);
+  },
+
+  /**
    * Tạo giao dịch COD (tiền mặt khi nhận hàng)
    */
   createCod: async (
