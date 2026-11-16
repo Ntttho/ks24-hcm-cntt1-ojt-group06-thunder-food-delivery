@@ -5,6 +5,7 @@ import com.foodthunder.restaurant.dto.CategoryDto;
 import com.foodthunder.restaurant.dto.CategoryRequestDto;
 import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Shop;
+import com.foodthunder.restaurant.exception.BadRequestException;
 import com.foodthunder.restaurant.exception.ConflictException;
 import com.foodthunder.restaurant.exception.ForbiddenException;
 import com.foodthunder.restaurant.exception.ResourceNotFoundException;
@@ -102,6 +103,10 @@ public class CategoryController {
 
         Shop shop = shopRepository.findByIdAndDeletedAtIsNull(restaurantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán với ID: " + restaurantId));
+
+        if (!"APPROVED".equalsIgnoreCase(shop.getApprovalStatus())) {
+            throw new BadRequestException("Quán ăn '" + shop.getName() + "' chưa được Ban Quản Trị phê duyệt, không thể tạo danh mục món!");
+        }
 
         // RBAC check: merchant must own this shop
         if (userRole != null && userRole.contains("MERCHANT") && userId != null) {

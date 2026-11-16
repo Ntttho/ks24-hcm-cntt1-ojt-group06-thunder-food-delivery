@@ -38,48 +38,57 @@ export const MerchantSider: React.FC<MerchantSiderProps> = ({
   selectedKey,
   onNavigate,
 }) => {
+  const isApproved = activeRestaurant?.approvalStatus === 'APPROVED';
+
   const siderMenuItems: MenuProps['items'] = [
     {
       key: '/merchant',
       icon: <InboxOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Tiếp nhận đơn hàng</span>,
-      onClick: () => onNavigate('/merchant'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant'),
     },
     {
       key: '/merchant/revenue',
       icon: <BarChartOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Báo cáo doanh thu</span>,
-      onClick: () => onNavigate('/merchant/revenue'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/revenue'),
     },
     {
       key: '/merchant/menu',
       icon: <AppstoreOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Quản lý thực đơn</span>,
-      onClick: () => onNavigate('/merchant/menu'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/menu'),
     },
     {
       key: '/merchant/categories',
       icon: <FolderOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Quản lý Danh mục</span>,
-      onClick: () => onNavigate('/merchant/categories'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/categories'),
     },
     {
       key: '/merchant/toppings',
       icon: <TagsOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Quản lý Topping</span>,
-      onClick: () => onNavigate('/merchant/toppings'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/toppings'),
     },
     {
       key: '/merchant/vouchers',
       icon: <GiftOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Khuyến mãi & Voucher</span>,
-      onClick: () => onNavigate('/merchant/vouchers'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/vouchers'),
     },
     {
       key: '/merchant/reviews',
       icon: <MessageOutlined className="text-lg" />,
       label: <span className="font-semibold text-sm">Quản lý Đánh giá</span>,
-      onClick: () => onNavigate('/merchant/reviews'),
+      disabled: !isApproved,
+      onClick: () => isApproved && onNavigate('/merchant/reviews'),
     },
   ];
 
@@ -208,7 +217,7 @@ export const MerchantSider: React.FC<MerchantSiderProps> = ({
           selectedKeys={[selectedKey]}
           items={siderMenuItems}
           className="border-none font-medium"
-          disabled={!hasRestaurants}
+          disabled={!hasRestaurants || !isApproved}
         />
       </div>
     </Sider>

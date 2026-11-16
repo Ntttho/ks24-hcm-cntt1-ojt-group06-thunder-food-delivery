@@ -167,14 +167,15 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Transactional
     public DriverStatusResponse toggleOnline(Integer driverId) {
         DriverDetail driver = driverDetailRepository.findById(driverId)
-                .orElseGet(() -> DriverDetail.builder()
-                        .userId(driverId)
-                        .licensePlate("59A1-00000")
-                        .idCardNumber("000000000000")
-                        .vehicleType("Motorbike")
-                        .approvalStatus("APPROVED")
-                        .isOnline(false)
-                        .build());
+                .orElseThrow(() -> new BadRequestException("Hồ sơ tài xế chưa được tạo hoặc chưa hoàn tất thủ tục đăng ký. Vui lòng liên hệ Admin!"));
+
+        if (driver.getApprovalStatus() == null || !"APPROVED".equalsIgnoreCase(driver.getApprovalStatus())) {
+            throw new BadRequestException("Hồ sơ tài xế của bạn đang ở trạng thái '" 
+                    + (driver.getApprovalStatus() != null ? driver.getApprovalStatus() : "PENDING")
+                    + "'. Bạn chỉ có thể bật trực tuyến sau khi được Ban Quản Trị phê duyệt!");
+        }
+
+        checkDriverSuspension(driverId);
 
         driver.setIsOnline(!Boolean.TRUE.equals(driver.getIsOnline()));
         driverDetailRepository.save(driver);
@@ -185,9 +186,15 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     @Override
     public DriverStatusResponse getDriverStatus(Integer driverId) {
-        DriverDetail driver = driverDetailRepository.findById(driverId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ tài xế với ID=" + driverId));
-        return mapToDriverStatusResponse(driver);
+        return driverDetailRepository.findById(driverId)
+                .map(this::mapToDriverStatusResponse)
+                .orElseGet(() -> DriverStatusResponse.builder()
+                        .userId(driverId)
+                        .approvalStatus("PENDING")
+                        .isOnline(false)
+                        .licensePlate("Chưa cập nhật")
+                        .vehicleType("Motorbike")
+                        .build());
     }
 
     @Override
@@ -235,7 +242,15 @@ public class DeliveryServiceImpl implements DeliveryService {
 
     @Override
     public List<DriverOfferResponse> getPendingOffers(Integer driverId) {
-        // Nếu tài xế đang bị tạm khóa nhận cuốc (AR < 80% hoặc CR > 10%), không hiển thị đơn mới
+        // 1. Kiểm tra trạng thái phê duyệt của tài xế
+        DriverDetail driver = driverDetailRepository.findById(driverId).orElse(null);
+        if (driver == null || driver.getApprovalStatus() == null || !"APPROVED".equalsIgnoreCase(driver.getApprovalStatus())) {
+            log.info("Driver #{} is not approved yet (status: {}), returning empty offers list",
+                    driverId, driver != null ? driver.getApprovalStatus() : "NOT_FOUND");
+            return Collections.emptyList();
+        }
+
+        // 2. Nếu tài xế đang bị tạm khóa nhận cuốc (AR < 80% hoặc CR > 10%), không hiển thị đơn mới
         List<DriverPenalty> activePenalties = driverPenaltyRepository.findActivePenalties(driverId, LocalDateTime.now());
         if (!activePenalties.isEmpty()) {
             log.info("Driver #{} is currently suspended from accepting orders, returning empty offers list", driverId);

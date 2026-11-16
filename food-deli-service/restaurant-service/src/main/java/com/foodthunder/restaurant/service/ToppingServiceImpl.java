@@ -96,6 +96,10 @@ public class ToppingServiceImpl implements ToppingService {
 
         verifyOwnership(shop, ownerId, role);
 
+        if (!"APPROVED".equalsIgnoreCase(shop.getApprovalStatus())) {
+            throw new BadRequestException("Quán ăn '" + shop.getName() + "' chưa được Ban Quản Trị phê duyệt, không thể tạo topping mới!");
+        }
+
         String trimmedName = request.getName().trim();
         if (toppingRepository.existsByRestaurantIdAndNameIgnoreCase(request.getRestaurantId(), trimmedName)) {
             throw new ConflictException("Tên topping '" + trimmedName + "' đã tồn tại trong thực đơn của quán");

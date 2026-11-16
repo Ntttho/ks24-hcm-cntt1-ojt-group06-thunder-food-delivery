@@ -132,6 +132,14 @@ export interface DriverReviewSummary {
   unavailableReason?: string;
 }
 
+export interface DriverStatusResponse {
+  userId: number;
+  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+  isOnline: boolean;
+  licensePlate?: string;
+  vehicleType?: string;
+}
+
 // =========================================================================
 // Internal Backend DTOs & Mappers (order-service, restaurant-service, review-service)
 // =========================================================================
@@ -666,6 +674,16 @@ export const filterDriverTripHistory = (
 };
 
 export const driverApi = {
+  // 0. Tra cứu trạng thái xét duyệt và hồ sơ tài xế
+  getDriverStatus: async (): Promise<ApiResponse<DriverStatusResponse>> => {
+    return apiClient.get('/deliveries/driver/status');
+  },
+
+  // 0b. Bật/tắt trạng thái trực tuyến của tài xế
+  toggleOnline: async (): Promise<ApiResponse<DriverStatusResponse>> => {
+    return apiClient.put('/deliveries/driver/toggle-online');
+  },
+
   // 1. Dò danh sách đơn đã xác nhận (CONFIRMED) chưa có người giao hàng (driverId = null)
   getAvailableOrders: async (): Promise<DriverOrder[]> => {
     const res = await apiClient.get<PaginatedData<BackendOrderDto>>(API_ENDPOINTS.ORDERS.LIST, {

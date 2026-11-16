@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Tag, message } from 'antd';
 import { ChevronLeft, RotateCcw, AlertCircle } from './icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +16,18 @@ import { TripHistoryTable } from './components/TripHistoryTable';
 import { TripDetailModal } from './components/TripDetailModal';
 
 export const ShipperHistoryPage: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
+
+  useEffect(() => {
+    driverApi.getDriverStatus().then((res) => {
+      const status = (res?.data?.approvalStatus || 'PENDING').toUpperCase();
+      if (status !== 'APPROVED') {
+        message.warning('Hồ sơ tài xế của bạn đang chờ Admin duyệt, chưa thể xem lịch sử!');
+        navigate(APP_ROUTES.SHIPPER_DASHBOARD);
+      }
+    }).catch(() => {});
+  }, [navigate]);
 
   // State management
   const [stats, setStats] = useState<DriverIncomeStatistics | null>(null);

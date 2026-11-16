@@ -13,3 +13,4 @@ export * from './MerchantOnboardingModal';
 export * from './MerchantOnboardingView';
 export * from './LocationPickerMap';
 export * from './MerchantRevenueWidget';
+export * from './MerchantApprovalGate';

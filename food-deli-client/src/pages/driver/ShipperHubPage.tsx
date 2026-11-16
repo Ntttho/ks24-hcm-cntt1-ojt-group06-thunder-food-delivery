@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { message, Modal, Tag, Input, Dropdown, notification, type MenuProps } from 'antd';
+import { message, Modal, Tag, Input, Dropdown, notification, Spin, type MenuProps } from 'antd';
 import {
   UserOutlined,
   LogoutOutlined,
@@ -33,7 +33,9 @@ import {
   DriverOrder,
   DriverWalletSummary,
   DriverReviewSummary,
+  DriverStatusResponse,
 } from '@/services/modules/driverApi';
+import { DriverPendingApprovalView, DriverRejectedView } from './components/DriverApprovalGate';
 import { driverWebSocket } from '@/services/modules/driverWebSocket';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { soundManager } from '@/utils/soundNotification';
@@ -164,8 +166,53 @@ export const ShipperHubPage: React.FC = () => {
   // Navigation tab for Hub
   const [activeTab, setActiveTab] = useState<'deliveries' | 'wallet' | 'reviews'>('deliveries');
 
+  // Driver approval and profile state
+  const [driverProfile, setDriverProfile] = useState<DriverStatusResponse | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'LOADING'>('LOADING');
+
+  const fetchDriverProfile = useCallback(async () => {
+    try {
+      const res = await driverApi.getDriverStatus();
+      if (res && res.data) {
+        setDriverProfile(res.data);
+        const status = (res.data.approvalStatus || 'PENDING').toUpperCase();
+        setApprovalStatus(status as any);
+        if (res.data.isOnline !== undefined) {
+          setIsOnline(Boolean(res.data.isOnline));
+        }
+      } else {
+        setApprovalStatus('APPROVED');
+      }
+    } catch {
+      setApprovalStatus('PENDING');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDriverProfile();
+  }, [fetchDriverProfile]);
+
   // Driver operational state
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
+
+  const handleToggleOnline = async () => {
+    if (approvalStatus !== 'APPROVED') {
+      message.warning('Hồ sơ tài xế chưa được phê duyệt, không thể bật nhận cuốc!');
+      return;
+    }
+    try {
+      const res = await driverApi.toggleOnline();
+      if (res?.data?.isOnline !== undefined) {
+        setIsOnline(res.data.isOnline);
+        message.success(res.data.isOnline ? 'Đã bật trạng thái trực tuyến!' : 'Đã chuyển sang chế độ ngoại tuyến');
+      } else {
+        setIsOnline(!isOnline);
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Không thể chuyển trạng thái trực tuyến';
+      message.error(msg);
+    }
+  };
   const [availableOrders, setAvailableOrders] = useState<DriverOrder[]>([]);
   const [loadingRadar, setLoadingRadar] = useState<boolean>(false);
   const [radarError, setRadarError] = useState<string | null>(null);
@@ -312,7 +359,7 @@ export const ShipperHubPage: React.FC = () => {
 
   // 3. Tự động dò đơn hàng định kỳ mỗi 6 giây khi Online và rảnh (kết hợp WebSocket realtime)
   useEffect(() => {
-    if (loadingInitial || !isOnline || currentOrder || activeTab !== 'deliveries') {
+    if (loadingInitial || approvalStatus !== 'APPROVED' || !isOnline || currentOrder || activeTab !== 'deliveries') {
       return;
     }
 
@@ -322,11 +369,11 @@ export const ShipperHubPage: React.FC = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [loadingInitial, isOnline, currentOrder, activeTab, fetchAvailableOrders]);
+  }, [loadingInitial, approvalStatus, isOnline, currentOrder, activeTab, fetchAvailableOrders]);
 
   // 3b. Realtime Driver WebSocket Subscription (/topic/drivers/available-orders)
   useEffect(() => {
-    if (loadingInitial || !isOnline || currentOrder || activeTab !== 'deliveries') {
+    if (loadingInitial || approvalStatus !== 'APPROVED' || !isOnline || currentOrder || activeTab !== 'deliveries') {
       return;
     }
 
@@ -479,6 +526,35 @@ export const ShipperHubPage: React.FC = () => {
 
   const driverDisplayName = user?.fullName || 'Tài xế Thunder';
 
+  if (approvalStatus === 'LOADING') {
+    return (
+      <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center">
+        <Spin size="large" />
+        <div className="mt-3 text-slate-500 font-semibold text-sm">Đang xác thực thông tin đối tác tài xế...</div>
+      </div>
+    );
+  }
+
+  if (approvalStatus === 'PENDING') {
+    return (
+      <DriverPendingApprovalView
+        driverProfile={driverProfile}
+        onRefresh={fetchDriverProfile}
+        onLogout={handleLogoutConfirm}
+      />
+    );
+  }
+
+  if (approvalStatus === 'REJECTED') {
+    return (
+      <DriverRejectedView
+        driverProfile={driverProfile}
+        onRefresh={fetchDriverProfile}
+        onLogout={handleLogoutConfirm}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col justify-start items-center py-0 sm:py-6">
       {/* Top Bar */}
@@ -576,7 +652,7 @@ export const ShipperHubPage: React.FC = () => {
               {/* Toggle Online/Offline Power Button (Disabled during active delivery) */}
               {!currentOrder && (
                 <button
-                  onClick={() => setIsOnline(!isOnline)}
+                  onClick={handleToggleOnline}
                   className={`relative flex items-center justify-center w-12 h-12 rounded-2xl shadow-lg transition-all duration-300 cursor-pointer ${
                     isOnline
                       ? 'bg-emerald-500 shadow-emerald-500/40 text-white hover:bg-emerald-600'
@@ -667,7 +743,7 @@ export const ShipperHubPage: React.FC = () => {
                 Bật trực tuyến ngay để dò các đơn hàng quán đã xác nhận (CONFIRMED) chưa có shipper!
               </p>
               <button
-                onClick={() => setIsOnline(true)}
+                onClick={handleToggleOnline}
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition-all active:scale-95 cursor-pointer"
               >
                 Bật Trực Tuyến Ngay

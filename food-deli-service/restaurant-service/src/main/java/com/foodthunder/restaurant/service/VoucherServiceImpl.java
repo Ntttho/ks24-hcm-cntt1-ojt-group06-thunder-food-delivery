@@ -63,6 +63,10 @@ public class VoucherServiceImpl implements VoucherService {
             Shop shop = shopRepository.findByIdAndDeletedAtIsNull(restaurantId)
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + restaurantId));
 
+            if (!"APPROVED".equalsIgnoreCase(shop.getApprovalStatus())) {
+                throw new BadRequestException("Quán ăn '" + shop.getName() + "' chưa được Ban Quản Trị phê duyệt, không thể tạo voucher!");
+            }
+
             if (role != null && role.contains("MERCHANT") && requesterUserId != null) {
                 if (!shop.getOwnerId().equals(requesterUserId)) {
                     throw new ForbiddenException("Bạn không có quyền tạo voucher cho quán khác (Chủ quán: " + shop.getOwnerId() + ")");

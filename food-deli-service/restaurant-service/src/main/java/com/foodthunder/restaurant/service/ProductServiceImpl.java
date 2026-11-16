@@ -142,6 +142,10 @@ public class ProductServiceImpl implements ProductService {
         MenuCategory category = menuCategoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy danh mục thực đơn ID: " + request.getCategoryId()));
 
+        if (category.getRestaurant() != null && !"APPROVED".equalsIgnoreCase(category.getRestaurant().getApprovalStatus())) {
+            throw new BadRequestException("Quán ăn '" + category.getRestaurant().getName() + "' chưa được Ban Quản Trị phê duyệt, không thể tạo món ăn mới!");
+        }
+
         Set<Topping> toppings = new HashSet<>();
         if (request.getToppingIds() != null && !request.getToppingIds().isEmpty()) {
             toppings.addAll(toppingRepository.findAllById(request.getToppingIds()));

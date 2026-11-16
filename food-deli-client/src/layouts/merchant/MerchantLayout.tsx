@@ -4,7 +4,12 @@ import { Layout, message, Spin, Alert } from 'antd';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
-import { MerchantOnboardingModal, MerchantOnboardingView } from '@/pages/merchant/components';
+import {
+  MerchantOnboardingModal,
+  MerchantOnboardingView,
+  MerchantPendingApprovalGate,
+  MerchantRejectedGate,
+} from '@/pages/merchant/components';
 import { MerchantSider, MerchantNavbar } from './components';
 
 const { Content } = Layout;
@@ -161,25 +166,6 @@ export const MerchantLayout: React.FC = () => {
 
         {/* Content Body */}
         <Content className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-4">
-          {activeRestaurant?.approvalStatus === 'PENDING' && (
-            <Alert
-              type="warning"
-              showIcon
-              message={<span className="font-bold">Quán ăn đang chờ Ban quản trị phê duyệt</span>}
-              description="Hồ sơ chi nhánh quán ăn này đang được Quản trị viên xét duyệt. Trong thời gian này, quán không thể mở cửa nhận đơn hoặc bán hàng cho khách."
-              className="rounded-2xl border-amber-200 bg-amber-50 shadow-xs"
-            />
-          )}
-          {activeRestaurant?.approvalStatus === 'REJECTED' && (
-            <Alert
-              type="error"
-              showIcon
-              message={<span className="font-bold">Quán ăn bị từ chối phê duyệt</span>}
-              description={`Lý do: ${activeRestaurant.rejectReason || 'Hồ sơ chưa đạt tiêu chuẩn. Vui lòng liên hệ Admin để được hỗ trợ.'}`}
-              className="rounded-2xl border-rose-200 bg-rose-50 shadow-xs"
-            />
-          )}
-
           {loadingShops ? (
             <div className="min-h-[400px] flex flex-col items-center justify-center gap-3">
               <Spin size="large" />
@@ -189,6 +175,20 @@ export const MerchantLayout: React.FC = () => {
             </div>
           ) : restaurants.length === 0 ? (
             <MerchantOnboardingView onSuccess={handleOnboardingSuccess} />
+          ) : activeRestaurant?.approvalStatus === 'PENDING' ? (
+            <MerchantPendingApprovalGate
+              activeRestaurant={activeRestaurant}
+              restaurants={restaurants}
+              onSelectShop={handleSelectShop}
+              onOpenAddShopModal={() => setIsAddShopModalOpen(true)}
+            />
+          ) : activeRestaurant?.approvalStatus === 'REJECTED' ? (
+            <MerchantRejectedGate
+              activeRestaurant={activeRestaurant}
+              restaurants={restaurants}
+              onSelectShop={handleSelectShop}
+              onOpenAddShopModal={() => setIsAddShopModalOpen(true)}
+            />
           ) : (
             <Outlet
               key={activeRestaurant?.id || 'default-shop'}
