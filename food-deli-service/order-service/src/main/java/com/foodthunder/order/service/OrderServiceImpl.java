@@ -234,48 +234,82 @@ public class OrderServiceImpl implements OrderService {
         }
         BigDecimal taxAmount = serviceFee.add(vatAmount);
         BigDecimal discountAmount = BigDecimal.ZERO;
-        Integer appliedVoucherId = request.getVoucherId();
+        BigDecimal shippingDiscountAmount = BigDecimal.ZERO;
+        Integer appliedVoucherId = null;
+        String appliedVoucherCode = null;
+        Integer appliedSystemVoucherId = null;
+        String appliedSystemVoucherCode = null;
+        Set<Integer> voucherIdsToRedeem = new LinkedHashSet<>();
 
-        // 4.1 Validate & apply voucher if provided
-        String voucherCode = request.getVoucherCode();
-        if ((voucherCode != null && !voucherCode.isBlank()) || appliedVoucherId != null) {
-            if ((voucherCode == null || voucherCode.isBlank()) && appliedVoucherId != null) {
-                try {
-                    ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.getVoucherById(appliedVoucherId);
-                    if (vRes != null && vRes.getBody() != null && vRes.getBody().getData() != null) {
-                        voucherCode = vRes.getBody().getData().getCode();
-                    }
-                } catch (Exception ex) {
-                    log.warn("Could not fetch voucher by id {}: {}", appliedVoucherId, ex.getMessage());
+        // 4.1 Validate & apply shop voucher + system voucher (both optional, max 1 each)
+        boolean isNewUser = isNewUserForVouchers(customerId);
+        List<RemoteVoucherValidationResponse> validatedVouchers = new ArrayList<>();
+
+        String primaryCode = resolveVoucherCode(request.getVoucherId(), request.getVoucherCode());
+        RemoteVoucherValidationResponse primaryVoucher = null;
+        if (primaryCode != null && !primaryCode.isBlank()) {
+            primaryVoucher = validateSingleVoucher(
+                    primaryCode, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
+                    "Không thể áp dụng voucher: "
+            );
+            validatedVouchers.add(primaryVoucher);
+        }
+
+        String systemCode = resolveVoucherCode(request.getSystemVoucherId(), request.getSystemVoucherCode());
+        if (systemCode != null && !systemCode.isBlank()) {
+            boolean isSameAsPrimary = primaryVoucher != null
+                    && ((primaryVoucher.getCode() != null && primaryVoucher.getCode().equalsIgnoreCase(systemCode))
+                    || (request.getSystemVoucherId() != null && request.getSystemVoucherId().equals(primaryVoucher.getVoucherId())));
+            if (!isSameAsPrimary) {
+                RemoteVoucherValidationResponse systemVoucher = validateSingleVoucher(
+                        systemCode, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
+                        "Không thể áp dụng voucher toàn hệ thống: "
+                );
+                if (Boolean.FALSE.equals(systemVoucher.getIsSystemVoucher()) || systemVoucher.getRestaurantId() != null) {
+                    throw new BadRequestException("Mã '" + systemVoucher.getCode() + "' là voucher riêng của quán, không thể dùng ở mục Voucher toàn hệ thống");
                 }
-            }
-
-            if (voucherCode != null && !voucherCode.isBlank()) {
-                RemoteValidateVoucherRequest vReq = RemoteValidateVoucherRequest.builder()
-                        .code(voucherCode)
-                        .restaurantId(targetRestaurantId)
-                        .orderAmount(subtotal)
-                        .build();
-
-                try {
-                    ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.validateVoucher(vReq);
-                    RemoteVoucherValidationResponse vData = (vRes != null && vRes.getBody() != null) ? vRes.getBody().getData() : null;
-                    if (vData == null || !Boolean.TRUE.equals(vData.getIsValid())) {
-                        String errMsg = (vData != null && vData.getMessage() != null)
-                                ? vData.getMessage()
-                                : "Mã voucher không hợp lệ";
-                        throw new BadRequestException("Không thể áp dụng voucher: " + errMsg);
-                    }
-                    discountAmount = vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO;
-                    appliedVoucherId = vData.getVoucherId();
-                } catch (BadRequestException bre) {
-                    throw bre;
-                } catch (Exception ex) {
-                    log.error("Error validating voucher with restaurant-service: {}", ex.getMessage());
-                    throw new BadRequestException("Lỗi xác thực mã voucher: " + ex.getMessage());
+                if (primaryVoucher != null && Boolean.TRUE.equals(primaryVoucher.getIsSystemVoucher())) {
+                    throw new BadRequestException("Mỗi đơn hàng chỉ được áp dụng tối đa 1 voucher toàn hệ thống");
                 }
+                validatedVouchers.add(systemVoucher);
+                appliedSystemVoucherId = systemVoucher.getVoucherId();
+                appliedSystemVoucherCode = systemVoucher.getCode();
             }
         }
+
+        if (primaryVoucher != null) {
+            appliedVoucherId = primaryVoucher.getVoucherId();
+            appliedVoucherCode = primaryVoucher.getCode();
+            if (Boolean.TRUE.equals(primaryVoucher.getIsSystemVoucher()) && appliedSystemVoucherId == null) {
+                appliedSystemVoucherId = primaryVoucher.getVoucherId();
+                appliedSystemVoucherCode = primaryVoucher.getCode();
+            }
+        } else if (appliedSystemVoucherId != null) {
+            appliedVoucherId = appliedSystemVoucherId;
+            appliedVoucherCode = appliedSystemVoucherCode;
+        }
+
+        BigDecimal remainingFood = subtotal;
+        BigDecimal remainingShipping = shippingFee;
+        for (RemoteVoucherValidationResponse vData : validatedVouchers) {
+            if (vData.getVoucherId() != null) {
+                voucherIdsToRedeem.add(vData.getVoucherId());
+            }
+            if ("FREESHIP".equalsIgnoreCase(vData.getVoucherCategory())) {
+                BigDecimal rawShip = vData.getShippingDiscountAmount() != null
+                        ? vData.getShippingDiscountAmount()
+                        : (vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO);
+                BigDecimal appliedShip = rawShip.max(BigDecimal.ZERO).min(remainingShipping);
+                remainingShipping = remainingShipping.subtract(appliedShip);
+                shippingDiscountAmount = shippingDiscountAmount.add(appliedShip);
+            } else {
+                BigDecimal rawFood = vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO;
+                BigDecimal appliedFood = rawFood.max(BigDecimal.ZERO).min(remainingFood);
+                remainingFood = remainingFood.subtract(appliedFood);
+                discountAmount = discountAmount.add(appliedFood);
+            }
+        }
+        discountAmount = discountAmount.add(shippingDiscountAmount);
 
         BigDecimal totalAmount = subtotal.add(shippingFee).add(taxAmount).subtract(discountAmount);
         if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
@@ -316,6 +350,9 @@ public class OrderServiceImpl implements OrderService {
                 .customerPhone(finalCustomerPhone)
                 .restaurantId(targetRestaurantId)
                 .voucherId(appliedVoucherId)
+                .voucherCode(appliedVoucherCode)
+                .systemVoucherId(appliedSystemVoucherId)
+                .systemVoucherCode(appliedSystemVoucherCode)
                 .receiverAddress(request.getReceiverAddress())
                 .note(request.getNote())
                 .receiverLat(request.getReceiverLat())
@@ -324,6 +361,7 @@ public class OrderServiceImpl implements OrderService {
                 .subtotalAmount(subtotal)
                 .taxAmount(taxAmount)
                 .shippingFee(shippingFee)
+                .shippingDiscountAmount(shippingDiscountAmount)
                 .discountAmount(discountAmount)
                 .totalAmount(totalAmount)
                 .paymentMethod(paymentMethod)
@@ -356,6 +394,9 @@ public class OrderServiceImpl implements OrderService {
                 throw new BadRequestException("Không thể trừ số lượng tồn kho của món ăn: " + ex.getMessage());
             }
         }
+
+        // Redeem voucher usage counters cleanly with compensation on failure
+        redeemOrderVouchers(voucherIdsToRedeem, stockDeductItems);
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created successfully with id: {}, code: {}, paymentMethod: {}, discount: {}, status: {}",
@@ -573,6 +614,7 @@ public class OrderServiceImpl implements OrderService {
             order.setCancelledByUserId(requestingUserId);
             order.setCancelledAt(LocalDateTime.now());
             restoreProductStock(order);
+            releaseOrderVouchers(order);
         } else if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus) && requestingUserId != null) {
             order.setDriverId(requestingUserId);
         }
@@ -710,6 +752,9 @@ public class OrderServiceImpl implements OrderService {
                 .restaurantId(order.getRestaurantId())
                 .driverId(order.getDriverId())
                 .voucherId(order.getVoucherId())
+                .voucherCode(order.getVoucherCode())
+                .systemVoucherId(order.getSystemVoucherId())
+                .systemVoucherCode(order.getSystemVoucherCode())
                 .receiverAddress(order.getReceiverAddress())
                 .note(order.getNote())
                 .receiverLat(order.getReceiverLat())
@@ -718,6 +763,7 @@ public class OrderServiceImpl implements OrderService {
                 .subtotalAmount(order.getSubtotalAmount())
                 .taxAmount(order.getTaxAmount())
                 .shippingFee(order.getShippingFee())
+                .shippingDiscountAmount(order.getShippingDiscountAmount())
                 .discountAmount(order.getDiscountAmount())
                 .totalAmount(order.getTotalAmount())
                 .paymentMethod(order.getPaymentMethod())
@@ -790,6 +836,7 @@ public class OrderServiceImpl implements OrderService {
         order.addStatusLog(logEntry);
 
         restoreProductStock(order);
+        releaseOrderVouchers(order);
 
         Order saved = orderRepository.save(order);
         log.info("Order ID={} cancelled with reason: {}", orderId, reason);
@@ -797,6 +844,154 @@ public class OrderServiceImpl implements OrderService {
         broadcastOrderToMerchant(saved);
 
         return mapToOrderResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public VoucherEligibilityResponse getVoucherEligibility(Integer customerId) {
+        if (customerId == null) {
+            return VoucherEligibilityResponse.builder()
+                    .isNewUser(true)
+                    .priorOrderCount(0L)
+                    .build();
+        }
+        long priorOrders = orderRepository.countByCustomerIdAndDeletedAtIsNullAndStatus_CodeNotIn(
+                customerId,
+                List.of(OrderStatus.CANCELLED, OrderStatus.TIMEOUT)
+        );
+        return VoucherEligibilityResponse.builder()
+                .isNewUser(priorOrders == 0)
+                .priorOrderCount(priorOrders)
+                .build();
+    }
+
+    private boolean isNewUserForVouchers(Integer customerId) {
+        if (customerId == null) {
+            return true;
+        }
+        return !orderRepository.existsByCustomerIdAndDeletedAtIsNullAndStatus_CodeNotIn(
+                customerId,
+                List.of(OrderStatus.CANCELLED, OrderStatus.TIMEOUT)
+        );
+    }
+
+    private String resolveVoucherCode(Integer voucherId, String voucherCode) {
+        if (voucherCode != null && !voucherCode.isBlank()) {
+            return voucherCode.trim().toUpperCase(Locale.ROOT);
+        }
+        if (voucherId == null) {
+            return null;
+        }
+        try {
+            ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.getVoucherById(voucherId);
+            if (vRes != null && vRes.getBody() != null && vRes.getBody().getData() != null) {
+                String code = vRes.getBody().getData().getCode();
+                return code != null ? code.trim().toUpperCase(Locale.ROOT) : null;
+            }
+        } catch (Exception ex) {
+            log.warn("Could not fetch voucher by id {}: {}", voucherId, ex.getMessage());
+        }
+        throw new BadRequestException("Không tìm thấy thông tin mã voucher ID=" + voucherId);
+    }
+
+    private RemoteVoucherValidationResponse validateSingleVoucher(
+            String voucherCode,
+            Integer targetRestaurantId,
+            BigDecimal subtotal,
+            BigDecimal shippingFee,
+            Integer customerId,
+            boolean isNewUser,
+            String errorPrefix
+    ) {
+        RemoteValidateVoucherRequest vReq = RemoteValidateVoucherRequest.builder()
+                .code(voucherCode)
+                .restaurantId(targetRestaurantId)
+                .orderAmount(subtotal)
+                .shippingFee(shippingFee)
+                .customerId(customerId)
+                .isNewUser(isNewUser)
+                .build();
+
+        try {
+            ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> vRes = restaurantClient.validateVoucher(vReq);
+            RemoteVoucherValidationResponse vData = (vRes != null && vRes.getBody() != null) ? vRes.getBody().getData() : null;
+            if (vData == null || !Boolean.TRUE.equals(vData.getIsValid())) {
+                String errMsg = (vData != null && vData.getMessage() != null)
+                        ? vData.getMessage()
+                        : "Mã voucher không hợp lệ";
+                throw new BadRequestException(errorPrefix + errMsg);
+            }
+            return vData;
+        } catch (BadRequestException bre) {
+            throw bre;
+        } catch (Exception ex) {
+            log.error("Error validating voucher with restaurant-service: {}", ex.getMessage());
+            throw new BadRequestException("Lỗi xác thực mã voucher: " + ex.getMessage());
+        }
+    }
+
+    private void redeemOrderVouchers(
+            Set<Integer> voucherIdsToRedeem,
+            List<com.foodthunder.order.dto.client.RemoteDeductStockItemRequest> stockDeductItems
+    ) {
+        if (voucherIdsToRedeem == null || voucherIdsToRedeem.isEmpty()) {
+            return;
+        }
+        List<Integer> redeemedSoFar = new ArrayList<>();
+        for (Integer voucherId : voucherIdsToRedeem) {
+            try {
+                ResponseEntity<ApiResponse<Void>> res = restaurantClient.redeemVoucher(voucherId);
+                if (res != null && res.getBody() != null && res.getBody().getStatus() >= 400) {
+                    throw new BadRequestException(res.getBody().getMessage() != null
+                            ? res.getBody().getMessage()
+                            : "Không thể sử dụng voucher ID=" + voucherId);
+                }
+                redeemedSoFar.add(voucherId);
+            } catch (BadRequestException bre) {
+                compensateVoucherAndStock(redeemedSoFar, stockDeductItems);
+                throw bre;
+            } catch (Exception ex) {
+                compensateVoucherAndStock(redeemedSoFar, stockDeductItems);
+                throw new BadRequestException("Không thể ghi nhận lượt sử dụng voucher: " + ex.getMessage());
+            }
+        }
+    }
+
+    private void compensateVoucherAndStock(
+            List<Integer> redeemedVoucherIds,
+            List<com.foodthunder.order.dto.client.RemoteDeductStockItemRequest> stockDeductItems
+    ) {
+        for (Integer id : redeemedVoucherIds) {
+            try {
+                restaurantClient.releaseVoucher(id);
+            } catch (Exception ex) {
+                log.warn("Failed to release voucher ID={} during compensation: {}", id, ex.getMessage());
+            }
+        }
+        if (stockDeductItems != null && !stockDeductItems.isEmpty()) {
+            try {
+                restaurantClient.restoreStock(new com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest(stockDeductItems));
+            } catch (Exception ex) {
+                log.warn("Failed to restore stock during voucher compensation: {}", ex.getMessage());
+            }
+        }
+    }
+
+    private void releaseOrderVouchers(Order order) {
+        Set<Integer> idsToRelease = new LinkedHashSet<>();
+        if (order.getVoucherId() != null) {
+            idsToRelease.add(order.getVoucherId());
+        }
+        if (order.getSystemVoucherId() != null) {
+            idsToRelease.add(order.getSystemVoucherId());
+        }
+        for (Integer id : idsToRelease) {
+            try {
+                restaurantClient.releaseVoucher(id);
+            } catch (Exception ex) {
+                log.warn("Failed to release voucher ID={} on order cancellation {}: {}", id, order.getId(), ex.getMessage());
+            }
+        }
     }
 
     private void restoreProductStock(Order order) {

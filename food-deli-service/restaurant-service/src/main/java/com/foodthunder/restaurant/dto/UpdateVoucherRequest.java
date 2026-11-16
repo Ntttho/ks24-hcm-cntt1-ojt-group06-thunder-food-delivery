@@ -15,6 +15,9 @@ import java.time.LocalDateTime;
 @Builder
 public class UpdateVoucherRequest {
 
+    @Pattern(regexp = "^[A-Za-z0-9_]{2,50}$", message = "Danh mục voucher chỉ chứa chữ, số, gạch dưới")
+    private String voucherCategory;
+
     @Pattern(regexp = "^(FIXED|PERCENTAGE)$", message = "Loại giảm giá phải là FIXED hoặc PERCENTAGE")
     private String discountType;
 

@@ -29,6 +29,9 @@ export interface CreateOrderPayload {
   distanceKm?: number;
   deliverySpeed?: 'priority' | 'standard' | 'schedule';
   voucherId?: number;
+  voucherCode?: string;
+  systemVoucherId?: number;
+  systemVoucherCode?: string;
   idempotencyKey?: string;
   items: CreateOrderItemPayload[];
   paymentMethod?: 'COD' | 'MOMO' | 'VNPAY' | 'WALLET';
@@ -47,6 +50,10 @@ export const orderApi = {
 
   getMyOrders: async (params?: { page?: number; size?: number }): Promise<ApiResponse<any>> => {
     return apiClient.get('/orders/my-orders', { params });
+  },
+
+  getVoucherEligibility: async (): Promise<ApiResponse<{ isNewUser: boolean; priorOrderCount: number }>> => {
+    return apiClient.get(API_ENDPOINTS.ORDERS.VOUCHER_ELIGIBILITY);
   },
 
   getAll: async (params?: Record<string, any>): Promise<ApiResponse<any>> => {

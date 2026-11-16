@@ -34,6 +34,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     Optional<Order> findByIdAndCustomerId(Long id, Integer customerId);
 
+    boolean existsByCustomerIdAndDeletedAtIsNullAndStatus_CodeNotIn(Integer customerId, Collection<String> excludedStatusCodes);
+
+    long countByCustomerIdAndDeletedAtIsNullAndStatus_CodeNotIn(Integer customerId, Collection<String> excludedStatusCodes);
+
     @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.items WHERE o.id IN :orderIds")
     List<Order> findAllWithItemsByIdIn(@Param("orderIds") Collection<Long> orderIds);
     @Query("SELECT o FROM Order o WHERE o.restaurantId = :restaurantId " +

@@ -22,6 +22,10 @@ public class Voucher {
     @Column(name = "restaurant_id")
     private Integer restaurantId; // null = global voucher, not null = restaurant voucher
 
+    @Column(name = "voucher_category", length = 50)
+    @Builder.Default
+    private String voucherCategory = "DISCOUNT_FOOD"; // FREESHIP, DISCOUNT_FOOD, NEW_USER
+
     @Column(name = "code", nullable = false, unique = true, length = 20)
     private String code;
 

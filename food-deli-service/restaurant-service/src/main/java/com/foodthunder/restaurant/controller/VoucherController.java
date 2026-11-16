@@ -52,14 +52,17 @@ public class VoucherController {
     }
 
     /**
-     * Lấy danh sách voucher (có thể lọc theo quán)
-     * GET /api/v1/vouchers?restaurantId=1
+     * Lấy danh sách voucher (hỗ trợ lọc theo quán, scope SYSTEM/RESTAURANT/ALL, category, activeOnly)
+     * GET /api/v1/vouchers?restaurantId=1&scope=SYSTEM&category=FREESHIP
      */
     @GetMapping
     public ResponseEntity<ApiResponse<List<VoucherDto>>> getVouchers(
-            @RequestParam(required = false) Integer restaurantId
+            @RequestParam(required = false) Integer restaurantId,
+            @RequestParam(required = false) String scope,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) Boolean activeOnly
     ) {
-        List<VoucherDto> vouchers = voucherService.getVouchers(restaurantId);
+        List<VoucherDto> vouchers = voucherService.getVouchers(restaurantId, scope, category, activeOnly);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách voucher thành công", vouchers));
     }
 
@@ -114,5 +117,25 @@ public class VoucherController {
     ) {
         VoucherDto updated = voucherService.toggleVoucherStatus(id, userId, userRole);
         return ResponseEntity.ok(ApiResponse.success("Đã thay đổi trạng thái voucher", updated));
+    }
+
+    /**
+     * Khấu trừ 1 lượt sử dụng voucher nguyên tử khi tạo đơn hàng (order-service nội bộ)
+     * POST/PUT /api/v1/vouchers/{id}/redeem
+     */
+    @RequestMapping(value = "/{id}/redeem", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<ApiResponse<VoucherDto>> redeemVoucher(@PathVariable Integer id) {
+        VoucherDto updated = voucherService.redeemVoucher(id);
+        return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận lượt sử dụng voucher", updated));
+    }
+
+    /**
+     * Hoàn trả 1 lượt sử dụng voucher khi đơn hàng bị hủy/quá hạn (order-service nội bộ)
+     * POST/PUT /api/v1/vouchers/{id}/release
+     */
+    @RequestMapping(value = "/{id}/release", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<ApiResponse<VoucherDto>> releaseVoucher(@PathVariable Integer id) {
+        VoucherDto updated = voucherService.releaseVoucher(id);
+        return ResponseEntity.ok(ApiResponse.success("Đã hoàn trả lượt sử dụng voucher", updated));
     }
 }

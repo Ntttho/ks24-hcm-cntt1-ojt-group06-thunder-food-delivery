@@ -37,6 +37,12 @@ public interface RestaurantClient {
     @GetMapping("/api/v1/vouchers/{id}")
     ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> getVoucherById(@PathVariable("id") Integer id);
 
+    @PostMapping("/api/v1/vouchers/{id}/redeem")
+    ResponseEntity<ApiResponse<Void>> redeemVoucher(@PathVariable("id") Integer id);
+
+    @PostMapping("/api/v1/vouchers/{id}/release")
+    ResponseEntity<ApiResponse<Void>> releaseVoucher(@PathVariable("id") Integer id);
+
     @GetMapping("/api/v1/restaurants/admin/analytics-counts")
     ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> getRestaurantAnalyticsCounts();
 

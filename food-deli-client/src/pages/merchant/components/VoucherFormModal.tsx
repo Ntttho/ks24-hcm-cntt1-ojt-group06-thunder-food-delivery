@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Form,
@@ -11,6 +11,7 @@ import {
   Space,
   Row,
   Col,
+  Tag,
 } from 'antd';
 import {
   GiftOutlined,
@@ -18,20 +19,30 @@ import {
   TagOutlined,
   DollarOutlined,
   PercentageOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type {
-  VoucherItem,
-  CreateVoucherPayload,
-  UpdateVoucherPayload,
+import {
+  restaurantApi,
+  type VoucherItem,
+  type VoucherCategoryItem,
+  type CreateVoucherPayload,
+  type UpdateVoucherPayload,
 } from '@/services/modules/restaurantApi';
 
 const { RangePicker } = DatePicker;
 
+const DEFAULT_VOUCHER_CATEGORIES: VoucherCategoryItem[] = [
+  { id: 1, code: 'DISCOUNT_FOOD', name: 'Giảm giá món ăn', isActive: true },
+  { id: 2, code: 'FREESHIP', name: 'Miễn phí vận chuyển', isActive: true },
+  { id: 3, code: 'NEW_USER', name: 'Khách hàng mới', isActive: true },
+];
+
 interface VoucherFormModalProps {
   isOpen: boolean;
   editingVoucher: VoucherItem | null;
-  restaurantId: number | string;
+  restaurantId?: number | string | null;
+  scopeMode?: 'MERCHANT' | 'ADMIN';
   submitting: boolean;
   onClose: () => void;
   onSubmit: (values: CreateVoucherPayload | UpdateVoucherPayload) => Promise<void>;
@@ -41,18 +52,36 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
   isOpen,
   editingVoucher,
   restaurantId,
+  scopeMode = 'MERCHANT',
   submitting,
   onClose,
   onSubmit,
 }) => {
   const [form] = Form.useForm();
   const discountType = Form.useWatch('discountType', form);
+  const voucherCategory = Form.useWatch('voucherCategory', form);
+  const [categories, setCategories] = useState<VoucherCategoryItem[]>(DEFAULT_VOUCHER_CATEGORIES);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    restaurantApi
+      .getVoucherCategories(true)
+      .then((res) => {
+        if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
+          setCategories(res.data);
+        }
+      })
+      .catch(() => {
+        setCategories(DEFAULT_VOUCHER_CATEGORIES);
+      });
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
       if (editingVoucher) {
         form.setFieldsValue({
           code: editingVoucher.code,
+          voucherCategory: editingVoucher.voucherCategory || 'DISCOUNT_FOOD',
           discountType: editingVoucher.discountType || 'FIXED',
           discountValue: editingVoucher.discountValue,
           maxDiscountAmount: editingVoucher.maxDiscountAmount,
@@ -67,15 +96,16 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
       } else {
         form.resetFields();
         form.setFieldsValue({
+          voucherCategory: scopeMode === 'ADMIN' ? 'FREESHIP' : 'DISCOUNT_FOOD',
           discountType: 'FIXED',
-          discountValue: 20000,
+          discountValue: scopeMode === 'ADMIN' ? 15000 : 20000,
           minOrderValue: 50000,
           dateRange: [dayjs(), dayjs().add(30, 'day')],
           isActive: true,
         });
       }
     }
-  }, [isOpen, editingVoucher, form]);
+  }, [isOpen, editingVoucher, scopeMode, form]);
 
   const handleFinish = async (values: any) => {
     const startDate = values.dateRange?.[0]
@@ -87,6 +117,7 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
 
     if (editingVoucher) {
       const payload: UpdateVoucherPayload = {
+        voucherCategory: values.voucherCategory || 'DISCOUNT_FOOD',
         discountType: values.discountType,
         discountValue: Number(values.discountValue),
         maxDiscountAmount:
@@ -102,7 +133,8 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
       await onSubmit(payload);
     } else {
       const payload: CreateVoucherPayload = {
-        restaurantId: Number(restaurantId),
+        restaurantId: scopeMode === 'ADMIN' ? undefined : Number(restaurantId),
+        voucherCategory: values.voucherCategory || 'DISCOUNT_FOOD',
         code: values.code.trim().toUpperCase(),
         discountType: values.discountType,
         discountValue: Number(values.discountValue),
@@ -131,18 +163,25 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             <GiftOutlined className="text-orange-500 text-lg" />
           )}
           <span className="font-bold text-slate-800">
-            {editingVoucher ? 'Chỉnh Sửa Voucher' : 'Tạo Mã Giảm Giá Mới'}
+            {editingVoucher
+              ? 'Chỉnh Sửa Voucher'
+              : scopeMode === 'ADMIN'
+              ? 'Tạo Voucher Toàn Hệ Thống'
+              : 'Tạo Mã Giảm Giá Quán Ăn'}
           </span>
+          <Tag color={scopeMode === 'ADMIN' ? 'volcano' : 'purple'} className="ml-1 text-[11px] font-semibold">
+            {scopeMode === 'ADMIN' ? 'Toàn sàn' : 'Quán ăn'}
+          </Tag>
         </div>
       }
       footer={null}
       destroyOnClose
-      width={600}
+      width={620}
       centered
     >
       <Form form={form} layout="vertical" onFinish={handleFinish} className="pt-3">
         <Row gutter={16}>
-          <Col span={14}>
+          <Col span={12}>
             <Form.Item
               name="code"
               label={<span className="font-semibold text-slate-700">Mã voucher</span>}
@@ -156,14 +195,32 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             >
               <Input
                 prefix={<TagOutlined className="text-slate-400" />}
-                placeholder="Ví dụ: GIAM20K, CHAOBANMOI"
+                placeholder="Ví dụ: FREESHIP, GIAM20K"
                 disabled={!!editingVoucher}
                 className="uppercase font-mono"
               />
             </Form.Item>
           </Col>
 
-          <Col span={10}>
+          <Col span={12}>
+            <Form.Item
+              name="voucherCategory"
+              label={<span className="font-semibold text-slate-700">Danh mục Voucher</span>}
+              rules={[{ required: true, message: 'Chọn danh mục voucher!' }]}
+            >
+              <Select
+                suffixIcon={<AppstoreOutlined />}
+                options={categories.map((cat) => ({
+                  value: cat.code,
+                  label: `${cat.name} (${cat.code})`,
+                }))}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+
+        <Row gutter={16}>
+          <Col span={24}>
             <Form.Item
               name="discountType"
               label={<span className="font-semibold text-slate-700">Loại giảm giá</span>}
@@ -175,7 +232,8 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
                     value: 'FIXED',
                     label: (
                       <span>
-                        <DollarOutlined className="text-emerald-500 mr-1.5" /> Số tiền cố định
+                        <DollarOutlined className="text-emerald-500 mr-1.5" /> Số tiền cố định (VNĐ)
+                        {voucherCategory === 'FREESHIP' ? ' — Trừ vào phí giao hàng' : ''}
                       </span>
                     ),
                   },
@@ -184,6 +242,7 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
                     label: (
                       <span>
                         <PercentageOutlined className="text-blue-500 mr-1.5" /> Phần trăm (%)
+                        {voucherCategory === 'FREESHIP' ? ' — Giảm % phí giao hàng' : ''}
                       </span>
                     ),
                   },

@@ -26,6 +26,10 @@ public class CreateOrderRequest {
 
     private String voucherCode;
 
+    private Integer systemVoucherId;
+
+    private String systemVoucherCode;
+
     @NotBlank(message = "Địa chỉ nhận hàng (receiverAddress) không được để trống")
     private String receiverAddress;
 

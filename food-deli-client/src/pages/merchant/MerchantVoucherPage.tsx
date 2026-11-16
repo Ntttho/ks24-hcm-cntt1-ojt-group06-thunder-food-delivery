@@ -50,17 +50,21 @@ export const MerchantVoucherPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchText, setSearchText] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
   // Modal Create/Edit state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingVoucher, setEditingVoucher] = useState<VoucherItem | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Fetch Vouchers from API
+  // Fetch Restaurant Vouchers from API (exclude System Vouchers owned by Admin)
   const fetchVouchers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await restaurantApi.getVouchers(currentRestaurantId);
+      const res = await restaurantApi.getVouchers({
+        restaurantId: currentRestaurantId,
+        scope: 'RESTAURANT',
+      });
       if (res && res.data) {
         setVouchers(Array.isArray(res.data) ? res.data : []);
       }
@@ -75,7 +79,7 @@ export const MerchantVoucherPage: React.FC = () => {
     fetchVouchers();
   }, [fetchVouchers]);
 
-  // Client-side search and status filtering
+  // Client-side search, category and status filtering
   const filteredVouchers = useMemo(() => {
     const q = searchText.trim().toLowerCase();
     const now = new Date();
@@ -84,7 +88,12 @@ export const MerchantVoucherPage: React.FC = () => {
       const matchesSearch =
         q === '' ||
         v.code.toLowerCase().includes(q) ||
-        (v.discountType && v.discountType.toLowerCase().includes(q));
+        (v.discountType && v.discountType.toLowerCase().includes(q)) ||
+        (v.voucherCategory && v.voucherCategory.toLowerCase().includes(q));
+
+      const matchesCategory =
+        categoryFilter === 'ALL' ||
+        (v.voucherCategory || 'DISCOUNT_FOOD').toUpperCase() === categoryFilter;
 
       const isExpired = v.expiryDate ? new Date(v.expiryDate) < now : false;
 
@@ -97,9 +106,9 @@ export const MerchantVoucherPage: React.FC = () => {
         matchesStatus = isExpired;
       }
 
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [vouchers, searchText, statusFilter]);
+  }, [vouchers, searchText, categoryFilter, statusFilter]);
 
   // Handle open create modal
   const handleOpenCreateModal = () => {
@@ -169,11 +178,23 @@ export const MerchantVoucherPage: React.FC = () => {
       title: 'Mã Voucher',
       dataIndex: 'code',
       key: 'code',
-      render: (code: string) => (
-        <div className="flex items-center gap-2">
-          <Tag color="purple" className="font-mono font-bold text-xs uppercase px-2 py-1 tracking-wider">
+      render: (code: string, record: VoucherItem) => (
+        <div className="flex flex-col gap-1 items-start">
+          <Tag color="purple" className="font-mono font-bold text-xs uppercase px-2 py-1 tracking-wider m-0">
             <GiftOutlined className="mr-1" />
             {code}
+          </Tag>
+          <Tag
+            color={
+              record.voucherCategory === 'FREESHIP'
+                ? 'cyan'
+                : record.voucherCategory === 'NEW_USER'
+                ? 'gold'
+                : 'blue'
+            }
+            className="text-[10px] font-semibold m-0"
+          >
+            {record.voucherCategory || 'DISCOUNT_FOOD'}
           </Tag>
         </div>
       ),
@@ -383,6 +404,18 @@ export const MerchantVoucherPage: React.FC = () => {
                 { value: 'ACTIVE', label: 'Đang hoạt động' },
                 { value: 'INACTIVE', label: 'Đang tạm dừng' },
                 { value: 'EXPIRED', label: 'Đã hết hạn' },
+              ]}
+              className="rounded-lg"
+            />
+            <Select
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              style={{ width: 185 }}
+              options={[
+                { value: 'ALL', label: 'Tất cả danh mục' },
+                { value: 'DISCOUNT_FOOD', label: 'Giảm giá món ăn' },
+                { value: 'FREESHIP', label: 'Miễn phí vận chuyển' },
+                { value: 'NEW_USER', label: 'Khách hàng mới' },
               ]}
               className="rounded-lg"
             />

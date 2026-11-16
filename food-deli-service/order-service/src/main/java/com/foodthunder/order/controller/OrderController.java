@@ -60,6 +60,19 @@ public class OrderController {
     }
 
     /**
+     * GET /api/v1/orders/voucher-eligibility
+     * Kiểm tra điều kiện áp dụng voucher khách hàng mới (NEW_USER) cho tài khoản hiện tại.
+     */
+    @GetMapping("/voucher-eligibility")
+    public ResponseEntity<ApiResponse<VoucherEligibilityResponse>> getVoucherEligibility(
+            @RequestHeader(value = "X-User-Id", required = false) String userIdHeader
+    ) {
+        Integer customerId = parseUserId(userIdHeader, null);
+        VoucherEligibilityResponse response = orderService.getVoucherEligibility(customerId);
+        return ResponseEntity.ok(ApiResponse.success("Kiểm tra điều kiện voucher thành công", response));
+    }
+
+    /**
      * GET /api/v1/orders/{id}
      * Xem chi tiết đơn hàng và toàn bộ lịch sử tiến trình (State logs).
      */

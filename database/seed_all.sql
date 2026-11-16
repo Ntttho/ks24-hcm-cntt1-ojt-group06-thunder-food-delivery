@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS `categories`;
 DROP TABLE IF EXISTS `restaurant_change_requests`;
 DROP TABLE IF EXISTS `restaurants`;
 DROP TABLE IF EXISTS `vouchers`;
+DROP TABLE IF EXISTS `voucher_categories`;
 DROP TABLE IF EXISTS `system_settings`;
 DROP TABLE IF EXISTS `user_addresses`;
 DROP TABLE IF EXISTS `merchant_details`;
@@ -215,9 +216,22 @@ CREATE TABLE `food_toppings` (
   CONSTRAINT `fk_food_toppings_topping` FOREIGN KEY (`topping_id`) REFERENCES `toppings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `voucher_categories` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(50) NOT NULL,               -- VD: FREESHIP, DISCOUNT_FOOD, NEW_USER
+  `name` VARCHAR(100) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_voucher_categories_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `vouchers` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT DEFAULT NULL,          -- [Logical FK] NULL = Voucher toàn sàn, NOT NULL = Voucher riêng của quán (restaurants.id)
+  `voucher_category` VARCHAR(50) NOT NULL DEFAULT 'DISCOUNT_FOOD', -- FREESHIP, DISCOUNT_FOOD, NEW_USER
   `code` VARCHAR(20) NOT NULL,
   `discount_type` VARCHAR(20) NOT NULL DEFAULT 'FIXED', -- FIXED (giảm tiền mặt), PERCENTAGE (giảm %)
   `discount_value` DECIMAL(10,2) NOT NULL DEFAULT '0.00', -- Giá trị giảm (tiền hoặc %)
@@ -231,7 +245,8 @@ CREATE TABLE `vouchers` (
   `is_active` TINYINT(1) DEFAULT '1',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_vouchers_code` (`code`),
-  KEY `idx_vouchers_restaurant_id` (`restaurant_id`)
+  KEY `idx_vouchers_restaurant_id` (`restaurant_id`),
+  KEY `idx_vouchers_category` (`voucher_category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
@@ -258,7 +273,10 @@ CREATE TABLE `orders` (
   `customer_phone` VARCHAR(20) DEFAULT NULL,  -- Snapshot SĐT khách lúc đặt đơn
   `restaurant_id` INT NOT NULL,           -- [Logical FK] trỏ sang restaurant-service: restaurants.id
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
-  `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
+  `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher quán / chính)
+  `voucher_code` VARCHAR(30) DEFAULT NULL,-- Snapshot mã voucher chính
+  `system_voucher_id` INT DEFAULT NULL,   -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher toàn sàn)
+  `system_voucher_code` VARCHAR(30) DEFAULT NULL, -- Snapshot mã voucher toàn sàn
   `receiver_address` TEXT,                -- Snapshot dữ liệu lúc đặt đơn
   `note` TEXT DEFAULT NULL,               -- Ghi chú của khách cho Quán ăn & Tài xế
   `receiver_lat` DOUBLE DEFAULT NULL,
@@ -267,6 +285,7 @@ CREATE TABLE `orders` (
   `subtotal_amount` DECIMAL(10,2) DEFAULT NULL,
   `tax_amount` DECIMAL(10,2) DEFAULT '0.00',
   `shipping_fee` DECIMAL(10,2) DEFAULT NULL,
+  `shipping_discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `total_amount` DECIMAL(10,2) DEFAULT NULL,
   `status_id` INT NOT NULL,               -- [Physical FK] trỏ sang order_statuses nội bộ
@@ -534,13 +553,19 @@ INSERT INTO `system_settings` (`id`, `config_key`, `config_value`, `description`
 (1, 'shipping_config', '{"base_km": 2, "base_fee": 15000, "extra_per_km": 5000}', 'Cấu hình tính phí giao hàng'),
 (2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT');
 
+-- 7b. Voucher Categories
+INSERT INTO `voucher_categories` (`id`, `code`, `name`, `description`, `is_active`) VALUES
+(1, 'FREESHIP', 'Miễn phí vận chuyển', 'Mã ưu đãi giảm trực tiếp vào phí giao hàng', 1),
+(2, 'DISCOUNT_FOOD', 'Giảm giá món ăn', 'Mã giảm giá trực tiếp hoặc theo % áp dụng cho giá trị món ăn', 1),
+(3, 'NEW_USER', 'Khách hàng mới', 'Mã khuyến mãi đặc biệt dành riêng cho đơn hàng đầu tiên', 1);
+
 -- 8. Vouchers
-INSERT INTO `vouchers` (`id`, `restaurant_id`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES
-(1, NULL, 'FREESHIP', 'FIXED', 15000.00, 15000.00, NULL, 50000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(2, NULL, 'FLASHFOOD20', 'FIXED', 20000.00, 20000.00, NULL, 80000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(3, NULL, 'WELCOME50', 'FIXED', 50000.00, 50000.00, NULL, 150000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(4, 1, 'HANHDUNG10', 'PERCENTAGE', 10.00, 10.00, 30000.00, 50000.00, 100, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
-(5, 1, 'HANHDUNG25K', 'FIXED', 25000.00, 25000.00, NULL, 100000.00, 50, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1);
+INSERT INTO `vouchers` (`id`, `restaurant_id`, `voucher_category`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES
+(1, NULL, 'FREESHIP', 'FREESHIP', 'FIXED', 15000.00, 15000.00, NULL, 50000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(2, NULL, 'DISCOUNT_FOOD', 'FLASHFOOD20', 'FIXED', 20000.00, 20000.00, NULL, 80000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(3, NULL, 'NEW_USER', 'WELCOME50', 'FIXED', 50000.00, 50000.00, NULL, 150000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(4, 1, 'DISCOUNT_FOOD', 'HANHDUNG10', 'PERCENTAGE', 10.00, 10.00, 30000.00, 50000.00, 100, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
+(5, 1, 'DISCOUNT_FOOD', 'HANHDUNG25K', 'FIXED', 25000.00, 25000.00, NULL, 100000.00, 50, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1);
 
 -- 9. Restaurants
 INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `longitude`, `opening_time`, `closing_time`, `is_open`, `is_open_today`, `temporary_closed_reason`, `temporary_closed_until`, `image_url`, `rating_avg`, `approval_status`, `approved_by`, `approved_at`, `reject_reason`, `deleted_at`) VALUES

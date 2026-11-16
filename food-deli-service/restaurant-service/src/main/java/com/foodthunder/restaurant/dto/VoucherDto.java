@@ -13,6 +13,8 @@ import java.time.LocalDateTime;
 public class VoucherDto {
     private Integer id;
     private Integer restaurantId;
+    private Boolean isSystemVoucher;
+    private String voucherCategory;
     private String code;
     private String discountType;
     private BigDecimal discountValue;

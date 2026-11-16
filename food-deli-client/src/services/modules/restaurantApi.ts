@@ -71,9 +71,34 @@ export interface MenuCategoryItem {
   itemCount?: number;
 }
 
+export interface VoucherCategoryItem {
+  id: number;
+  code: string;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateVoucherCategoryPayload {
+  code: string;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateVoucherCategoryPayload {
+  name?: string;
+  description?: string;
+  isActive?: boolean;
+}
+
 export interface VoucherItem {
   id: number;
-  restaurantId?: number;
+  restaurantId?: number | null;
+  isSystemVoucher?: boolean;
+  voucherCategory?: string;
   code: string;
   discountType: 'FIXED' | 'PERCENTAGE';
   discountValue: number;
@@ -88,7 +113,8 @@ export interface VoucherItem {
 }
 
 export interface CreateVoucherPayload {
-  restaurantId?: number;
+  restaurantId?: number | null;
+  voucherCategory?: string;
   code: string;
   discountType: 'FIXED' | 'PERCENTAGE';
   discountValue: number;
@@ -100,6 +126,7 @@ export interface CreateVoucherPayload {
 }
 
 export interface UpdateVoucherPayload {
+  voucherCategory?: string;
   discountType?: 'FIXED' | 'PERCENTAGE';
   discountValue?: number;
   maxDiscountAmount?: number;
@@ -108,6 +135,30 @@ export interface UpdateVoucherPayload {
   startDate?: string;
   expiryDate?: string;
   isActive?: boolean;
+}
+
+export interface ValidateVoucherPayload {
+  code: string;
+  restaurantId?: number;
+  orderAmount: number;
+  shippingFee?: number;
+  customerId?: number;
+  isNewUser?: boolean;
+}
+
+export interface VoucherValidationResult {
+  voucherId?: number;
+  restaurantId?: number | null;
+  isSystemVoucher?: boolean;
+  voucherCategory?: string;
+  code: string;
+  discountType?: 'FIXED' | 'PERCENTAGE';
+  discountValue?: number;
+  discountAmount?: number;
+  shippingDiscountAmount?: number;
+  minOrderValue?: number;
+  isValid: boolean;
+  message: string;
 }
 
 export interface ProductPayload {
@@ -260,8 +311,26 @@ export const restaurantApi = {
     return apiClient.delete<void>(`/categories/${id}`);
   },
 
-  getVouchers: async (restaurantId?: number | string): Promise<ApiResponse<VoucherItem[]>> => {
-    return apiClient.get<VoucherItem[]>('/vouchers', { params: { restaurantId } });
+  getVouchers: async (
+    paramsOrRestaurantId?:
+      | number
+      | string
+      | {
+          restaurantId?: number | string;
+          scope?: 'ALL' | 'SYSTEM' | 'RESTAURANT';
+          category?: string;
+          activeOnly?: boolean;
+        }
+  ): Promise<ApiResponse<VoucherItem[]>> => {
+    const params =
+      paramsOrRestaurantId !== undefined && typeof paramsOrRestaurantId === 'object'
+        ? paramsOrRestaurantId
+        : { restaurantId: paramsOrRestaurantId };
+    return apiClient.get<VoucherItem[]>('/vouchers', { params });
+  },
+
+  validateVoucher: async (payload: ValidateVoucherPayload): Promise<ApiResponse<VoucherValidationResult>> => {
+    return apiClient.post<VoucherValidationResult>('/vouchers/validate', payload);
   },
 
   getVoucherById: async (id: number | string): Promise<ApiResponse<VoucherItem>> => {
@@ -282,6 +351,31 @@ export const restaurantApi = {
 
   toggleVoucher: async (id: number | string): Promise<ApiResponse<VoucherItem>> => {
     return apiClient.patch<VoucherItem>(`/vouchers/${id}/toggle`);
+  },
+
+  getVoucherCategories: async (activeOnly?: boolean): Promise<ApiResponse<VoucherCategoryItem[]>> => {
+    return apiClient.get<VoucherCategoryItem[]>('/voucher-categories', {
+      params: activeOnly !== undefined ? { activeOnly } : undefined,
+    });
+  },
+
+  createVoucherCategory: async (payload: CreateVoucherCategoryPayload): Promise<ApiResponse<VoucherCategoryItem>> => {
+    return apiClient.post<VoucherCategoryItem>('/voucher-categories', payload);
+  },
+
+  updateVoucherCategory: async (
+    id: number | string,
+    payload: UpdateVoucherCategoryPayload
+  ): Promise<ApiResponse<VoucherCategoryItem>> => {
+    return apiClient.put<VoucherCategoryItem>(`/voucher-categories/${id}`, payload);
+  },
+
+  toggleVoucherCategory: async (id: number | string): Promise<ApiResponse<VoucherCategoryItem>> => {
+    return apiClient.patch<VoucherCategoryItem>(`/voucher-categories/${id}/toggle`);
+  },
+
+  deleteVoucherCategory: async (id: number | string): Promise<ApiResponse<void>> => {
+    return apiClient.delete<void>(`/voucher-categories/${id}`);
   },
 
   getProductDetail: async (productId: number | string): Promise<ApiResponse<ProductDetailItem>> => {
