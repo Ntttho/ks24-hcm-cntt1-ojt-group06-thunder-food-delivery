@@ -8,6 +8,7 @@ import {
   Tooltip,
   FloatButton,
   message,
+  notification,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -262,6 +263,27 @@ export const OrderDetailPage: React.FC = () => {
 
         // Tự động kiểm tra / mở khóa quyền đánh giá khi đơn chuyển sang COMPLETED / DELIVERED
         if (['DELIVERED', 'COMPLETED'].includes(newStatusCode)) {
+          // Bật thông báo hoàn thành đơn hàng và gợi ý đánh giá
+          notification.success({
+            message: '🎉 Đơn hàng đã giao thành công!',
+            description: 'Món ăn đã được giao tới bạn. Hãy để lại đánh giá cho Quán ăn và Tài xế nhé!',
+            placement: 'topRight',
+            duration: 6,
+            btn: (
+              <Button
+                type="primary"
+                size="small"
+                className="bg-orange-500 hover:bg-orange-600 rounded-lg font-bold"
+                onClick={() => {
+                  notification.destroy();
+                  setIsRestaurantReviewOpen(true);
+                }}
+              >
+                Đánh giá ngay
+              </Button>
+            ),
+          });
+
           reviewApi
             .getOrderReviewStatus(prev.id)
             .then((reviewRes) => {
@@ -483,6 +505,61 @@ export const OrderDetailPage: React.FC = () => {
           statusCode={order.statusCode}
           animationKey={statusAnimationKey}
         />
+
+        {/* Khối hành động nổi bật khi đơn hàng Hoàn thành (Unlock Actions) */}
+        {isCompleted && (
+          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-green-50 border border-emerald-200 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center font-black text-xl shrink-0 shadow-md">
+                🎉
+              </div>
+              <div>
+                <h4 className="text-base font-extrabold text-slate-900 mb-0.5">
+                  Đơn hàng đã được giao thành công!
+                </h4>
+                <p className="text-xs text-slate-600 mb-0">
+                  Cảm ơn bạn đã tin dùng Food Thunder. Hãy để lại đánh giá để giúp quán và tài xế phục vụ tốt hơn nhé!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end shrink-0">
+              {/* Nút đánh giá quán */}
+              {restaurantReviewed ? (
+                <Tag color="orange" className="text-xs py-1.5 px-3 font-bold rounded-xl m-0 flex items-center gap-1">
+                  <StarFilled className="text-amber-500" /> Quán: Đã đánh giá
+                </Tag>
+              ) : (
+                <Button
+                  type="primary"
+                  icon={<ShopOutlined />}
+                  onClick={() => setIsRestaurantReviewOpen(true)}
+                  className="bg-orange-500 hover:bg-orange-600 font-bold rounded-xl text-xs h-9 shadow-xs"
+                >
+                  Đánh giá quán
+                </Button>
+              )}
+
+              {/* Nút đánh giá tài xế */}
+              {order.driverId ? (
+                driverReviewed ? (
+                  <Tag color="green" className="text-xs py-1.5 px-3 font-bold rounded-xl m-0 flex items-center gap-1">
+                    <StarFilled className="text-emerald-500" /> Tài xế: Đã đánh giá
+                  </Tag>
+                ) : (
+                  <Button
+                    type="primary"
+                    icon={<CarOutlined />}
+                    onClick={() => setIsDriverReviewOpen(true)}
+                    className="bg-emerald-600 hover:bg-emerald-700 font-bold rounded-xl text-xs h-9 shadow-xs"
+                  >
+                    Đánh giá tài xế
+                  </Button>
+                )
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {/* Live Interactive Map Route with Simulation */}
         <GoogleMapRouteView
