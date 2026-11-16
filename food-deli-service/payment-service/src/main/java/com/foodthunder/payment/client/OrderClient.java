@@ -22,5 +22,12 @@ public interface OrderClient {
             @RequestBody RemoteUpdateOrderStatusRequest request,
             @RequestHeader(value = "X-User-Role", defaultValue = "SYSTEM") String role,
             @RequestHeader(value = "X-User-Id", defaultValue = "0") String userId);
+
+    @PutMapping("/api/v1/orders/{id}/payment-success")
+    ResponseEntity<ApiResponse<RemoteOrderDto>> confirmPaymentSuccess(
+            @PathVariable("id") Long id,
+            @RequestParam(value = "transactionNo", required = false) String transactionNo,
+            @RequestHeader(value = "X-User-Role", defaultValue = "SYSTEM") String role,
+            @RequestHeader(value = "X-User-Id", defaultValue = "0") String userId);
 }
 

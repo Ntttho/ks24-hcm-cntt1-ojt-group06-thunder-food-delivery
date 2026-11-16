@@ -45,17 +45,24 @@ public final class VietQrUtil {
 
     /**
      * Sinh cú pháp nội dung chuyển khoản định danh đơn hàng:
-     * Ví dụ: FOODDELI ORD123
+     * Tiền tố FDL + tối thiểu 3 chữ số: FDL001, FDL123
      */
     public static String buildPaymentContent(String prefix, Long orderId) {
-        String cleanPrefix = (prefix == null || prefix.isBlank()) ? "FOODDELI" : prefix.trim();
-        return cleanPrefix + " ORD" + orderId;
+        String cleanPrefix = (prefix == null || prefix.isBlank()) ? "FDL" : prefix.trim().toUpperCase();
+        if (orderId == null) {
+            return cleanPrefix;
+        }
+        if (orderId < 100) {
+            return String.format("%s%03d", cleanPrefix, orderId);
+        }
+        return cleanPrefix + orderId;
     }
 
     /**
      * Trích xuất mã đơn hàng (orderId) từ nội dung chuyển khoản của biến động số dư.
      * Hỗ trợ các định dạng phong phú:
-     * - "ND: CHUYEN TIEN FOODDELI ORD123 MA GD 87219" -> 123
+     * - "ND: CHUYEN TIEN FDL001 MA GD 87219" -> 1
+     * - "FDL001", "FDL123", "FDL_123"
      * - "FOODDELI_ORD_123" -> 123
      * - "ORD123" -> 123
      */
@@ -64,10 +71,10 @@ public final class VietQrUtil {
             return null;
         }
 
-        String safePrefix = (prefix == null || prefix.isBlank()) ? "FOODDELI" : prefix.trim();
+        String safePrefix = (prefix == null || prefix.isBlank()) ? "FDL" : prefix.trim();
 
-        // 1. Tìm theo định dạng có prefix: FOODDELI ORD123 hoặc FOODDELI123 hoặc FOODDELI_123
-        Pattern prefixPattern = Pattern.compile(Pattern.quote(safePrefix) + "[\\s_:-]*ORD?(\\d+)", Pattern.CASE_INSENSITIVE);
+        // 1. Tìm theo định dạng có prefix: FDL001, FDL123, FOODDELI ORD123
+        Pattern prefixPattern = Pattern.compile("(?:FDL|FOODDELI|" + Pattern.quote(safePrefix) + ")[\\s_:-]*(?:ORD)?[\\s_:-]*(\\d+)", Pattern.CASE_INSENSITIVE);
         Matcher prefixMatcher = prefixPattern.matcher(transactionContent);
         if (prefixMatcher.find()) {
             try {

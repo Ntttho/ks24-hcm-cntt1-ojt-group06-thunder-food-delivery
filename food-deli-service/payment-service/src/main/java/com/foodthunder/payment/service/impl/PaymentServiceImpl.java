@@ -118,12 +118,12 @@ public class PaymentServiceImpl implements PaymentService {
             return ApiResponse.success("Đã ghi nhận, bỏ qua giao dịch chi tiền.", null);
         }
 
-        // 3. Trích xuất mã đơn hàng từ nội dung chuyển khoản
-        String content = payload.getSafeContent();
-        Long orderId = SepayUtil.extractOrderId(content, sepayConfig.getOrderPrefix());
+        // 3. Trích xuất mã đơn hàng từ mã nhận diện (code) hoặc nội dung chuyển khoản
+        Long orderId = resolveOrderId(payload);
 
         if (orderId == null) {
-            log.warn("SePay Webhook không chứa mã đơn hàng hợp lệ: content='{}'", content);
+            log.warn("SePay Webhook không chứa mã đơn hàng hợp lệ: code='{}', content='{}'",
+                    payload.getCode(), payload.getSafeContent());
             return ApiResponse.success("Giao dịch không thuộc đơn hàng FoodThunder hoặc sai cú pháp, đã bỏ qua.", null);
         }
 
@@ -182,18 +182,24 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 8. Đồng bộ trạng thái đơn hàng sang order-service: AWAITING_PAYMENT -> PENDING
         try {
-            orderClient.updateOrderStatus(
-                    orderId,
-                    RemoteUpdateOrderStatusRequest.builder()
-                            .status("PENDING")
-                            .note("Đã thanh toán SePay QR thành công qua ngân hàng (Ref: " + refCode + ")")
-                            .build(),
-                    "SYSTEM",
-                    "0"
-            );
-            log.info("Đã đồng bộ đơn hàng #{} sang trạng thái PENDING thành công.", orderId);
+            orderClient.confirmPaymentSuccess(orderId, refCode, "SYSTEM", "0");
+            log.info("Đã gọi confirmPaymentSuccess sang order-service cho đơn hàng #{} thành công.", orderId);
         } catch (Exception e) {
-            log.error("Lỗi gọi Feign Client sang order-service để cập nhật đơn hàng #{}: {}", orderId, e.getMessage());
+            log.warn("Lỗi gọi confirmPaymentSuccess sang order-service cho đơn hàng #{}: {}. Thử fallback qua updateOrderStatus...", orderId, e.getMessage());
+            try {
+                orderClient.updateOrderStatus(
+                        orderId,
+                        RemoteUpdateOrderStatusRequest.builder()
+                                .statusCode("PENDING")
+                                .reason("Đã thanh toán SePay QR thành công qua ngân hàng (Ref: " + refCode + ")")
+                                .build(),
+                        "SYSTEM",
+                        "0"
+                );
+                log.info("Fallback updateOrderStatus thành công cho đơn hàng #{}.", orderId);
+            } catch (Exception ex) {
+                log.error("Fallback updateOrderStatus thất bại cho đơn hàng #{}: {}", orderId, ex.getMessage());
+            }
         }
 
         return ApiResponse.success("Xác nhận thanh toán đơn hàng #" + orderId + " thành công!", null);
@@ -326,6 +332,54 @@ public class PaymentServiceImpl implements PaymentService {
         return paymentRepository.save(payment);
     }
 
+    @Override
+    @Transactional
+    public PaymentResponseDto simulatePaymentSuccess(Long orderId) {
+        log.info("Giả lập thanh toán thành công (SANDBOX) cho đơn hàng #{}", orderId);
+        Payment payment = paymentRepository.findByOrderIdForUpdate(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin thanh toán cho đơn hàng #" + orderId));
+
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            log.info("Đơn hàng #{} đã ở trạng thái thanh toán SUCCESS.", orderId);
+            return checkPaymentStatus(orderId);
+        }
+
+        String refCode = "SIMULATED_" + orderId + "_" + System.currentTimeMillis();
+        payment.setStatus(PaymentStatus.SUCCESS);
+        PaymentTransaction successTx = PaymentTransaction.builder()
+                .payment(payment)
+                .attemptNumber((int) transactionRepository.countByPaymentId(payment.getId()) + 1)
+                .status(TransactionStatus.SUCCESS)
+                .transactionRef(refCode)
+                .gatewayResponse("{\"simulated\": true, \"note\": \"Test thanh toan gia lap sandbox\"}")
+                .build();
+        payment.addTransaction(successTx);
+        paymentRepository.save(payment);
+
+        try {
+            orderClient.confirmPaymentSuccess(orderId, refCode, "SYSTEM", "0");
+            log.info("Đã gọi confirmPaymentSuccess (Sandbox) cho đơn hàng #{} thành công.", orderId);
+        } catch (Exception e) {
+            log.warn("Lỗi gọi confirmPaymentSuccess sandbox cho đơn #{}: {}. Thử fallback qua updateOrderStatus...", orderId, e.getMessage());
+            try {
+                orderClient.updateOrderStatus(
+                        orderId,
+                        RemoteUpdateOrderStatusRequest.builder()
+                                .statusCode("PENDING")
+                                .reason("Giả lập thanh toán Sandbox thành công (Ref: " + refCode + ")")
+                                .build(),
+                        "SYSTEM",
+                        "0"
+                );
+                log.info("Fallback updateOrderStatus (Sandbox) thành công cho đơn hàng #{}.", orderId);
+            } catch (Exception ex) {
+                log.error("Fallback updateOrderStatus sandbox thất bại cho đơn #{}: {}", orderId, ex.getMessage());
+            }
+        }
+
+        return checkPaymentStatus(orderId);
+    }
+
     private void validateSepayWebhookSecurity(String authHeader) {
         String configuredToken = sepayConfig.getWebhookToken();
         String apiKey = sepayConfig.getApiKey();
@@ -334,7 +388,7 @@ public class PaymentServiceImpl implements PaymentService {
             if (authHeader == null || authHeader.isBlank()) {
                 throw new BadRequestException("Thiếu Header xác thực SePay Webhook!");
             }
-            String cleanToken = authHeader.replace("Apikey ", "").replace("Bearer ", "").trim();
+            String cleanToken = authHeader.replaceAll("(?i)^(apikey|bearer)\\s+", "").trim();
             boolean matchToken = configuredToken != null && configuredToken.equals(cleanToken);
             boolean matchApiKey = apiKey != null && apiKey.equals(cleanToken);
 
@@ -343,6 +397,19 @@ public class PaymentServiceImpl implements PaymentService {
                 throw new BadRequestException("Khóa bảo mật SePay Webhook không hợp lệ!");
             }
         }
+    }
+
+    private Long resolveOrderId(SepayWebhookPayload payload) {
+        if (payload == null) {
+            return null;
+        }
+        if (payload.getCode() != null && !payload.getCode().isBlank()) {
+            Long idFromCode = SepayUtil.extractOrderId(payload.getCode(), sepayConfig.getOrderPrefix());
+            if (idFromCode != null) {
+                return idFromCode;
+            }
+        }
+        return SepayUtil.extractOrderId(payload.getSafeContent(), sepayConfig.getOrderPrefix());
     }
 
     private String toJson(Object obj) {

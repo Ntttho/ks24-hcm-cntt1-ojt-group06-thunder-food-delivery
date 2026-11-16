@@ -42,10 +42,10 @@ public class SepayConfig {
     private String webhookToken = "sepay_webhook_token_here";
 
     /**
-     * Tiền tố nội dung chuyển khoản định danh đơn hàng (mặc định: FOODDELI).
-     * Cú pháp chuyển khoản sẽ là: FOODDELI ORD{orderId}
+     * Tiền tố nội dung chuyển khoản định danh đơn hàng (mặc định: FDL).
+     * Cú pháp chuyển khoản sẽ là: FDL{orderId} (tối thiểu 3 chữ số, ví dụ FDL001, FDL123)
      */
-    private String orderPrefix = "FOODDELI";
+    private String orderPrefix = "FDL";
 
     /**
      * Template sinh ảnh QR của SePay (compact, compact2, qronly...).

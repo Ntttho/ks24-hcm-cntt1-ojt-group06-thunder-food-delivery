@@ -1,5 +1,7 @@
 .git
-**/target
-**/build
 **/.gradle
 **/out
+**/target
+**/build
+.idea
+*.log

@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RemoteUpdateOrderStatusRequest {
 
-    private String status;
-    private String note;
+    private String statusCode;
+    private String reason;
 }
 

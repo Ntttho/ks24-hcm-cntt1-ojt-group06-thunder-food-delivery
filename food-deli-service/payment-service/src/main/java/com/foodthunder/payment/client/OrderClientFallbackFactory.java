@@ -30,6 +30,15 @@ public class OrderClientFallbackFactory implements FallbackFactory<OrderClient> 
                 log.warn("Fallback updateOrderStatus được gọi cho orderId={}", id);
                 return ResponseEntity.ok(ApiResponse.error(503, "order-service unavailable: " + cause.getMessage()));
             }
+
+            @Override
+            public ResponseEntity<ApiResponse<RemoteOrderDto>> confirmPaymentSuccess(Long id,
+                                                                                     String transactionNo,
+                                                                                     String role,
+                                                                                     String userId) {
+                log.warn("Fallback confirmPaymentSuccess được gọi cho orderId={}", id);
+                return ResponseEntity.ok(ApiResponse.error(503, "order-service unavailable: " + cause.getMessage()));
+            }
         };
     }
 }

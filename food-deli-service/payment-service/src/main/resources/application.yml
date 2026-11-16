@@ -37,7 +37,7 @@ sepay:
   account-name: ${SEPAY_ACCOUNT_NAME:FOOD THUNDER DELI}
   api-key: ${SEPAY_API_KEY:sepay_api_token_here}
   webhook-token: ${SEPAY_WEBHOOK_TOKEN:sepay_webhook_token_here}
-  order-prefix: ${SEPAY_ORDER_PREFIX:FOODDELI}
+  order-prefix: ${SEPAY_ORDER_PREFIX:FDL}
   template: ${SEPAY_TEMPLATE:compact2}
   qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
 

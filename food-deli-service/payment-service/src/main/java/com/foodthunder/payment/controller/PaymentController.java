@@ -85,6 +85,17 @@ public class PaymentController {
     }
 
     /**
+     * Giả lập thanh toán đơn hàng thành công (dành cho môi trường Sandbox / Demo)
+     */
+    @PostMapping("/orders/{orderId}/simulate-success")
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> simulatePaymentSuccess(
+            @PathVariable("orderId") Long orderId) {
+        log.info("API POST /api/v1/payments/orders/{}/simulate-success (SANDBOX)", orderId);
+        PaymentResponseDto dto = paymentService.simulatePaymentSuccess(orderId);
+        return ResponseEntity.ok(ApiResponse.success("Giả lập thanh toán đơn hàng #" + orderId + " thành công!", dto));
+    }
+
+    /**
      * Khởi tạo giao dịch thanh toán tiền mặt (COD)
      */
     @PostMapping("/cod")
