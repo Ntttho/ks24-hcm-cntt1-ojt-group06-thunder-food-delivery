@@ -75,6 +75,7 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
   const [isMapExpanded, setIsMapExpanded] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [driverLiveCoords, setDriverLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   // Realtime STOMP & API Chat Sync for order
   useEffect(() => {
@@ -107,21 +108,26 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
     };
   }, [order.id]);
 
-  // Realtime GPS broadcast to server & customer tracking when DELIVERING
+  // Realtime GPS broadcast to server & customer tracking
   useEffect(() => {
-    if (!order.id || stageInfo.stage !== 'DELIVERING') return;
+    if (!order.id) return;
 
     const pushLocation = () => {
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            driverApi.updateLocation({
-              latitude: pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              heading: pos.coords.heading || 0,
-              speedKmh: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24,
-              orderId: order.id,
-            }).catch(() => {});
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            setDriverLiveCoords(coords);
+
+            if (stageInfo.stage === 'DELIVERING') {
+              driverApi.updateLocation({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                heading: pos.coords.heading || 0,
+                speedKmh: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24,
+                orderId: order.id,
+              }).catch(() => {});
+            }
           },
           () => {}
         );
@@ -366,8 +372,10 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
               customerAddress={order.receiverAddress}
               customerLat={order.receiverLat || 10.7925}
               customerLng={order.receiverLng || 106.7214}
+              driverLiveCoords={driverLiveCoords}
               isDelivering={isDeliveringStage}
               orderCode={order.orderCode}
+              statusCode={order.statusCode}
             />
           </div>
         )}
