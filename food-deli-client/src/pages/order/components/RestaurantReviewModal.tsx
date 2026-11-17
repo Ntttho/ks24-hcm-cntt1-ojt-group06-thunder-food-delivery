@@ -96,7 +96,7 @@ export const RestaurantReviewModal: React.FC<RestaurantReviewModalProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-extrabold text-gray-900 text-base truncate">
-              {order.restaurantName || `Quán ăn #${order.restaurantId}`}
+              {order.restaurantName || 'Quán ăn đối tác'}
             </div>
             <div className="text-xs text-gray-500">
               Đơn đặt gồm {order.items?.length || 0} món ăn

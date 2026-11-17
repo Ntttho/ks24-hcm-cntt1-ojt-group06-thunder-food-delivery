@@ -27,6 +27,7 @@ import {
 import { ActiveDeliveryView } from './components/ActiveDeliveryView';
 import { ShipperWalletView } from './components/ShipperWalletView';
 import { ShipperReviewsView } from './components/ShipperReviewsView';
+import { ShipperProfileView } from './components/ShipperProfileView';
 import { useAuth } from '@/hooks/useAuth';
 import {
   driverApi,
@@ -36,6 +37,7 @@ import {
   DriverStatusResponse,
 } from '@/services/modules/driverApi';
 import { DriverPendingApprovalView, DriverRejectedView } from './components/DriverApprovalGate';
+import { DriverRegistrationView } from './components/DriverRegistrationView';
 import { driverWebSocket } from '@/services/modules/driverWebSocket';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { soundManager } from '@/utils/soundNotification';
@@ -128,6 +130,12 @@ export const ShipperHubPage: React.FC = () => {
     },
     { type: 'divider' },
     {
+      key: 'shipper-profile',
+      icon: <UserOutlined className="text-emerald-500" />,
+      label: <span className="font-semibold text-slate-700">Thông tin tài khoản & Phương tiện</span>,
+      onClick: () => setActiveTab('profile'),
+    },
+    {
       key: 'history',
       icon: <HistoryOutlined className="text-blue-500" />,
       label: <span className="font-semibold text-slate-700">Lịch sử chuyến đi & Thu nhập</span>,
@@ -164,27 +172,35 @@ export const ShipperHubPage: React.FC = () => {
   ];
 
   // Navigation tab for Hub
-  const [activeTab, setActiveTab] = useState<'deliveries' | 'wallet' | 'reviews'>('deliveries');
+  const [activeTab, setActiveTab] = useState<'deliveries' | 'wallet' | 'reviews' | 'profile'>('deliveries');
 
   // Driver approval and profile state
   const [driverProfile, setDriverProfile] = useState<DriverStatusResponse | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED' | 'LOADING'>('LOADING');
+  const [approvalStatus, setApprovalStatus] = useState<
+    'NOT_REGISTERED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'LOADING'
+  >('LOADING');
+  const [isEditingProfile, setIsEditingProfile] = useState<boolean>(false);
 
   const fetchDriverProfile = useCallback(async () => {
     try {
       const res = await driverApi.getDriverStatus();
       if (res && res.data) {
         setDriverProfile(res.data);
-        const status = (res.data.approvalStatus || 'PENDING').toUpperCase();
+        const rawStatus = (res.data.approvalStatus || '').toUpperCase();
+        // Nếu backend báo NOT_REGISTERED hoặc chưa có biển số xe thì tài xế cần vào form đăng ký xe
+        const status =
+          rawStatus === 'NOT_REGISTERED' || (!res.data.licensePlate && rawStatus === 'PENDING')
+            ? 'NOT_REGISTERED'
+            : rawStatus || 'NOT_REGISTERED';
         setApprovalStatus(status as any);
         if (res.data.isOnline !== undefined) {
           setIsOnline(Boolean(res.data.isOnline));
         }
       } else {
-        setApprovalStatus('APPROVED');
+        setApprovalStatus('NOT_REGISTERED');
       }
     } catch {
-      setApprovalStatus('PENDING');
+      setApprovalStatus('NOT_REGISTERED');
     }
   }, []);
 
@@ -535,22 +551,46 @@ export const ShipperHubPage: React.FC = () => {
     );
   }
 
+  // 1. Tài xế chưa đăng ký thông tin xe & CCCD HOẶC đang trong chế độ chỉnh sửa hồ sơ
+  if (approvalStatus === 'NOT_REGISTERED' || isEditingProfile) {
+    return (
+      <DriverRegistrationView
+        initialValues={{
+          licensePlate: driverProfile?.licensePlate,
+          idCardNumber: driverProfile?.idCardNumber,
+          vehicleType: driverProfile?.vehicleType,
+        }}
+        isEditing={isEditingProfile}
+        onSubmitted={async () => {
+          setIsEditingProfile(false);
+          await fetchDriverProfile();
+        }}
+        onCancel={isEditingProfile ? () => setIsEditingProfile(false) : undefined}
+        onLogout={handleLogoutConfirm}
+      />
+    );
+  }
+
+  // 2. Tài xế đã nộp hồ sơ và đang chờ Admin phê duyệt
   if (approvalStatus === 'PENDING') {
     return (
       <DriverPendingApprovalView
         driverProfile={driverProfile}
         onRefresh={fetchDriverProfile}
         onLogout={handleLogoutConfirm}
+        onEditProfile={() => setIsEditingProfile(true)}
       />
     );
   }
 
+  // 3. Hồ sơ tài xế bị Admin từ chối
   if (approvalStatus === 'REJECTED') {
     return (
       <DriverRejectedView
         driverProfile={driverProfile}
         onRefresh={fetchDriverProfile}
         onLogout={handleLogoutConfirm}
+        onReapply={() => setIsEditingProfile(true)}
       />
     );
   }
@@ -712,6 +752,17 @@ export const ShipperHubPage: React.FC = () => {
               >
                 <Star className="w-4 h-4" />
                 <span>Đánh giá</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                  activeTab === 'profile'
+                    ? 'bg-emerald-500 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <UserOutlined className="text-sm" />
+                <span>Hồ sơ</span>
               </button>
             </nav>
           )}
@@ -959,6 +1010,17 @@ export const ShipperHubPage: React.FC = () => {
             <ShipperReviewsView
               reviewData={reviewData}
               loadingReviews={loadingReviews}
+            />
+          )}
+
+          {/* =========================================================================
+              VIEW 5: SHIPPER PROFILE & VEHICLE (THÔNG TIN TÀI XẾ & PHƯƠNG TIỆN)
+             ========================================================================= */}
+          {!currentOrder && activeTab === 'profile' && (
+            <ShipperProfileView
+              driverProfile={driverProfile}
+              onProfileUpdated={fetchDriverProfile}
+              onLogout={handleLogoutConfirm}
             />
           )}
         </header>

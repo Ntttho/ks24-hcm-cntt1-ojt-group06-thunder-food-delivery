@@ -320,7 +320,7 @@ export const MerchantReviewPage: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-extrabold text-gray-900 text-sm">
-                        {rev.customerName || `Khách hàng #${rev.customerId}`}
+                        {rev.customerName || 'Khách hàng thân thiết'}
                       </span>
                       <Tag color="cyan" className="rounded-md text-[10px] font-bold">
                         Đã mua hàng

@@ -12,5 +12,7 @@ import lombok.NoArgsConstructor;
 public class RemoteUpdateOrderStatusRequest {
     private String statusCode;
     private String reason;
+    private String driverName;
+    private String driverPhone;
 }
 

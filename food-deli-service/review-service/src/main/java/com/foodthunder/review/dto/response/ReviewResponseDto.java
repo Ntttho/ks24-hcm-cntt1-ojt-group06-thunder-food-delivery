@@ -21,6 +21,7 @@ public class ReviewResponseDto {
     private String customerAvatar;
     private String targetType;
     private Long targetId;
+    private String targetName;
     private Integer orderRestaurantId;
     private Boolean orderContextAvailable;
     private List<ReviewOrderItemDto> orderItems;

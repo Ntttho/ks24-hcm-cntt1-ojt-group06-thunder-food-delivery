@@ -12,7 +12,16 @@ import java.util.List;
 public class ReviewOrderContextDto {
     private Long orderId;
     private Integer restaurantId;
+    private String restaurantName;
+    private String customerName;
+    private String driverName;
     private List<ItemDto> items;
+
+    public ReviewOrderContextDto(Long orderId, Integer restaurantId, List<ItemDto> items) {
+        this.orderId = orderId;
+        this.restaurantId = restaurantId;
+        this.items = items;
+    }
 
     @Data
     @NoArgsConstructor

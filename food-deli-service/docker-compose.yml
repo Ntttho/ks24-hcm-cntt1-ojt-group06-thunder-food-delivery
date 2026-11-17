@@ -79,8 +79,8 @@ services:
       dockerfile: config-server/Dockerfile
     container_name: ft-config-server
     restart: unless-stopped
-    ports:
-      - "8888:8888"
+    expose:
+      - "8888"
     depends_on:
       discovery-service:
         condition: service_healthy

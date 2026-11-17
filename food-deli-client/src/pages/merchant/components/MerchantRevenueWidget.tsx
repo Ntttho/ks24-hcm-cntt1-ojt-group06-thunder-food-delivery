@@ -111,7 +111,7 @@ export const MerchantRevenueWidget: React.FC<MerchantRevenueWidgetProps> = ({
               </Tag>
             </div>
             <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-              <ShopOutlined /> {restaurantName || `Quán #${restaurantId}`}
+              <ShopOutlined /> {restaurantName || 'Cửa hàng đối tác'}
             </p>
           </div>
         </div>

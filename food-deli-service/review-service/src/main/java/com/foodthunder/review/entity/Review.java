@@ -37,11 +37,20 @@ public class Review {
     @Column(name = "customer_id", nullable = false)
     private Long customerId;
 
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "customer_avatar", length = 255)
+    private String customerAvatar;
+
     @Column(name = "target_type", nullable = false, length = 20)
     private String targetType;
 
     @Column(name = "target_id", nullable = false)
     private Long targetId;
+
+    @Column(name = "target_name", length = 150)
+    private String targetName;
 
     @Column(name = "food_item_id")
     private Long foodItemId;

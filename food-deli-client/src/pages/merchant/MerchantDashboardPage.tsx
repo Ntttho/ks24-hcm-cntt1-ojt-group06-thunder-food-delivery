@@ -600,7 +600,7 @@ export const MerchantDashboardPage: React.FC = () => {
           orderId={chatOrder.id}
           orderCode={chatOrder.orderCode}
           shopId={chatOrder.restaurantId || currentRestaurantId}
-          driverName={chatOrder.driverName || (chatOrder.driverId ? `Tài xế #${chatOrder.driverId}` : undefined)}
+          driverName={chatOrder.driverName || (chatOrder.driverId ? 'Tài xế giao hàng' : undefined)}
           driverPhone={chatOrder.driverPhone}
           restaurantName={outletContext?.activeRestaurant?.name}
         />

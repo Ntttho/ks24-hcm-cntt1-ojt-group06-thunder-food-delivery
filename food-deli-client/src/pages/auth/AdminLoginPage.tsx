@@ -77,8 +77,8 @@ export const AdminLoginPage: React.FC = () => {
   // Quick fill sample admin credentials from seed data
   const handleQuickFillAdmin = () => {
     form.setFieldsValue({
-      identifier: '0900000005',
-      password: 'Password@123',
+      identifier: '0900000000',
+      password: 'password123',
     });
     message.info('Đã điền thông tin tài khoản Quản trị viên mẫu (ID #5)');
   };

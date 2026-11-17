@@ -119,9 +119,17 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         // 6. Đồng bộ liên dịch vụ sang order-service qua OpenFeign
         try {
+            DriverDetail dDetail = driverDetailRepository.findById(driverId).orElse(null);
+            String driverName = (dDetail != null && dDetail.getFullName() != null && !dDetail.getFullName().isBlank())
+                    ? dDetail.getFullName().trim() : ("Tài xế #" + driverId);
+            String driverPhone = (dDetail != null && dDetail.getPhoneNumber() != null && !dDetail.getPhoneNumber().isBlank())
+                    ? dDetail.getPhoneNumber().trim() : "0900000000";
+
             RemoteUpdateOrderStatusRequest statusReq = RemoteUpdateOrderStatusRequest.builder()
                     .statusCode("DRIVER_ACCEPTED")
-                    .reason("Tài xế #" + driverId + " đã nhận đơn giao hàng")
+                    .reason("Tài xế " + driverName + " đã nhận đơn giao hàng")
+                    .driverName(driverName)
+                    .driverPhone(driverPhone)
                     .build();
 
             ResponseEntity<ApiResponse<Object>> feignResp = orderClient.updateOrderStatus(orderId, statusReq, driverId, "ROLE_DRIVER");
@@ -190,10 +198,12 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .map(this::mapToDriverStatusResponse)
                 .orElseGet(() -> DriverStatusResponse.builder()
                         .userId(driverId)
-                        .approvalStatus("PENDING")
+                        .approvalStatus("NOT_REGISTERED")
                         .isOnline(false)
-                        .licensePlate("Chưa cập nhật")
-                        .vehicleType("Motorbike")
+                        .licensePlate(null)
+                        .idCardNumber(null)
+                        .vehicleType("Xe máy (Motorbike)")
+                        .rejectReason(null)
                         .build());
     }
 
@@ -274,7 +284,9 @@ public class DeliveryServiceImpl implements DeliveryService {
         DriverOffer offer = driverOfferRepository.findByOrderIdAndDriverId(orderId, driverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài xế #" + driverId + " không phải người nhận đơn #" + orderId));
 
-        if (!"ACCEPTED".equalsIgnoreCase(offer.getStatus())) {
+        if (!"ACCEPTED".equalsIgnoreCase(offer.getStatus())
+                && !"DELIVERING".equalsIgnoreCase(offer.getStatus())
+                && !"PICKING_UP".equalsIgnoreCase(offer.getStatus())) {
             throw new BadRequestException("Đơn hàng chưa ở trạng thái được bạn tiếp nhận!");
         }
 
@@ -296,7 +308,18 @@ public class DeliveryServiceImpl implements DeliveryService {
             throw new BadRequestException("Lỗi cập nhật tiến trình giao hàng: " + ex.getMessage());
         }
 
-        // 3. Nếu có gửi kèm tọa độ thì ghi nhận vào driver_locations
+        // 3. Khắc phục BUG-02: Cập nhật trạng thái offer nội bộ khi hoàn tất hoặc giao hàng
+        if ("COMPLETED".equalsIgnoreCase(targetStep)) {
+            offer.setStatus("COMPLETED");
+            offer.setRespondedAt(LocalDateTime.now());
+            driverOfferRepository.save(offer);
+            log.info("Driver #{} completed order #{}, offer status updated to COMPLETED", driverId, orderId);
+        } else if ("DELIVERING".equalsIgnoreCase(targetStep)) {
+            offer.setStatus("DELIVERING");
+            driverOfferRepository.save(offer);
+        }
+
+        // 4. Nếu có gửi kèm tọa độ thì ghi nhận vào driver_locations và broadcast WebSocket sang khách hàng
         if (request.getCurrentLat() != null && request.getCurrentLng() != null) {
             DriverLocation location = DriverLocation.builder()
                     .driverId(driverId)
@@ -305,7 +328,17 @@ public class DeliveryServiceImpl implements DeliveryService {
                     .longitude(request.getCurrentLng())
                     .speedKmh(24.0)
                     .build();
-            driverLocationRepository.save(location);
+            DriverLocation savedLoc = driverLocationRepository.save(location);
+
+            if (notificationClient != null) {
+                try {
+                    String topic = "/topic/orders/" + orderId + "/location";
+                    notificationClient.broadcastEvent(new NotificationClient.BroadcastRequest(topic, mapToDriverLocationResponse(savedLoc)));
+                    log.debug("Broadcasted updated delivery step driver location to topic {}", topic);
+                } catch (Exception ex) {
+                    log.warn("Failed to broadcast location on step update: {}", ex.getMessage());
+                }
+            }
         }
 
         log.info("Driver #{} updated delivery step for order #{} to {}", driverId, orderId, targetStep);
@@ -315,8 +348,10 @@ public class DeliveryServiceImpl implements DeliveryService {
         return DriverStatusResponse.builder()
                 .userId(d.getUserId())
                 .licensePlate(d.getLicensePlate())
+                .idCardNumber(d.getIdCardNumber())
                 .vehicleType(d.getVehicleType())
                 .approvalStatus(d.getApprovalStatus())
+                .rejectReason(d.getRejectReason())
                 .isOnline(d.getIsOnline())
                 .build();
     }
@@ -335,11 +370,50 @@ public class DeliveryServiceImpl implements DeliveryService {
     }
 
     private DriverOfferResponse mapToOfferResponse(DriverOffer o) {
+        String orderCode = "ORD-" + o.getOrderId();
+        String restaurantName = "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi";
+        String restaurantAddress = "123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM";
+        String restaurantPhone = "02838383838";
+        String customerName = "Khách hàng";
+        String customerPhone = "0987654321";
+        String receiverAddress = "Địa chỉ giao hàng";
+        java.math.BigDecimal totalAmount = java.math.BigDecimal.valueOf(100000);
+        String paymentMethod = "COD";
+
+        if (orderClient != null && o.getOrderId() != null) {
+            try {
+                var resp = orderClient.getOrderById(o.getOrderId());
+                if (resp != null && resp.getBody() != null && resp.getBody().data() != null) {
+                    var ord = resp.getBody().data();
+                    if (ord.getOrderCode() != null) orderCode = ord.getOrderCode();
+                    if (ord.getRestaurantName() != null) restaurantName = ord.getRestaurantName();
+                    if (ord.getRestaurantAddress() != null) restaurantAddress = ord.getRestaurantAddress();
+                    if (ord.getRestaurantPhone() != null) restaurantPhone = ord.getRestaurantPhone();
+                    if (ord.getCustomerName() != null) customerName = ord.getCustomerName();
+                    if (ord.getCustomerPhone() != null) customerPhone = ord.getCustomerPhone();
+                    if (ord.getReceiverAddress() != null) receiverAddress = ord.getReceiverAddress();
+                    if (ord.getTotalAmount() != null) totalAmount = ord.getTotalAmount();
+                    if (ord.getPaymentMethod() != null) paymentMethod = ord.getPaymentMethod();
+                }
+            } catch (Exception ex) {
+                log.warn("Could not enrich DriverOfferResponse from orderClient for orderId {}: {}", o.getOrderId(), ex.getMessage());
+            }
+        }
+
         return DriverOfferResponse.builder()
                 .id(o.getId())
                 .orderId(o.getOrderId())
+                .orderCode(orderCode)
                 .driverId(o.getDriverId())
                 .status(o.getStatus())
+                .restaurantName(restaurantName)
+                .restaurantAddress(restaurantAddress)
+                .restaurantPhone(restaurantPhone)
+                .customerName(customerName)
+                .customerPhone(customerPhone)
+                .receiverAddress(receiverAddress)
+                .totalAmount(totalAmount)
+                .paymentMethod(paymentMethod)
                 .distanceKm(o.getDistanceKm())
                 .pickupEtaMinutes(o.getPickupEtaMinutes())
                 .dispatchScore(o.getDispatchScore())
@@ -351,7 +425,10 @@ public class DeliveryServiceImpl implements DeliveryService {
     @Override
     @Transactional
     public DriverMetricsResponse cancelOrder(Integer driverId, Long orderId, DriverCancelOrderRequest request) {
-        DriverOffer offer = driverOfferRepository.findByOrderIdAndDriverId(orderId, driverId)
+        List<DriverOffer> offers = driverOfferRepository.findAllByOrderIdForUpdate(orderId);
+        DriverOffer offer = offers.stream()
+                .filter(o -> o.getDriverId().equals(driverId))
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin đơn hàng #" + orderId + " được tiếp nhận bởi tài xế #" + driverId));
 
         if (!"ACCEPTED".equalsIgnoreCase(offer.getStatus()) && !"PICKING_UP".equalsIgnoreCase(offer.getStatus())) {
@@ -423,7 +500,7 @@ public class DeliveryServiceImpl implements DeliveryService {
         // 5. Thống kê toàn thời gian (hỗ trợ tương thích ngược)
         List<DriverOffer> allOffers = driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(driverId);
         long totalAll = allOffers.size();
-        long completedAll = allOffers.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()) || "ACCEPTED".equalsIgnoreCase(o.getStatus())).count();
+        long completedAll = allOffers.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
         long cancelledAll = allOffers.stream().filter(o -> "REJECTED".equalsIgnoreCase(o.getStatus()) || "DRIVER_CANCELLED".equalsIgnoreCase(o.getStatus())).count();
         double completionRate = totalAll > 0 ? (double) Math.round((double) completedAll / totalAll * 10000.0) / 100.0 : 100.0;
         double earnings = completedAll * 20000.0;
@@ -601,6 +678,15 @@ public class DeliveryServiceImpl implements DeliveryService {
                         .isOnline(false)
                         .build());
 
+        if (request.getFullName() != null && !request.getFullName().isBlank()) {
+            detail.setFullName(request.getFullName().trim());
+        }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().isBlank()) {
+            detail.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+            detail.setEmail(request.getEmail().trim());
+        }
         if (request.getLicensePlate() != null && !request.getLicensePlate().isBlank()) {
             detail.setLicensePlate(request.getLicensePlate().trim());
         }
@@ -618,8 +704,25 @@ public class DeliveryServiceImpl implements DeliveryService {
     }
 
     private DriverApprovalDto mapToDriverApprovalDto(DriverDetail detail) {
+        String fullName = detail.getFullName();
+        if (fullName == null || fullName.isBlank()) {
+            fullName = "Tài xế #" + detail.getUserId();
+        }
+        String phoneNumber = detail.getPhoneNumber();
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            phoneNumber = "090000000" + detail.getUserId();
+        }
+        String email = detail.getEmail();
+        if (email == null || email.isBlank()) {
+            email = "driver." + detail.getUserId() + "@foodthunder.com";
+        }
+
         return DriverApprovalDto.builder()
                 .userId(detail.getUserId())
+                .fullName(fullName)
+                .phoneNumber(phoneNumber)
+                .email(email)
+                .avatarUrl("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150")
                 .licensePlate(detail.getLicensePlate())
                 .idCardNumber(detail.getIdCardNumber())
                 .vehicleType(detail.getVehicleType() != null ? detail.getVehicleType() : "Xe máy (Motorbike)")

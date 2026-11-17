@@ -52,6 +52,7 @@ export interface ReviewItemDto {
   customerAvatar?: string;
   targetType: 'RESTAURANT' | 'DRIVER';
   targetId: number;
+  targetName?: string;
   orderRestaurantId?: number;
   orderContextAvailable?: boolean;
   orderItems?: ReviewOrderItemDto[];
