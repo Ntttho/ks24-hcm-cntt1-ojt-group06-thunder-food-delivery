@@ -24,7 +24,6 @@ import {
   AdminUserPage,
   AdminApprovalPage,
   AdminAnalyticsPage,
-  AdminSystemSettingsPage,
   ShipperHubPage,
   ShipperHistoryPage,
   AdminRestaurantReviewsPage,
@@ -173,7 +172,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'system-settings',
-        element: <AdminSystemSettingsPage />,
+        element: <Navigate to="/admin/settings" replace />,
       },
     ],
   },

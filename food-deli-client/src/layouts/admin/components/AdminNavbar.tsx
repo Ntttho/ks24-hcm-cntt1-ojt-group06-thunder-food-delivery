@@ -39,15 +39,24 @@ export const AdminNavbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
-  // Load pending approvals count for badge notification
+  // Load pending approvals count for badge notification (Both restaurants & drivers)
   useEffect(() => {
     let mounted = true;
-    adminApprovalApi
-      .getRestaurantChangeRequests('PENDING')
-      .then((res) => {
+    Promise.allSettled([
+      adminApprovalApi.getRestaurantChangeRequests('PENDING'),
+      adminApprovalApi.getDriverApprovals('PENDING'),
+    ])
+      .then(([resRestaurants, resDrivers]) => {
         if (!mounted) return;
-        const count = Array.isArray(res.data) ? res.data.length : 0;
-        setPendingApprovalsCount(count);
+        const restCount =
+          resRestaurants.status === 'fulfilled' && Array.isArray(resRestaurants.value?.data)
+            ? resRestaurants.value.data.length
+            : 0;
+        const driverCount =
+          resDrivers.status === 'fulfilled' && Array.isArray(resDrivers.value?.data)
+            ? resDrivers.value.data.length
+            : 0;
+        setPendingApprovalsCount(restCount + driverCount);
       })
       .catch(() => {
         // Fallback silently if network fails

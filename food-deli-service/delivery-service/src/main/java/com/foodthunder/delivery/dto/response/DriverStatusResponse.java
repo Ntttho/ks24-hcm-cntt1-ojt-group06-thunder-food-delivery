@@ -12,8 +12,10 @@ import lombok.NoArgsConstructor;
 public class DriverStatusResponse {
     private Integer userId;
     private String licensePlate;
+    private String idCardNumber;
     private String vehicleType;
     private String approvalStatus;
+    private String rejectReason;
     private Boolean isOnline;
 }
 

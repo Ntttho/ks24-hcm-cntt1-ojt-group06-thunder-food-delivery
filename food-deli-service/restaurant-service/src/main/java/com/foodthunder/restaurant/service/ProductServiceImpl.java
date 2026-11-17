@@ -295,7 +295,14 @@ public class ProductServiceImpl implements ProductService {
             return;
         }
 
-        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : request.getItems()) {
+        // 1. Sắp xếp danh sách Product ID theo thứ tự tăng dần (Ordered Resource Locking)
+        // Triệt tiêu 100% Deadlock trong MySQL InnoDB khi nhiều đơn hàng cùng chứa các món trùng nhau
+        List<com.foodthunder.restaurant.dto.product.DeductStockItemRequest> sortedItems = request.getItems().stream()
+                .filter(it -> it.getProductId() != null)
+                .sorted(Comparator.comparing(com.foodthunder.restaurant.dto.product.DeductStockItemRequest::getProductId))
+                .collect(Collectors.toList());
+
+        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : sortedItems) {
             Product product = productRepository.findByIdForUpdate(item.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn ID=" + item.getProductId()));
 
@@ -313,6 +320,32 @@ public class ProductServiceImpl implements ProductService {
             productRepository.save(product);
             log.info("Deducted stock for product ID={}, deducted={}, remaining={}", product.getId(), item.getQuantity(), remaining);
         }
+
+        // 2. Khóa bi quan và xác thực tính khả dụng của Topping đi kèm (nếu có)
+        if (request.getToppingIds() != null && !request.getToppingIds().isEmpty()) {
+            List<Integer> sortedToppingIds = request.getToppingIds().stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            if (!sortedToppingIds.isEmpty()) {
+                List<Topping> lockedToppings = toppingRepository.findAllByIdsForUpdate(sortedToppingIds);
+                Map<Integer, Topping> toppingMap = lockedToppings.stream()
+                        .collect(Collectors.toMap(Topping::getId, t -> t, (a, b) -> a));
+
+                for (Integer toppingId : sortedToppingIds) {
+                    Topping topping = toppingMap.get(toppingId);
+                    if (topping == null) {
+                        throw new BadRequestException("Topping ID=" + toppingId + " không tồn tại hoặc đã bị xóa!");
+                    }
+                    if (Boolean.FALSE.equals(topping.getIsAvailable())) {
+                        throw new BadRequestException("Topping '" + topping.getName() + "' hiện đang tạm ngưng phục vụ, vui lòng chọn lại!");
+                    }
+                }
+                log.info("Validated and locked {} toppings under pessimistic lock", sortedToppingIds.size());
+            }
+        }
     }
 
     @Override
@@ -322,7 +355,13 @@ public class ProductServiceImpl implements ProductService {
             return;
         }
 
-        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : request.getItems()) {
+        // Sắp xếp Product ID tăng dần trước khi hoàn kho để tránh deadlock
+        List<com.foodthunder.restaurant.dto.product.DeductStockItemRequest> sortedItems = request.getItems().stream()
+                .filter(it -> it.getProductId() != null)
+                .sorted(Comparator.comparing(com.foodthunder.restaurant.dto.product.DeductStockItemRequest::getProductId))
+                .collect(Collectors.toList());
+
+        for (com.foodthunder.restaurant.dto.product.DeductStockItemRequest item : sortedItems) {
             Product product = productRepository.findByIdForUpdate(item.getProductId()).orElse(null);
             if (product != null) {
                 int current = product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0;

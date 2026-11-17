@@ -132,11 +132,21 @@ export interface DriverReviewSummary {
   unavailableReason?: string;
 }
 
+export type DriverApprovalStatus = 'NOT_REGISTERED' | 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+
 export interface DriverStatusResponse {
   userId: number;
-  approvalStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | string;
+  approvalStatus: DriverApprovalStatus;
   isOnline: boolean;
-  licensePlate?: string;
+  licensePlate?: string | null;
+  idCardNumber?: string | null;
+  vehicleType?: string | null;
+  rejectReason?: string | null;
+}
+
+export interface DriverRegistrationRequest {
+  licensePlate: string;
+  idCardNumber: string;
   vehicleType?: string;
 }
 
@@ -684,6 +694,11 @@ export const driverApi = {
   // 0. Tra cứu trạng thái xét duyệt và hồ sơ tài xế
   getDriverStatus: async (): Promise<ApiResponse<DriverStatusResponse>> => {
     return apiClient.get('/deliveries/driver/status');
+  },
+
+  // 0a. Đăng ký / cập nhật hồ sơ phương tiện & CCCD tài xế
+  registerDriver: async (data: DriverRegistrationRequest): Promise<ApiResponse<any>> => {
+    return apiClient.post('/deliveries/drivers/register', data);
   },
 
   // 0b. Bật/tắt trạng thái trực tuyến của tài xế

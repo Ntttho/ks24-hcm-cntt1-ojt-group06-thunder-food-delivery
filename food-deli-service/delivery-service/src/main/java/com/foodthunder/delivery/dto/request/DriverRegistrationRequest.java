@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DriverRegistrationRequest {
+    private String fullName;
+    private String phoneNumber;
+    private String email;
     private String licensePlate;
     private String idCardNumber;
     private String vehicleType;

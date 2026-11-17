@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Alert, Checkbox, message } from 'antd';
+import { Form, Input, Button, Alert, Checkbox, message, Select } from 'antd';
 import {
   LockOutlined,
   UserOutlined,
@@ -10,12 +10,14 @@ import {
   CheckCircleFilled,
   ArrowRightOutlined,
   FireFilled,
+  IdcardOutlined,
 } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
 import { getRoleDefaultPath } from '@/utils/navigation';
 import type { RegisterRequest } from '@/types';
+import { driverApi, type DriverRegistrationRequest } from '@/services/modules/driverApi';
 import { PasswordStrengthMeter } from './components/PasswordStrengthMeter';
 import { SocialAuthButtons } from './components/SocialAuthButtons';
 
@@ -79,6 +81,21 @@ export const RegisterPage: React.FC = () => {
       };
 
       await register(payload);
+
+      // Nếu người dùng đăng ký vai trò Tài xế: tự động ghi nhận ngay thông tin xe & CCCD vào bảng driver_details
+      if (selectedRole === 'DRIVER') {
+        try {
+          const driverPayload: DriverRegistrationRequest = {
+            licensePlate: (values.licensePlate || '').trim().toUpperCase(),
+            idCardNumber: (values.idCardNumber || '').trim(),
+            vehicleType: values.vehicleType || 'Xe máy số',
+          };
+          await driverApi.registerDriver(driverPayload);
+        } catch (driverErr) {
+          console.warn('Lưu thông tin phương tiện tài xế lỗi:', driverErr);
+        }
+      }
+
       message.success('Đăng ký tài khoản thành công! Bạn có thể bắt đầu sử dụng ngay.');
       navigate(getRoleDefaultPath(selectedRole), { replace: true });
     } catch {
@@ -223,6 +240,81 @@ export const RegisterPage: React.FC = () => {
             className="!rounded-xl border-slate-200 hover:border-orange-400 focus:border-orange-500"
           />
         </Form.Item>
+
+        {/* Khối khai báo thông tin xe & giấy tờ chỉ hiển thị khi chọn vai trò Tài xế */}
+        {selectedRole === 'DRIVER' && (
+          <div className="bg-emerald-50/70 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 mb-5 space-y-3.5 transition-all animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2 border-b border-emerald-200/60 pb-2">
+              <IdcardOutlined className="text-emerald-700 text-base" />
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900 m-0">
+                  Thông tin phương tiện & Giấy tờ đối tác
+                </h4>
+                <p className="text-[11px] text-emerald-700 m-0">
+                  Khai báo để Ban quản trị phê duyệt kích hoạt tài khoản đối tác
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+              <Form.Item
+                label={<span className="text-xs font-semibold text-slate-700">Biển số xe giao hàng <span className="text-red-500">*</span></span>}
+                name="licensePlate"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập biển số xe!' },
+                  {
+                    pattern: /^[0-9]{2}[A-Za-z0-9\s.-]{4,10}$/,
+                    message: 'Biển số chưa đúng định dạng chuẩn (VD: 59-X1 987.65)',
+                  },
+                ]}
+                extra={<span className="text-[10px] text-slate-400">VD: 59-X1 987.65, 29B1-123.45</span>}
+              >
+                <Input
+                  prefix={<CarOutlined className="text-slate-400 mr-1" />}
+                  placeholder="59-X1 987.65"
+                  className="!rounded-xl border-slate-200 uppercase font-mono font-bold"
+                  maxLength={15}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label={<span className="text-xs font-semibold text-slate-700">Số CCCD / CMND <span className="text-red-500">*</span></span>}
+                name="idCardNumber"
+                rules={[
+                  { required: true, message: 'Vui lòng nhập số CCCD!' },
+                  {
+                    pattern: /^[0-9]{9,12}$/,
+                    message: 'Số CCCD gồm 9 đến 12 chữ số hợp lệ',
+                  },
+                ]}
+                extra={<span className="text-[10px] text-slate-400">12 chữ số trên CCCD gắn chip</span>}
+              >
+                <Input
+                  prefix={<IdcardOutlined className="text-slate-400 mr-1" />}
+                  placeholder="079201012345"
+                  className="!rounded-xl border-slate-200 font-mono font-bold"
+                  maxLength={12}
+                />
+              </Form.Item>
+            </div>
+
+            <Form.Item
+              label={<span className="text-xs font-semibold text-slate-700">Loại phương tiện sử dụng</span>}
+              name="vehicleType"
+              initialValue="Xe máy số"
+            >
+              <Select
+                options={[
+                  { label: 'Xe máy số (Wave, Sirius, Future, Blade...)', value: 'Xe máy số' },
+                  { label: 'Xe máy tay ga (Vision, Air Blade, Lead, SH...)', value: 'Xe máy tay ga' },
+                  { label: 'Xe máy điện (VinFast, Dat Bike, Yadea...)', value: 'Xe máy điện' },
+                  { label: 'Xe máy côn tay (Exciter, Winner, Raider...)', value: 'Xe máy côn tay' },
+                ]}
+                className="rounded-xl font-medium"
+              />
+            </Form.Item>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
           <Form.Item

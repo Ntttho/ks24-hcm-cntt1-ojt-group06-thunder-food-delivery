@@ -136,6 +136,7 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal subtotal = BigDecimal.ZERO;
         List<OrderItem> orderItems = new ArrayList<>();
         List<com.foodthunder.order.dto.client.RemoteDeductStockItemRequest> stockDeductItems = new ArrayList<>();
+        List<Integer> selectedToppingIds = new ArrayList<>();
 
         for (CreateOrderItemRequest itemRequest : request.getItems()) {
             ResponseEntity<ApiResponse<RemoteProductDto>> productResponse;
@@ -194,6 +195,7 @@ public class OrderServiceImpl implements OrderService {
                         throw new BadRequestException("Topping ID=" + toppingRequest.getToppingId()
                                 + " không thuộc danh mục món '" + product.getName() + "'");
                     }
+                    selectedToppingIds.add(toppingDto.getId());
 
                     BigDecimal toppingPrice = toppingDto.getPrice();
                     int toppingQty = toppingRequest.getQuantity() != null && toppingRequest.getQuantity() > 0
@@ -348,15 +350,15 @@ public class OrderServiceImpl implements OrderService {
                 .build();
         order.addStatusLog(initialLog);
 
-        // Deduct product stock via restaurantClient
-        if (!stockDeductItems.isEmpty()) {
+        // Deduct product stock and validate toppings via restaurantClient
+        if (!stockDeductItems.isEmpty() || !selectedToppingIds.isEmpty()) {
             try {
-                restaurantClient.deductStock(new com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest(stockDeductItems));
+                restaurantClient.deductStock(new com.foodthunder.order.dto.client.RemoteDeductStockBatchRequest(stockDeductItems, selectedToppingIds));
             } catch (BadRequestException bre) {
                 throw bre;
             } catch (Exception ex) {
                 log.error("Failed to deduct stock from restaurant-service: {}", ex.getMessage());
-                throw new BadRequestException("Không thể trừ số lượng tồn kho của món ăn: " + ex.getMessage());
+                throw new BadRequestException("Không thể trừ số lượng tồn kho của món ăn hoặc xác thực topping: " + ex.getMessage());
             }
         }
 
@@ -700,11 +702,7 @@ public class OrderServiceImpl implements OrderService {
         String resolvedDriverPhone = order.getDriverPhone();
         if (order.getDriverId() != null) {
             if (resolvedDriverName == null || resolvedDriverName.isBlank()) {
-                resolvedDriverName = (order.getDriverId() == 2)
-                        ? "Tran Thi B"
-                        : (order.getDriverId() == 4)
-                        ? "Pham Thi D"
-                        : ("Tài xế Thunder #" + order.getDriverId());
+                resolvedDriverName = "Tài xế Thunder #" + order.getDriverId();
             }
             if (resolvedDriverPhone == null || resolvedDriverPhone.isBlank()) {
                 resolvedDriverPhone = "090000000" + order.getDriverId();
@@ -713,8 +711,8 @@ public class OrderServiceImpl implements OrderService {
 
         String resolvedCustomerName = order.getCustomerName();
         if (resolvedCustomerName == null || resolvedCustomerName.isBlank()) {
-            resolvedCustomerName = (order.getCustomerId() != null && order.getCustomerId() == 1)
-                    ? "Customer Demo"
+            resolvedCustomerName = (order.getCustomerId() != null)
+                    ? "Khách hàng #" + order.getCustomerId()
                     : "Khách hàng";
         }
         String resolvedCustomerPhone = order.getCustomerPhone();
@@ -834,6 +832,28 @@ public class OrderServiceImpl implements OrderService {
         String currentStatus = order.getStatus().getCode();
         if (OrderStatus.COMPLETED.equalsIgnoreCase(currentStatus) || OrderStatus.CANCELLED.equalsIgnoreCase(currentStatus)) {
             throw new BadRequestException("Không thể hủy đơn hàng đã ở trạng thái: " + currentStatus);
+        }
+
+        String role = requestingUserRole != null ? requestingUserRole.replace("ROLE_", "").toUpperCase() : "CUSTOMER";
+
+        if ("CUSTOMER".equalsIgnoreCase(role)) {
+            if (requestingUserId != null && !order.getCustomerId().equals(requestingUserId)) {
+                throw new BadRequestException("Bạn không có quyền hủy đơn hàng của người khác!");
+            }
+            if (!OrderStatus.PENDING.equalsIgnoreCase(currentStatus) && !"AWAITING_PAYMENT".equalsIgnoreCase(currentStatus)) {
+                throw new BadRequestException("Không thể hủy đơn hàng! Quán ăn đã xác nhận nấu món hoặc đơn đang được vận chuyển.");
+            }
+            if (order.getCreatedAt() != null) {
+                long secondsElapsed = java.time.Duration.between(order.getCreatedAt(), LocalDateTime.now()).getSeconds();
+                if (secondsElapsed > 60) {
+                    throw new BadRequestException("Đã quá thời gian cho phép hủy đơn (Tối đa 60 giây kể từ khi đặt hàng)!");
+                }
+            }
+        } else if ("MERCHANT".equalsIgnoreCase(role)) {
+            if (OrderStatus.DELIVERING.equalsIgnoreCase(currentStatus)
+                    || OrderStatus.PICKING_UP.equalsIgnoreCase(currentStatus)) {
+                throw new BadRequestException("Không thể hủy đơn hàng! Đơn đã có tài xế tiếp nhận hoặc đang giao hàng.");
+            }
         }
 
         OrderStatus cancelledStatus = getOrCreateStatus(OrderStatus.CANCELLED, "Đã huỷ", "Đơn hàng đã bị huỷ", 8);
