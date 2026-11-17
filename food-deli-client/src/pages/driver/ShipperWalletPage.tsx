@@ -126,6 +126,13 @@ export const ShipperWalletPage: React.FC = () => {
 
   // Handle withdraw submission
   const handleConfirmWithdraw = async () => {
+    if (wallet && wallet.holdingCodAmount > 0) {
+      message.error(
+        `Bạn đang tạm giữ ${wallet.holdingCodAmount.toLocaleString('vi-VN')} đ tiền mặt COD chưa nộp. Vui lòng quyết toán COD trước khi rút tiền!`
+      );
+      return;
+    }
+
     const num = Number(withdrawAmount.replace(/\D/g, ''));
     if (!num || num <= 0) {
       message.warning('Vui lòng nhập số tiền rút hợp lệ!');
@@ -175,12 +182,38 @@ export const ShipperWalletPage: React.FC = () => {
     }
   };
 
-  // Handle COD settlement submission
+  // Handle COD settlement submission (Quyết toán COD nộp lại công ty)
   const handleConfirmCodSettlement = async () => {
+    if (!wallet || wallet.holdingCodAmount <= 0) {
+      message.info('Bạn hiện không có khoản tiền COD nào cần quyết toán.');
+      setIsCodSettlementModalOpen(false);
+      return;
+    }
+
     setIsSettlingCod(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      message.success('Đã gửi thông tin quyết toán COD thành công! Ban quản trị sẽ đối soát và xác nhận giao dịch.');
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const settledAmount = wallet.holdingCodAmount;
+      const settleTx: DriverWalletTransaction = {
+        id: `TX-SETTLE-${Date.now()}`,
+        type: 'COD_SETTLED',
+        typeLabel: 'Đã nộp tiền COD',
+        direction: 'OUT',
+        amount: settledAmount,
+        balanceAfter: wallet.availableBalance,
+        description: `Đã chuyển khoản quyết toán nộp ${settledAmount.toLocaleString('vi-VN')} đ tiền mặt COD về tài khoản công ty`,
+        createdAt: new Date().toISOString(),
+      };
+
+      setWallet({
+        ...wallet,
+        holdingCodAmount: 0,
+        transactionHistory: [settleTx, ...wallet.transactionHistory],
+      });
+
+      message.success(
+        `Đã quyết toán nộp ${settledAmount.toLocaleString('vi-VN')} đ tiền COD thành công! Lệnh rút tiền thu nhập đã được mở khóa an toàn.`
+      );
       setIsCodSettlementModalOpen(false);
     } catch (err) {
       message.error('Có lỗi xảy ra khi gửi thông tin quyết toán.');
@@ -245,6 +278,14 @@ export const ShipperWalletPage: React.FC = () => {
             </Tag>
           );
         }
+        if (tx.type === 'COD_SETTLED') {
+          return (
+            <Tag color="processing" className="font-semibold text-xs px-2 py-0.5 rounded-md flex items-center gap-1 w-fit">
+              <CheckCircle className="w-3 h-3 text-blue-600" />
+              <span>{tx.typeLabel || 'Đã nộp COD'}</span>
+            </Tag>
+          );
+        }
         return (
           <Tag color="error" className="font-semibold text-xs px-2 py-0.5 rounded-md flex items-center gap-1 w-fit">
             <ArrowUpRight className="w-3 h-3" />
@@ -290,6 +331,16 @@ export const ShipperWalletPage: React.FC = () => {
                 {tx.amount.toLocaleString('vi-VN')} đ
               </span>
               <span className="text-[10px] text-amber-500 block font-semibold">(Thu tiền mặt COD)</span>
+            </div>
+          );
+        }
+        if (tx.type === 'COD_SETTLED') {
+          return (
+            <div className="text-right">
+              <span className="font-black text-blue-600 text-sm">
+                -{tx.amount.toLocaleString('vi-VN')} đ
+              </span>
+              <span className="text-[10px] text-blue-500 block font-semibold">(Đã nộp lại COD)</span>
             </div>
           );
         }
@@ -381,9 +432,16 @@ export const ShipperWalletPage: React.FC = () => {
               <div className="text-3xl sm:text-4xl font-black mt-3 tracking-tight">
                 {wallet ? `${wallet.availableBalance.toLocaleString('vi-VN')} đ` : '-- đ'}
               </div>
-              <p className="text-emerald-100/80 text-[11px] mt-2 leading-relaxed">
-                Tiền cước tích lũy từ các đơn hoàn thành (COMPLETED). Có thể rút về ngân hàng bất kỳ lúc nào.
-              </p>
+              {wallet && wallet.holdingCodAmount > 0 ? (
+                <div className="mt-2 bg-amber-400/20 border border-amber-300/40 rounded-xl px-2.5 py-1 text-[11px] text-amber-100 flex items-center gap-1.5 font-bold">
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                  <span>Tạm khóa rút tiền (Đang nợ {wallet.holdingCodAmount.toLocaleString('vi-VN')} đ tiền COD)</span>
+                </div>
+              ) : (
+                <p className="text-emerald-100/80 text-[11px] mt-2 leading-relaxed">
+                  Tiền cước tích lũy từ các đơn hoàn thành (COMPLETED). Đã quyết toán COD, có thể rút về ngân hàng ngay.
+                </p>
+              )}
             </div>
 
             <div className="mt-6 pt-4 border-t border-white/20 flex items-center justify-between gap-3">
@@ -393,7 +451,11 @@ export const ShipperWalletPage: React.FC = () => {
                 className="w-full bg-white hover:bg-emerald-50 text-emerald-800 font-black text-xs py-2.5 px-4 rounded-xl shadow-md transition-all active:scale-98 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <ArrowUpRight className="w-4 h-4 text-emerald-700" />
-                <span>Rút tiền về ngân hàng</span>
+                <span>
+                  {wallet && wallet.holdingCodAmount > 0
+                    ? 'Rút tiền về ngân hàng (Yêu cầu nộp COD)'
+                    : 'Rút tiền về ngân hàng'}
+                </span>
               </button>
             </div>
           </div>
@@ -701,12 +763,41 @@ export const ShipperWalletPage: React.FC = () => {
         centered
       >
         <div className="space-y-4 pt-3">
-          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
-            <span className="block font-semibold">Số dư khả dụng hiện tại:</span>
-            <span className="text-2xl font-black text-emerald-700 block mt-1">
-              {wallet ? `${wallet.availableBalance.toLocaleString('vi-VN')} đ` : '0 đ'}
-            </span>
-          </div>
+          {/* Cảnh báo tạm khóa rút tiền theo Cách 1: Khi còn tiền COD chưa nộp */}
+          {wallet && wallet.holdingCodAmount > 0 ? (
+            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-900 text-xs space-y-2.5">
+              <div className="flex items-center gap-2 font-black text-amber-900 text-sm">
+                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                <span>Tạm khóa rút tiền: Chưa quyết toán tiền mặt COD</span>
+              </div>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Bạn đang tạm giữ <strong className="text-amber-950 font-black">{wallet.holdingCodAmount.toLocaleString('vi-VN')} đ</strong> tiền mặt COD của các đơn hàng chưa nộp về hệ thống. Theo quy định bảo toàn tài chính, <strong>quý đối tác cần nộp lại tiền mặt COD trước khi thực hiện rút tiền thu nhập</strong> về thẻ ngân hàng.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsWithdrawModalOpen(false);
+                  setIsCodSettlementModalOpen(true);
+                }}
+                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer active:scale-98"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Chuyển sang nộp quyết toán COD ngay</span>
+              </button>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">Số dư khả dụng hiện tại:</span>
+                <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  Đủ điều kiện rút
+                </span>
+              </div>
+              <span className="text-2xl font-black text-emerald-700 block mt-1">
+                {wallet ? `${wallet.availableBalance.toLocaleString('vi-VN')} đ` : '0 đ'}
+              </span>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -715,20 +806,21 @@ export const ShipperWalletPage: React.FC = () => {
             <div className="relative">
               <input
                 type="text"
+                disabled={Boolean(wallet && wallet.holdingCodAmount > 0)}
                 placeholder="Nhập số tiền (tối thiểu 50.000 đ)"
                 value={withdrawAmount}
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, '');
                   setWithdrawAmount(val ? Number(val).toLocaleString('vi-VN') : '');
                 }}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
                 VNĐ
               </span>
             </div>
             {/* Quick amount chips */}
-            {wallet && wallet.availableBalance > 0 && (
+            {wallet && wallet.availableBalance > 0 && wallet.holdingCodAmount <= 0 && (
               <div className="flex items-center gap-1.5 mt-2 flex-wrap text-xs">
                 <button
                   type="button"
@@ -760,9 +852,10 @@ export const ShipperWalletPage: React.FC = () => {
               Ngân hàng nhận tiền
             </label>
             <select
+              disabled={Boolean(wallet && wallet.holdingCodAmount > 0)}
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+              className="w-full bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
             >
               <option value="MB Bank (Ngân hàng Quân đội)">MB Bank (Ngân hàng Quân đội)</option>
               <option value="Vietcombank (Ngân hàng Ngoại Thương VN)">Vietcombank (Ngân hàng Ngoại Thương VN)</option>
@@ -779,9 +872,10 @@ export const ShipperWalletPage: React.FC = () => {
               </label>
               <input
                 type="text"
+                disabled={Boolean(wallet && wallet.holdingCodAmount > 0)}
                 value={bankAccount}
                 onChange={(e) => setBankAccount(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
               />
             </div>
             <div>
@@ -790,9 +884,10 @@ export const ShipperWalletPage: React.FC = () => {
               </label>
               <input
                 type="text"
+                disabled={Boolean(wallet && wallet.holdingCodAmount > 0)}
                 value={accountHolder}
                 onChange={(e) => setAccountHolder(e.target.value.toUpperCase())}
-                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
               />
             </div>
           </div>
@@ -808,11 +903,13 @@ export const ShipperWalletPage: React.FC = () => {
             <button
               type="button"
               onClick={handleConfirmWithdraw}
-              disabled={isSubmittingWithdraw}
-              className="flex-[2] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              disabled={isSubmittingWithdraw || Boolean(wallet && wallet.holdingCodAmount > 0)}
+              className="flex-[2] py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmittingWithdraw ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : wallet && wallet.holdingCodAmount > 0 ? (
+                <span>Vui lòng nộp COD trước khi rút</span>
               ) : (
                 <span>Xác nhận rút tiền</span>
               )}
