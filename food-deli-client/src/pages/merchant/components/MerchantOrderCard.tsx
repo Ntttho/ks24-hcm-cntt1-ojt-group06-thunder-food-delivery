@@ -248,7 +248,7 @@ export const MerchantOrderCard: React.FC<MerchantOrderCardProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <Tag color="cyan" className="text-xs px-3 py-1 font-semibold rounded-lg">
                 <CarOutlined className="mr-1" /> Tài xế đang giao hàng
-                {order.driverId ? ` (Tài xế #${order.driverId})` : ''}
+                {order.driverName ? ` (Tài xế: ${order.driverName})` : order.driverId ? ' (Tài xế đối tác)' : ''}
               </Tag>
               {order.distanceKm && (
                 <Tag color="blue" className="text-xs px-2.5 py-1 font-medium rounded-lg">

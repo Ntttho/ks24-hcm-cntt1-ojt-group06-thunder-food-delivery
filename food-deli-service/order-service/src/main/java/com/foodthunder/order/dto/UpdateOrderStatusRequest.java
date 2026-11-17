@@ -13,4 +13,6 @@ public class UpdateOrderStatusRequest {
     private String statusCode;
 
     private String reason;
+    private String driverName;
+    private String driverPhone;
 }

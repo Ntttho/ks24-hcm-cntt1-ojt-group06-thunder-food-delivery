@@ -1,5 +1,5 @@
 import React from 'react';
-import { Table, Button, Input, Select, Tag, Space, Popconfirm, Tooltip } from 'antd';
+import { Table, Button, Input, Select, Tag, Space, Popconfirm, Tooltip, Avatar } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   SearchOutlined,
@@ -10,6 +10,7 @@ import {
   CarOutlined,
 } from '@ant-design/icons';
 import type { DriverApprovalItem } from '@/services/modules/adminApprovalApi';
+import { maskPhoneNumber } from '@/utils/privacyMask';
 
 interface DriverApprovalTabProps {
   driverApprovals: DriverApprovalItem[];
@@ -70,11 +71,29 @@ export const DriverApprovalTab: React.FC<DriverApprovalTabProps> = ({
 
   const columns: ColumnsType<DriverApprovalItem> = [
     {
-      title: 'Mã TX',
-      dataIndex: 'userId',
-      key: 'userId',
-      width: 90,
-      render: (uid) => <span className="font-mono text-slate-400 font-semibold text-xs">User #{uid}</span>,
+      title: 'Tài xế',
+      key: 'driverInfo',
+      width: 180,
+      render: (_, record) => (
+        <div className="flex items-center gap-2.5">
+          <Avatar
+            size={36}
+            src={record.avatarUrl}
+            icon={<CarOutlined />}
+            className="bg-blue-100 text-blue-600 font-bold shrink-0"
+          >
+            {record.fullName ? record.fullName.slice(0, 2).toUpperCase() : 'TX'}
+          </Avatar>
+          <div className="min-w-0">
+            <div className="font-bold text-slate-800 text-xs truncate">
+              {record.fullName || 'Tài xế đối tác'}
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono">
+              {record.phoneNumber ? maskPhoneNumber(record.phoneNumber) : (record.email || 'Chưa cập nhật liên hệ')}
+            </div>
+          </div>
+        </div>
+      ),
     },
     {
       title: 'CCCD / CMND',
@@ -157,7 +176,7 @@ export const DriverApprovalTab: React.FC<DriverApprovalTabProps> = ({
             <>
               <Popconfirm
                 title="Phê duyệt hồ sơ tài xế?"
-                description={`Xác nhận phê duyệt tài xế User #${record.userId} (Biển số: ${record.licensePlate || 'N/A'})?`}
+                description={`Xác nhận phê duyệt tài xế ${record.fullName || 'đối tác'} (Biển số: ${record.licensePlate || 'N/A'})?`}
                 onConfirm={() => onApprove(record.userId)}
                 okText="Phê duyệt"
                 cancelText="Hủy"

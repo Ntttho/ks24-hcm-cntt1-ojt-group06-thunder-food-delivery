@@ -18,8 +18,13 @@ public class OrderClientDto {
     private Long id;
     private String orderCode;
     private Integer customerId;
+    private String customerName;
+    private String customerPhone;
     private Integer restaurantId;
+    private String restaurantName;
     private Integer driverId;
+    private String driverName;
+    private String driverPhone;
     private String statusCode;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")

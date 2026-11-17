@@ -11,6 +11,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class DriverApprovalDto {
     private Integer userId;
+    private String fullName;
+    private String phoneNumber;
+    private String email;
+    private String avatarUrl;
     private String licensePlate;
     private String idCardNumber;
     private String vehicleType;

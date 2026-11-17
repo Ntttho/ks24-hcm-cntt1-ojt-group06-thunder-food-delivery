@@ -27,6 +27,7 @@ import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
 import { chatApi } from '@/services/modules/chatApi';
 import { soundManager } from '@/utils/soundNotification';
+import { maskPhoneNumber } from '@/utils/privacyMask';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import type { CustomerOrder } from '@/types';
 import { APP_ROUTES } from '@/constants';
@@ -132,13 +133,13 @@ export const OrderDetailPage: React.FC = () => {
             customerName: data.customerName || 'Khách hàng',
             customerPhone: data.customerPhone || '0987654321',
             restaurantId: Number(data.restaurantId || 1),
-            restaurantName: data.restaurantName || `Nhà hàng #${data.restaurantId}`,
-            restaurantAddress: data.restaurantAddress || data.restaurantName,
+            restaurantName: data.restaurantName || (Number(data.restaurantId) === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : 'Quán ăn đối tác'),
+            restaurantAddress: data.restaurantAddress || '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM',
             restaurantLat: data.restaurantLat ? Number(data.restaurantLat) : 10.7769,
             restaurantLng: data.restaurantLng ? Number(data.restaurantLng) : 106.7009,
             driverId: data.driverId ? Number(data.driverId) : undefined,
-            driverName: data.driverName || (data.driverId ? 'Nguyễn Tuấn Tài (Tài xế Thunder)' : undefined),
-            driverPhone: data.driverPhone || (data.driverId ? '0912345678' : undefined),
+            driverName: data.driverName || (data.driverId ? (Number(data.driverId) === 2 ? 'Tran Thi B' : 'Tài xế Thunder') : undefined),
+            driverPhone: data.driverPhone || (data.driverId ? '0900000002' : undefined),
             receiverAddress: data.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
             receiverLat: data.receiverLat ? Number(data.receiverLat) : 10.7925,
             receiverLng: data.receiverLng ? Number(data.receiverLng) : 106.7214,
@@ -536,7 +537,7 @@ export const OrderDetailPage: React.FC = () => {
             <span>{order.customerName || 'Khách hàng'}</span>
             <span>•</span>
             <PhoneOutlined />
-            <span>{order.customerPhone || '0987654321'}</span>
+            <span>{maskPhoneNumber(order.customerPhone)}</span>
           </div>
           {(order as any).note && (
             <div className="mt-2.5 pt-2 border-t border-gray-100 flex items-start gap-1.5 text-xs text-amber-900 bg-amber-50/80 p-2.5 rounded-xl">

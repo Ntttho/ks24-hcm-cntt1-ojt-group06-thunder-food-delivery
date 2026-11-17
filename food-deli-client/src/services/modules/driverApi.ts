@@ -177,7 +177,14 @@ interface BackendOrderDto {
   customerName?: string | null;
   customerPhone?: string | null;
   restaurantId: number;
+  restaurantName?: string | null;
+  restaurantAddress?: string | null;
+  restaurantPhone?: string | null;
+  restaurantLat?: number | null;
+  restaurantLng?: number | null;
   driverId?: number | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
   receiverAddress?: string | null;
   receiverLat?: number | null;
   receiverLng?: number | null;
@@ -466,13 +473,13 @@ const mapOrderToDriverOrder = (
     customerId: order.customerId,
     restaurantId: order.restaurantId,
     restaurantOwnerId: shop?.ownerId,
-    restaurantName: shop?.name || `Quán ăn #${order.restaurantId}`,
-    restaurantAddress: shop?.address || 'Chưa cập nhật địa chỉ quán',
-    restaurantPhone: shop?.phone || '',
-    restaurantLat: shop?.latitude ?? null,
-    restaurantLng: shop?.longitude ?? null,
+    restaurantName: order.restaurantName || shop?.name || 'Quán ăn đối tác',
+    restaurantAddress: order.restaurantAddress || shop?.address || 'Chưa cập nhật địa chỉ quán',
+    restaurantPhone: order.restaurantPhone || shop?.phone || '',
+    restaurantLat: order.restaurantLat ?? shop?.latitude ?? null,
+    restaurantLng: order.restaurantLng ?? shop?.longitude ?? null,
     receiverName:
-      order.customerName?.trim() || (order.customerId ? `Khách hàng #${order.customerId}` : 'Khách hàng'),
+      order.customerName?.trim() || 'Khách hàng',
     receiverPhone: order.customerPhone?.trim() || '',
     receiverAddress: order.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
     receiverLat: order.receiverLat ?? null,
@@ -521,10 +528,10 @@ const mapOrderToTripHistory = (
     id: order.id,
     orderCode,
     restaurantId: order.restaurantId,
-    restaurantName: shop?.name || `Quán ăn #${order.restaurantId}`,
-    restaurantAddress: shop?.address || 'Chưa cập nhật địa chỉ quán',
+    restaurantName: order.restaurantName || shop?.name || 'Quán ăn đối tác',
+    restaurantAddress: order.restaurantAddress || shop?.address || 'Chưa cập nhật địa chỉ quán',
     receiverName:
-      order.customerName?.trim() || (order.customerId ? `Khách hàng #${order.customerId}` : 'Khách hàng'),
+      order.customerName?.trim() || 'Khách hàng thân thiết',
     receiverAddress: order.receiverAddress || 'Chưa cập nhật địa chỉ giao hàng',
     receiverPhone: order.customerPhone?.trim() || 'Chưa cập nhật SĐT',
     shippingFee,
@@ -720,10 +727,15 @@ export const driverApi = {
 
   // 2. Tài xế nhận đơn ngay (CONFIRMED -> DRIVER_ACCEPTED qua order-service Pessimistic Lock)
   acceptOrder: async (orderId: number | string): Promise<DriverOrder> => {
+    const user = storage.getUser();
     const driverId = resolveDriverId();
+    const driverName = user?.fullName || 'Tài xế giao hàng';
+    const driverPhone = user?.phone || user?.phoneNumber || '';
     const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
       statusCode: 'DRIVER_ACCEPTED',
-      reason: `Tài xế #${driverId} đã nhận đơn giao hàng`,
+      reason: `Tài xế ${driverName} đã nhận đơn giao hàng`,
+      driverName,
+      driverPhone,
     });
 
     const accepted = res?.data;
@@ -749,13 +761,14 @@ export const driverApi = {
     statusCode: string,
     reason?: string
   ): Promise<DriverOrder> => {
-    const driverId = resolveDriverId();
+    const user = storage.getUser();
+    const driverName = user?.fullName || 'Tài xế';
     const normalizedStatus = statusCode.trim().toUpperCase();
     const defaultReasonMap: Record<string, string> = {
-      PICKING_UP: `Tài xế #${driverId} đã tới quán và đang lấy món`,
-      DELIVERING: `Tài xế #${driverId} đã lấy món và đang giao tới khách hàng`,
-      COMPLETED: `Tài xế #${driverId} đã giao hàng thành công`,
-      DRIVER_REJECTED: `Tài xế #${driverId} trả đơn`,
+      PICKING_UP: `Tài xế ${driverName} đã tới quán và đang lấy món`,
+      DELIVERING: `Tài xế ${driverName} đã lấy món và đang giao tới khách hàng`,
+      COMPLETED: `Tài xế ${driverName} đã giao hàng thành công`,
+      DRIVER_REJECTED: `Tài xế ${driverName} trả đơn`,
     };
 
     const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
