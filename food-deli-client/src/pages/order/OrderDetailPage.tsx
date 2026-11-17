@@ -498,8 +498,9 @@ export const OrderDetailPage: React.FC = () => {
           customerLat={order.receiverLat || 10.7925}
           customerLng={order.receiverLng || 106.7214}
           driverLiveCoords={driverLiveCoords}
-          isDelivering={order.statusCode === 'DELIVERING' || order.statusCode === 'DRIVER_ACCEPTED'}
+          isDelivering={order.statusCode === 'DELIVERING'}
           orderCode={order.orderCode}
+          statusCode={order.statusCode}
         />
 
         {/* 4. Driver & Restaurant Contact Cards */}
