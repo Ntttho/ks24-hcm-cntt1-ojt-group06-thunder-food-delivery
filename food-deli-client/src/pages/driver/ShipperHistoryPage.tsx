@@ -392,31 +392,28 @@ export const ShipperHistoryPage: React.FC = () => {
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl self-start sm:self-auto">
               <button
                 onClick={() => setSelectedPeriod('all')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedPeriod === 'all'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedPeriod === 'all'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Tất cả
               </button>
               <button
                 onClick={() => setSelectedPeriod('today')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedPeriod === 'today'
-                    ? 'bg-white text-emerald-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedPeriod === 'today'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Hôm nay
               </button>
               <button
                 onClick={() => setSelectedPeriod('week')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedPeriod === 'week'
-                    ? 'bg-white text-emerald-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedPeriod === 'week'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Tuần này
               </button>
@@ -428,31 +425,28 @@ export const ShipperHistoryPage: React.FC = () => {
             <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl shrink-0 self-start">
               <button
                 onClick={() => setSelectedStatus('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedStatus === 'ALL'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedStatus === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Tất cả ({allTrips.length})
               </button>
               <button
                 onClick={() => setSelectedStatus('SUCCESS')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedStatus === 'SUCCESS'
-                    ? 'bg-white text-emerald-700 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedStatus === 'SUCCESS'
+                  ? 'bg-white text-emerald-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Thành công ({stats?.completedTripsAll ?? 0})
               </button>
               <button
                 onClick={() => setSelectedStatus('FAILED')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedStatus === 'FAILED'
-                    ? 'bg-white text-rose-600 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${selectedStatus === 'FAILED'
+                  ? 'bg-white text-rose-600 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+                  }`}
               >
                 Thất bại / Hủy ({stats?.failedTripsAll ?? 0})
               </button>
@@ -571,24 +565,21 @@ export const ShipperHistoryPage: React.FC = () => {
           <div className="space-y-4 pt-2 text-xs">
             {/* Hero cước & thanh toán */}
             <div
-              className={`p-4 rounded-2xl border flex items-center justify-between ${
-                selectedTrip.isSuccess
-                  ? 'bg-emerald-50 border-emerald-100'
-                  : 'bg-rose-50 border-rose-100'
-              }`}
+              className={`p-4 rounded-2xl border flex items-center justify-between ${selectedTrip.isSuccess
+                ? 'bg-emerald-50 border-emerald-100'
+                : 'bg-rose-50 border-rose-100'
+                }`}
             >
               <div>
                 <span
-                  className={`text-[11px] font-bold block ${
-                    selectedTrip.isSuccess ? 'text-emerald-700' : 'text-rose-700'
-                  }`}
+                  className={`text-[11px] font-bold block ${selectedTrip.isSuccess ? 'text-emerald-700' : 'text-rose-700'
+                    }`}
                 >
                   {selectedTrip.isSuccess ? 'Tiền cước tài xế thực nhận' : 'Đơn không hoàn thành (không cộng cước)'}
                 </span>
                 <span
-                  className={`text-2xl font-black ${
-                    selectedTrip.isSuccess ? 'text-emerald-600' : 'text-rose-600'
-                  }`}
+                  className={`text-2xl font-black ${selectedTrip.isSuccess ? 'text-emerald-600' : 'text-rose-600'
+                    }`}
                 >
                   {selectedTrip.isSuccess
                     ? `+${selectedTrip.earnedFee.toLocaleString('vi-VN')} đ`

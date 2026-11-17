@@ -35,6 +35,8 @@ export const APP_ROUTES = {
   MERCHANT_REVIEWS: '/merchant/reviews',
   SHIPPER_DASHBOARD: '/shipper',
   SHIPPER_HISTORY: '/shipper/history',
+  SHIPPER_WALLET: '/shipper/wallet',
+  DRIVER_WALLET: '/driver/wallet',
   NOT_FOUND: '*',
 } as const;
 

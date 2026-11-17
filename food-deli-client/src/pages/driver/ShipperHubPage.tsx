@@ -287,6 +287,14 @@ export const ShipperHubPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-1.5">
           <Link
+            to={APP_ROUTES.DRIVER_WALLET}
+            className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+            title="Quản lý ví & biến động số dư chi tiết"
+          >
+            <Wallet className="w-3.5 h-3.5" />
+            <span>Ví của tôi</span>
+          </Link>
+          <Link
             to={APP_ROUTES.SHIPPER_HISTORY}
             className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
             title="Xem chi tiết toàn bộ lịch sử đơn hàng & thu nhập"
@@ -680,6 +688,14 @@ export const ShipperHubPage: React.FC = () => {
                         Chưa có chuyến xe nào hoàn thành.
                       </p>
                     )}
+
+                    <Link
+                      to={APP_ROUTES.DRIVER_WALLET}
+                      className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md shadow-emerald-600/20 cursor-pointer"
+                    >
+                      <Wallet className="w-4 h-4" />
+                      <span>Quản lý Ví thu nhập &amp; Biến động dòng tiền chi tiết &gt;</span>
+                    </Link>
 
                     <Link
                       to={APP_ROUTES.SHIPPER_HISTORY}

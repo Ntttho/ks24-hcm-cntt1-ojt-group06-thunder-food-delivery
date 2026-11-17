@@ -115,6 +115,28 @@ export interface DriverHistoryQueryParams {
   search?: string;
 }
 
+export interface DriverWalletTransaction {
+  id: string;
+  orderId?: number;
+  orderCode?: string;
+  type: 'DELIVERY_FEE' | 'COD_COLLECTED' | 'BONUS' | 'WITHDRAWAL' | 'COD_SETTLED' | string;
+  typeLabel: string;
+  direction: 'IN' | 'HOLDING' | 'OUT' | string;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  createdAt: string;
+}
+
+export interface DriverWalletDetails {
+  driverId: number;
+  availableBalance: number;
+  holdingCodAmount: number;
+  todayEarnings: number;
+  completedTripsCount: number;
+  transactionHistory: DriverWalletTransaction[];
+}
+
 export interface DriverReviewItem {
   id: number;
   customerName: string;
@@ -248,6 +270,7 @@ const isHistoryOrderStatus = (statusCode?: string | null): boolean => {
   const code = (statusCode || '').trim().toUpperCase();
   return SUCCESS_HISTORY_STATUSES.has(code) || FAIL_HISTORY_STATUSES.has(code);
 };
+// dòng 213 -221 vì delivering k có trogn 2 cái trên nên false /false 
 
 const resolveHistoryStatusLabel = (statusCode: string, backendLabel?: string | null): string => {
   switch (statusCode.toUpperCase()) {
@@ -868,8 +891,10 @@ export const driverApi = {
   getHistoryDashboard: async (params?: DriverHistoryQueryParams): Promise<DriverHistoryDashboard> => {
     const driverId = resolveDriverId(params?.driverId);
     const rawOrders = await fetchAllDriverOrders(driverId);
+    // là mảng chứa các đơn hàng của của tài xé 
 
     const historyOrders = rawOrders.filter((order) => isHistoryOrderStatus(order.statusCode));
+    // lọc ra trạng thái đơn nếu trừ cái đang giao ra là k lấy
     const shopMap = await fetchRestaurantDirectoryMap(historyOrders.map((o) => o.restaurantId));
 
     const allHistoryTrips = historyOrders
@@ -895,5 +920,110 @@ export const driverApi = {
   getTripHistory: async (params?: DriverHistoryQueryParams): Promise<DriverTripHistory[]> => {
     const dashboard = await driverApi.getHistoryDashboard(params);
     return dashboard.trips;
+  },
+
+  // 9. Lấy chi tiết ví thu nhập, tiền mặt COD đang giữ & lịch sử biến động số dư (Task DUC-01)
+  getDriverWallet: async (explicitDriverId?: number | string): Promise<DriverWalletDetails> => {
+    const driverId = resolveDriverId(explicitDriverId);
+    try {
+      const response = await apiClient.get<ApiResponse<DriverWalletDetails>>(
+        API_ENDPOINTS.DELIVERY.WALLET,
+        {
+          headers: {
+            'X-User-Id': String(driverId),
+          },
+        }
+      );
+      if (response.data && response.data.data) {
+        return response.data.data;
+      }
+    } catch (err) {
+      console.warn('API /deliveries/driver/wallet chưa phản hồi, thử route fallback...', err);
+      try {
+        const altResponse = await apiClient.get<ApiResponse<DriverWalletDetails>>(
+          API_ENDPOINTS.DELIVERY.ALTERNATIVE_WALLET,
+          {
+            headers: {
+              'X-User-Id': String(driverId),
+            },
+          }
+        );
+        if (altResponse.data && altResponse.data.data) {
+          return altResponse.data.data;
+        }
+      } catch (altErr) {
+        console.warn('Fallback gọi trực tiếp delivery-service không thành công, tính toán từ history dashboard', altErr);
+      }
+    }
+
+    // Client-side fallback if backend service is offline
+    const dashboard = await driverApi.getHistoryDashboard({ driverId, period: 'all' });
+    const successTrips = dashboard.trips.filter((t) => t.isSuccess);
+
+    let holdingCod = 0;
+    for (const trip of successTrips) {
+      if (trip.paymentMethod === 'COD' && trip.codAmount > 0) {
+        holdingCod += trip.codAmount;
+      }
+    }
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    let todayEarned = 0;
+    for (const trip of successTrips) {
+      const tripDate = new Date(trip.completedAtIso);
+      if (tripDate >= startOfToday) {
+        todayEarned += trip.earnedFee;
+      }
+    }
+
+    const sortedAsc = [...successTrips].sort(
+      (a, b) => new Date(a.completedAtIso).getTime() - new Date(b.completedAtIso).getTime()
+    );
+
+    let runningBal = 0;
+    const txHistory: DriverWalletTransaction[] = [];
+    for (const trip of sortedAsc) {
+      runningBal += trip.earnedFee;
+      txHistory.push({
+        id: `TX-SHIP-${trip.id}`,
+        orderId: typeof trip.id === 'number' ? trip.id : undefined,
+        orderCode: trip.orderCode,
+        type: 'DELIVERY_FEE',
+        typeLabel: 'Tiền cước giao hàng',
+        direction: 'IN',
+        amount: trip.earnedFee,
+        balanceAfter: runningBal,
+        description: `Nhận tiền ship đơn hàng #${trip.orderCode} (${trip.restaurantName})`,
+        createdAt: trip.completedAtIso,
+      });
+
+      if (trip.paymentMethod === 'COD' && trip.codAmount > 0) {
+        txHistory.push({
+          id: `TX-COD-${trip.id}`,
+          orderId: typeof trip.id === 'number' ? trip.id : undefined,
+          orderCode: trip.orderCode,
+          type: 'COD_COLLECTED',
+          typeLabel: 'Thu hộ tiền mặt COD',
+          direction: 'HOLDING',
+          amount: trip.codAmount,
+          balanceAfter: runningBal,
+          description: `Thu tiền mặt COD đơn #${trip.orderCode} (chờ quyết toán nộp lại)`,
+          createdAt: trip.completedAtIso,
+        });
+      }
+    }
+
+    txHistory.reverse();
+
+    return {
+      driverId: Number(driverId),
+      availableBalance: runningBal,
+      holdingCodAmount: holdingCod,
+      todayEarnings: todayEarned,
+      completedTripsCount: successTrips.length,
+      transactionHistory: txHistory,
+    };
   },
 };

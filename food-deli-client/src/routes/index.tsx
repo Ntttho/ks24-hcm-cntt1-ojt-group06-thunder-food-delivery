@@ -24,6 +24,7 @@ import {
   AdminUserPage,
   ShipperHubPage,
   ShipperHistoryPage,
+  ShipperWalletPage,
   AdminRestaurantReviewsPage,
   AdminDriverReviewsPage,
 } from '@/pages';
@@ -268,6 +269,23 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
         <ShipperHistoryPage />
+      </ProtectedRoute>
+    ),
+  },
+  // Shipper / Driver Wallet & Cash Flow Management (Task DUC-01)
+  {
+    path: APP_ROUTES.SHIPPER_WALLET,
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperWalletPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: APP_ROUTES.DRIVER_WALLET,
+    element: (
+      <ProtectedRoute allowedRoles={['ROLE_DRIVER']}>
+        <ShipperWalletPage />
       </ProtectedRoute>
     ),
   },

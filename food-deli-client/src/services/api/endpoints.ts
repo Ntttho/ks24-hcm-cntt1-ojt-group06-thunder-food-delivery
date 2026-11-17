@@ -71,6 +71,8 @@ export const API_ENDPOINTS = {
     ACCEPT: (orderId: number | string) => `/delivery/orders/${orderId}/accept`,
     UPDATE_STATUS: (orderId: number | string) => `/delivery/orders/${orderId}/status`,
     EARNINGS: '/delivery/earnings',
+    WALLET: '/deliveries/driver/wallet',
+    ALTERNATIVE_WALLET: '/delivery/driver/wallet',
   },
   // Review Service
   REVIEWS: {

@@ -65,5 +65,10 @@ public interface DeliveryService {
      * Thống kê hiệu suất và thu nhập của tài xế.
      */
     DriverMetricsResponse getDriverMetrics(Integer driverId);
+
+    /**
+     * Task DUC-01: Truy vấn tính toán Tổng Ví & Chức năng "Ví Của Tôi" cho Driver.
+     */
+    DriverWalletResponse getDriverWallet(Integer driverId);
 }
 

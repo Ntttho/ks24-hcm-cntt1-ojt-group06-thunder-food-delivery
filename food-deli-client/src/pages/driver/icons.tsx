@@ -453,5 +453,55 @@ export const ChevronUp: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props
   </svg>
 );
 
+export const ArrowDownLeft: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <line x1="17" y1="7" x2="7" y2="17" />
+    <polyline points="17 17 7 17 7 7" />
+  </svg>
+);
+
+export const ArrowUpRight: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <line x1="7" y1="17" x2="17" y2="7" />
+    <polyline points="7 7 17 7 17 17" />
+  </svg>
+);
+
+export const Download: React.FC<IconProps> = ({ className = 'w-4 h-4', ...props }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    {...props}
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
+
 
 

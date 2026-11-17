@@ -26,9 +26,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.foodthunder.common.dto.response.PageResponse;
+import com.foodthunder.delivery.dto.client.RemoteOrderResponse;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -510,6 +516,142 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .rollingWindowCancelled(rollingChargeableCancelledCount)
                 .isSuspended(isSuspended)
                 .penaltyReason(acceptanceRate < 80.0 ? "AR (" + acceptanceRate + "%) < 80%" : (cancellationRate > 10.0 ? "CR (" + cancellationRate + "%) > 10%" : null))
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DriverWalletResponse getDriverWallet(Integer driverId) {
+        log.info("Computing wallet details for driver #{}", driverId);
+
+        double availableBalance = 0.0;
+        double holdingCodAmount = 0.0;
+        double todayEarnings = 0.0;
+        long completedTripsCount = 0L;
+        List<DriverWalletTransactionResponse> transactions = new ArrayList<>();
+
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfToday = LocalDate.now().atTime(LocalTime.MAX);
+
+        // 1. Thử truy vấn danh sách đơn hàng thực tế của tài xế qua OpenFeign order-service
+        List<RemoteOrderResponse> remoteOrders = Collections.emptyList();
+        try {
+            ResponseEntity<ApiResponse<PageResponse<RemoteOrderResponse>>> orderRes =
+                    orderClient.getOrders(driverId, null, 0, 100);
+            if (orderRes != null && orderRes.getBody() != null && orderRes.getBody().getData() != null) {
+                PageResponse<RemoteOrderResponse> page = orderRes.getBody().getData();
+                if (page.content() != null) {
+                    remoteOrders = page.content();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Could not query orders from order-service via Feign for driver #{}: {}", driverId, e.getMessage());
+        }
+
+        if (!remoteOrders.isEmpty()) {
+            // Lọc ra các đơn hàng đã hoàn thành (COMPLETED)
+            List<RemoteOrderResponse> completedOrders = remoteOrders.stream()
+                    .filter(o -> o.getStatusCode() != null && "COMPLETED".equalsIgnoreCase(o.getStatusCode().trim()))
+                    .sorted(Comparator.comparing(RemoteOrderResponse::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .toList();
+
+            completedTripsCount = completedOrders.size();
+            double runningBalance = 0.0;
+
+            for (RemoteOrderResponse order : completedOrders) {
+                double shippingFee = order.getShippingFee() != null ? order.getShippingFee().doubleValue() : 15000.0;
+                double orderTotal = order.getTotalAmount() != null ? order.getTotalAmount().doubleValue() : 0.0;
+                String method = order.getPaymentMethod() != null ? order.getPaymentMethod().toUpperCase() : "COD";
+                LocalDateTime orderTime = order.getCreatedAt() != null ? order.getCreatedAt() : LocalDateTime.now();
+
+                // Cộng dồn thu nhập cước
+                availableBalance += shippingFee;
+                runningBalance += shippingFee;
+
+                if (orderTime.isAfter(startOfToday) && orderTime.isBefore(endOfToday)) {
+                    todayEarnings += shippingFee;
+                }
+
+                // Ghi nhận giao dịch tiền công ship
+                transactions.add(DriverWalletTransactionResponse.builder()
+                        .id("TX-FEE-" + order.getId())
+                        .orderId(order.getId())
+                        .orderCode(order.getOrderCode() != null ? order.getOrderCode() : "ORD-" + order.getId())
+                        .type("DELIVERY_FEE")
+                        .typeLabel("Tiền công giao hàng")
+                        .direction("IN")
+                        .amount(shippingFee)
+                        .balanceAfter(runningBalance)
+                        .description("Cộng cước giao đơn hàng #" + (order.getOrderCode() != null ? order.getOrderCode() : order.getId()))
+                        .createdAt(orderTime)
+                        .build());
+
+                // Nếu là đơn COD, shipper thu tiền mặt của khách giữ hộ cho quán/nền tảng
+                if ("COD".equalsIgnoreCase(method) && orderTotal > 0) {
+                    holdingCodAmount += orderTotal;
+                    transactions.add(DriverWalletTransactionResponse.builder()
+                            .id("TX-COD-" + order.getId())
+                            .orderId(order.getId())
+                            .orderCode(order.getOrderCode() != null ? order.getOrderCode() : "ORD-" + order.getId())
+                            .type("COD_HOLDING")
+                            .typeLabel("Thu hộ tiền mặt COD")
+                            .direction("HOLDING")
+                            .amount(orderTotal)
+                            .balanceAfter(runningBalance)
+                            .description("Thu tiền mặt COD từ khách cho đơn #" + (order.getOrderCode() != null ? order.getOrderCode() : order.getId()))
+                            .createdAt(orderTime)
+                            .build());
+                }
+            }
+        } else {
+            // Fallback: Sử dụng dữ liệu từ bảng driver_offers nội bộ nếu order-service chưa có đơn
+            List<DriverOffer> completedOffers = driverOfferRepository.findByDriverIdOrderByCreatedAtDesc(driverId).stream()
+                    .filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus()) || "ACCEPTED".equalsIgnoreCase(o.getStatus()))
+                    .sorted(Comparator.comparing(DriverOffer::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                    .toList();
+
+            completedTripsCount = completedOffers.size();
+            double runningBalance = 0.0;
+
+            for (DriverOffer offer : completedOffers) {
+                double shippingFee = 20000.0; // Định mức cước tiêu chuẩn
+                LocalDateTime offerTime = offer.getCreatedAt() != null ? offer.getCreatedAt() : LocalDateTime.now();
+
+                availableBalance += shippingFee;
+                runningBalance += shippingFee;
+
+                if (offerTime.isAfter(startOfToday) && offerTime.isBefore(endOfToday)) {
+                    todayEarnings += shippingFee;
+                }
+
+                transactions.add(DriverWalletTransactionResponse.builder()
+                        .id("TX-OFFER-" + offer.getId())
+                        .orderId(offer.getOrderId())
+                        .orderCode("ORD-" + offer.getOrderId())
+                        .type("DELIVERY_FEE")
+                        .typeLabel("Tiền công giao hàng")
+                        .direction("IN")
+                        .amount(shippingFee)
+                        .balanceAfter(runningBalance)
+                        .description("Cộng cước giao cuốc xe #" + offer.getOrderId())
+                        .createdAt(offerTime)
+                        .build());
+            }
+        }
+
+        // Sắp xếp lịch sử giao dịch mới nhất lên đầu
+        transactions.sort((a, b) -> {
+            if (a.getCreatedAt() == null || b.getCreatedAt() == null) return 0;
+            return b.getCreatedAt().compareTo(a.getCreatedAt());
+        });
+
+        return DriverWalletResponse.builder()
+                .driverId(driverId)
+                .availableBalance(availableBalance)
+                .holdingCodAmount(holdingCodAmount)
+                .todayEarnings(todayEarnings)
+                .completedTripsCount(completedTripsCount)
+                .transactionHistory(transactions)
                 .build();
     }
 }

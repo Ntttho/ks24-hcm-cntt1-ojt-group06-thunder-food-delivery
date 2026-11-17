@@ -11,4 +11,5 @@ export * from './order';
 export * from './admin/AdminUserPage';
 export * from './driver/ShipperHubPage';
 export * from './driver/ShipperHistoryPage';
+export * from './driver/ShipperWalletPage';
 export * from './admin/AdminReviewManagementPage';

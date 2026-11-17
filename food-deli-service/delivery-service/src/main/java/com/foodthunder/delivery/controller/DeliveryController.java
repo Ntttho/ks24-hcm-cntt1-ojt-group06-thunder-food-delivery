@@ -147,4 +147,20 @@ public class DeliveryController {
         DriverMetricsResponse res = deliveryService.getDriverMetrics(driverId);
         return ResponseEntity.ok(ApiResponse.success("Thống kê tài xế thành công", res));
     }
+
+    /**
+     * Task DUC-01: Truy vấn tính toán Tổng Ví & Chức năng "Ví Của Tôi" cho Driver.
+     * Hỗ trợ các endpoint:
+     * - GET /api/v1/deliveries/driver/wallet
+     * - GET /api/v1/deliveries/wallet
+     * - GET /api/v1/delivery/driver/wallet
+     * - GET /api/v1/drivers/wallet
+     */
+    @GetMapping({"/driver/wallet", "/wallet"})
+    public ResponseEntity<ApiResponse<DriverWalletResponse>> getDriverWallet(
+            @RequestHeader(value = "X-User-Id", defaultValue = "2") Integer driverId) {
+        log.info("REST request to get driver wallet details for driver #{}", driverId);
+        DriverWalletResponse res = deliveryService.getDriverWallet(driverId);
+        return ResponseEntity.ok(ApiResponse.success("Lấy thông tin ví tài xế thành công", res));
+    }
 }
