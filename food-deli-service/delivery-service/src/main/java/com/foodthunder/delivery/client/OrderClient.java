@@ -1,9 +1,11 @@
 package com.foodthunder.delivery.client;
 
 import com.foodthunder.common.dto.response.ApiResponse;
+import com.foodthunder.delivery.dto.client.RemoteOrderDto;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,5 +21,8 @@ public interface OrderClient {
             @RequestHeader(value = "X-User-Id", required = false) Integer userId,
             @RequestHeader(value = "X-User-Role", required = false) String userRole
     );
+
+    @GetMapping("/api/v1/orders/{id}")
+    ResponseEntity<ApiResponse<RemoteOrderDto>> getOrderById(@PathVariable("id") Long id);
 }
 

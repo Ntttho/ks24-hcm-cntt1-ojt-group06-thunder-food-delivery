@@ -21,6 +21,15 @@ public class DriverDetail {
     @Column(name = "user_id")
     private Integer userId;
 
+    @Column(name = "full_name", length = 100)
+    private String fullName;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
+    @Column(name = "email", length = 100)
+    private String email;
+
     @Column(name = "license_plate", length = 20)
     private String licensePlate;
 

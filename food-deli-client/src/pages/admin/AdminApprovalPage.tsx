@@ -89,7 +89,7 @@ export const AdminApprovalPage: React.FC = () => {
   const handleApproveRestaurant = async (id: number) => {
     try {
       await adminApprovalApi.approveRestaurantChangeRequest(id);
-      message.success(`Đã phê duyệt yêu cầu quán ăn #${id} thành công!`);
+      message.success('Đã phê duyệt yêu cầu thay đổi quán ăn thành công!');
       if (isDetailModalOpen) setIsDetailModalOpen(false);
       fetchRestaurantRequests(restaurantStatusFilter);
     } catch (err: any) {
@@ -99,7 +99,7 @@ export const AdminApprovalPage: React.FC = () => {
 
   // Open Reject Modal for Restaurant
   const handleOpenRejectRestaurant = (req: RestaurantChangeRequestItem) => {
-    const name = req.payloadData?.name || req.restaurantName || `Quán #${req.restaurantId}`;
+    const name = req.payloadData?.name || req.restaurantName || 'Quán ăn đối tác';
     setRejectTarget({
       type: 'restaurant',
       id: req.id,
@@ -112,7 +112,7 @@ export const AdminApprovalPage: React.FC = () => {
   const handleApproveDriver = async (userId: number) => {
     try {
       await adminApprovalApi.approveDriver(userId);
-      message.success(`Đã phê duyệt hồ sơ tài xế #${userId} thành công!`);
+      message.success('Đã phê duyệt hồ sơ tài xế thành công!');
       fetchDriverApprovals(driverStatusFilter);
     } catch (err: any) {
       message.error(err?.response?.data?.message || err?.message || 'Không thể phê duyệt tài xế');
@@ -124,7 +124,7 @@ export const AdminApprovalPage: React.FC = () => {
     setRejectTarget({
       type: 'driver',
       id: driver.userId,
-      title: `Từ chối hồ sơ tài xế #${driver.userId} (Biển số: ${driver.licensePlate || 'Chưa cập nhật'})`,
+      title: `Từ chối hồ sơ tài xế ${driver.fullName || 'đối tác'} (Biển số: ${driver.licensePlate || 'Chưa cập nhật'})`,
     });
     setRejectModalOpen(true);
   };

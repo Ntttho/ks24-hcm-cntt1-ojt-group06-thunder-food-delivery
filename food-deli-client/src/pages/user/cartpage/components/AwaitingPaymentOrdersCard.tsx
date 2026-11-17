@@ -106,7 +106,7 @@ export const AwaitingPaymentOrdersCard: React.FC<AwaitingPaymentOrdersCardProps>
 
             <div className="space-y-1 text-xs text-slate-600 mb-3">
               <div className="font-extrabold text-slate-800 text-sm">
-                {order.restaurantName || `Quán ăn #${order.restaurantId}`}
+                {order.restaurantName || 'Quán ăn đối tác'}
               </div>
               <div className="text-slate-500 line-clamp-1">{order.receiverAddress}</div>
               <div className="flex justify-between items-center pt-1 font-semibold">

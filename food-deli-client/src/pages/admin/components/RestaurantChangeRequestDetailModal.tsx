@@ -47,7 +47,7 @@ export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeReques
     }
   }
 
-  const shopName = payloadData.name || request.restaurantName || `Quán ăn #${request.restaurantId}`;
+  const shopName = payloadData.name || request.restaurantName || 'Quán ăn đối tác';
   const address = payloadData.address || 'Chưa có thông tin địa chỉ';
   const openingTime = payloadData.openingTime || '07:00:00';
   const closingTime = payloadData.closingTime || '22:00:00';
@@ -191,8 +191,8 @@ export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeReques
           <Descriptions.Item label="Mã quán ăn (Shop ID)">
             <span className="font-mono font-semibold">#{request.restaurantId}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="Người gửi yêu cầu (Owner ID)">
-            <span className="font-mono">User #{request.requestedBy}</span>
+          <Descriptions.Item label="Người gửi yêu cầu">
+            <span className="font-medium text-slate-700">Chủ quán đối tác (ID: {request.requestedBy})</span>
           </Descriptions.Item>
           <Descriptions.Item label="Thời gian gửi">
             <span className="text-xs text-slate-600">
@@ -201,7 +201,7 @@ export const RestaurantChangeRequestDetailModal: React.FC<RestaurantChangeReques
           </Descriptions.Item>
           <Descriptions.Item label="Người xét duyệt">
             <span className="text-xs text-slate-600">
-              {request.reviewedBy ? `Admin #${request.reviewedBy}` : 'Chưa có'}
+              {request.reviewedBy ? 'Ban Quản Trị' : 'Chưa có'}
             </span>
           </Descriptions.Item>
           <Descriptions.Item label="Thời gian duyệt">

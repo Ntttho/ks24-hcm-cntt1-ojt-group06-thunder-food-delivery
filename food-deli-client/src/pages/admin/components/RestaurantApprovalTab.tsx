@@ -84,7 +84,7 @@ export const RestaurantApprovalTab: React.FC<RestaurantApprovalTabProps> = ({
       key: 'shopInfo',
       render: (_, record) => {
         const payload = record.payloadData || {};
-        const name = payload.name || record.restaurantName || `Quán ăn #${record.restaurantId}`;
+        const name = payload.name || record.restaurantName || 'Quán ăn đối tác';
         const address = payload.address;
         return (
           <div>
@@ -95,8 +95,8 @@ export const RestaurantApprovalTab: React.FC<RestaurantApprovalTabProps> = ({
                 <span className="truncate max-w-xs">{address}</span>
               </div>
             )}
-            <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-              Mã Quán: #{record.restaurantId} &bull; Chủ quán: User #{record.requestedBy}
+            <div className="text-[11px] text-slate-400 font-medium mt-0.5">
+              Mã Quán: #{record.restaurantId} &bull; Chủ quán: Đối tác Thunder
             </div>
           </div>
         );
@@ -158,7 +158,7 @@ export const RestaurantApprovalTab: React.FC<RestaurantApprovalTabProps> = ({
             <>
               <Popconfirm
                 title="Phê duyệt cập nhật quán ăn?"
-                description={`Xác nhận phê duyệt các thay đổi cho "${record.payloadData?.name || record.restaurantName || record.restaurantId}"?`}
+                description={`Xác nhận phê duyệt các thay đổi cho "${record.payloadData?.name || record.restaurantName || 'Quán ăn đối tác'}"?`}
                 onConfirm={() => onApprove(record.id)}
                 okText="Phê duyệt"
                 cancelText="Hủy"

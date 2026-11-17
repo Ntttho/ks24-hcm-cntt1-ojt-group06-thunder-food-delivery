@@ -114,11 +114,22 @@ public class ReviewServiceImpl implements ReviewService {
             }
         }
 
+        String resolvedCustomerName = (order.getCustomerName() != null && !order.getCustomerName().isBlank())
+                ? order.getCustomerName() : "Customer Demo";
+        String resolvedCustomerAvatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+        String resolvedRestaurantName = (order.getRestaurantName() != null && !order.getRestaurantName().isBlank())
+                ? order.getRestaurantName() : "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi";
+        String resolvedDriverName = (order.getDriverName() != null && !order.getDriverName().isBlank())
+                ? order.getDriverName() : ((order.getDriverId() != null && order.getDriverId() == 2) ? "Tran Thi B (Tài xế Thunder)" : "Tài xế Thunder #" + order.getDriverId());
+
         Review restaurantReviewEntity = Review.builder()
                 .orderId(request.getOrderId())
                 .customerId(customerId)
+                .customerName(resolvedCustomerName)
+                .customerAvatar(resolvedCustomerAvatar)
                 .targetType("RESTAURANT")
                 .targetId(restaurantId)
+                .targetName(resolvedRestaurantName)
                 .foodItemId(foodItemId)
                 .rating(resReview.getRating())
                 .comment(resReview.getComment())
@@ -132,8 +143,11 @@ public class ReviewServiceImpl implements ReviewService {
             Review driverReviewEntity = Review.builder()
                     .orderId(request.getOrderId())
                     .customerId(customerId)
+                    .customerName(resolvedCustomerName)
+                    .customerAvatar(resolvedCustomerAvatar)
                     .targetType("DRIVER")
                     .targetId(order.getDriverId().longValue())
+                    .targetName(resolvedDriverName)
                     .rating(driverReview.getRating())
                     .comment(driverReview.getComment())
                     .imagesJson(serializeImages(driverReview.getImages()))
@@ -174,11 +188,19 @@ public class ReviewServiceImpl implements ReviewService {
             throw new BadRequestException("Không xác định được nhà hàng cho đơn hàng #" + request.getOrderId());
         }
 
+        String resolvedCustomerName = (order.getCustomerName() != null && !order.getCustomerName().isBlank())
+                ? order.getCustomerName() : "Customer Demo";
+        String resolvedRestaurantName = (order.getRestaurantName() != null && !order.getRestaurantName().isBlank())
+                ? order.getRestaurantName() : "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi";
+
         Review restaurantReviewEntity = Review.builder()
                 .orderId(request.getOrderId())
                 .customerId(customerId)
+                .customerName(resolvedCustomerName)
+                .customerAvatar("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150")
                 .targetType("RESTAURANT")
                 .targetId(restaurantId)
+                .targetName(resolvedRestaurantName)
                 .foodItemId(request.getFoodItemId())
                 .rating(request.getRating())
                 .comment(request.getComment())
@@ -226,11 +248,19 @@ public class ReviewServiceImpl implements ReviewService {
             fullComment.append(request.getComment().trim());
         }
 
+        String resolvedCustomerName = (order.getCustomerName() != null && !order.getCustomerName().isBlank())
+                ? order.getCustomerName() : "Customer Demo";
+        String resolvedDriverName = (order.getDriverName() != null && !order.getDriverName().isBlank())
+                ? order.getDriverName() : ((order.getDriverId() != null && order.getDriverId() == 2) ? "Tran Thi B (Tài xế Thunder)" : "Tài xế Thunder #" + order.getDriverId());
+
         Review driverReviewEntity = Review.builder()
                 .orderId(request.getOrderId())
                 .customerId(customerId)
+                .customerName(resolvedCustomerName)
+                .customerAvatar("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150")
                 .targetType("DRIVER")
                 .targetId(order.getDriverId().longValue())
+                .targetName(resolvedDriverName)
                 .rating(request.getRating())
                 .comment(fullComment.toString().trim())
                 .quickTagsJson(serializeStringList(request.getQuickTags()))
@@ -498,11 +528,15 @@ public class ReviewServiceImpl implements ReviewService {
         if (targetType == null) {
             throw new BadRequestException("targetType không được để trống");
         }
+        String targetName = "RESTAURANT".equalsIgnoreCase(targetType) ? "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi" : "Tran Thi B (Tài xế Thunder)";
         Review review = Review.builder()
                 .orderId(req.getOrderId())
                 .customerId(req.getCustomerId())
+                .customerName("Customer Demo")
+                .customerAvatar("https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150")
                 .targetType(targetType)
                 .targetId(req.getTargetId())
+                .targetName(targetName)
                 .foodItemId(req.getFoodItemId())
                 .rating(req.getRating())
                 .comment(req.getComment())
@@ -610,13 +644,34 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     private ReviewResponseDto mapToDto(Review r) {
+        String customerName = r.getCustomerName();
+        if (customerName == null || customerName.isBlank()) {
+            customerName = (r.getCustomerId() != null && r.getCustomerId() == 1) ? "Customer Demo" : ("Khách hàng #" + r.getCustomerId());
+        }
+        String customerAvatar = r.getCustomerAvatar();
+        if (customerAvatar == null || customerAvatar.isBlank()) {
+            customerAvatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
+        }
+        String targetName = r.getTargetName();
+        if (targetName == null || targetName.isBlank()) {
+            if ("RESTAURANT".equalsIgnoreCase(r.getTargetType())) {
+                targetName = (r.getTargetId() != null && r.getTargetId() == 1) ? "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi" : ("Quán ăn #" + r.getTargetId());
+            } else {
+                targetName = (r.getTargetId() != null && r.getTargetId() == 2) ? "Tran Thi B (Tài xế Thunder)" : ("Tài xế #" + r.getTargetId());
+            }
+        }
+
         return ReviewResponseDto.builder()
                 .id(r.getId())
                 .orderId(r.getOrderId())
                 .customerId(r.getCustomerId())
+                .customerName(customerName)
+                .customerAvatar(customerAvatar)
                 .targetType(r.getTargetType())
                 .targetId(r.getTargetId())
+                .targetName(targetName)
                 .foodItemId(r.getFoodItemId())
+                .foodName(r.getFoodItemId() != null ? "Cơm Tấm Chay" : null)
                 .rating(r.getRating())
                 .comment(r.getComment())
                 .images(deserializeImages(r.getImagesJson()))

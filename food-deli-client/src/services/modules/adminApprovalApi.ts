@@ -17,6 +17,10 @@ export interface RestaurantChangeRequestItem {
 
 export interface DriverApprovalItem {
   userId: number;
+  fullName?: string;
+  phoneNumber?: string;
+  email?: string;
+  avatarUrl?: string;
   licensePlate: string;
   idCardNumber: string;
   vehicleType: string;

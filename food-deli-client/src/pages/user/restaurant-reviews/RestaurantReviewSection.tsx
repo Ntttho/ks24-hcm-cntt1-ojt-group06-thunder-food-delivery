@@ -104,7 +104,7 @@ export const RestaurantReviewSection: React.FC<RestaurantReviewSectionProps> = (
         if (revRes.status === 'fulfilled' && revRes.value?.data?.content && revRes.value.data.content.length > 0) {
           const mapped: ReviewItem[] = revRes.value.data.content.map((item: any) => ({
             id: `rev-${item.id}`,
-            authorName: item.customerName || `Khách hàng #${item.customerId}`,
+            authorName: item.customerName || 'Khách hàng thân thiết',
             authorAvatar: item.customerAvatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100',
             rating: item.rating,
             createdAt: new Date(item.createdAt).toLocaleString('vi-VN', {
