@@ -17,12 +17,7 @@ spring:
         - id: manager-service-route
           uri: lb://manager-service
           predicates:
-            - Path=/api/v1/admin/settings,/api/v1/admin/settings/**,/api/v1/admin/system-settings,/api/v1/admin/system-settings/**
-
-        - id: manager-banner-route
-          uri: lb://manager-banner
-          predicates:
-            - Path=/api/v1/admin/banners,/api/v1/admin/banners/**,/api/v1/admin/campaigns,/api/v1/admin/campaigns/**,/api/v1/banners,/api/v1/banners/**
+            - Path=/api/v1/admin/settings,/api/v1/admin/settings/**,/api/v1/admin/system-settings,/api/v1/admin/system-settings/**,/api/v1/admin/banners,/api/v1/admin/banners/**,/api/v1/admin/campaigns,/api/v1/admin/campaigns/**,/api/v1/banners,/api/v1/banners/**
 
         # 1. Auth & User Microservice (Load balanced across auth-service instances)
         - id: auth-service-route

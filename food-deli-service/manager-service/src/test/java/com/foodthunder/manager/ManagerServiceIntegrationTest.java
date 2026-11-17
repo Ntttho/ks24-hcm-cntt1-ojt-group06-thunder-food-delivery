@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -94,5 +95,77 @@ class ManagerServiceIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.data.defaultShippingFee").exists());
+    }
+
+    @Test
+    void shouldManageBannerAndCampaignLifecycle() throws Exception {
+        LocalDateTime now = LocalDateTime.now();
+        String campaign = objectMapper.writeValueAsString(java.util.Map.of(
+                "name", "Summer sale",
+                "description", "Seasonal promotion",
+                "startDate", now.minusHours(1).toString(),
+                "endDate", now.plusHours(1).toString(),
+                "status", "ACTIVE"));
+        String campaignResponse = mockMvc.perform(post("/api/v1/admin/campaigns")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(campaign))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long campaignId = objectMapper.readTree(campaignResponse).path("data").path("id").asLong();
+
+        String banner = objectMapper.writeValueAsString(java.util.Map.of(
+                "title", "Summer banner",
+                "description", "Limited time",
+                "imageUrl", "https://cdn.example.com/banner.jpg",
+                "targetUrl", "/restaurants",
+                "campaignId", campaignId,
+                "isActive", true,
+                "displayOrder", 1));
+        String bannerResponse = mockMvc.perform(post("/api/v1/admin/banners")
+                        .header("X-User-Role", "ROLE_ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(banner))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.campaignId").value(campaignId))
+                .andReturn().getResponse().getContentAsString();
+        long bannerId = objectMapper.readTree(bannerResponse).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/banners/active"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].title").value("Summer banner"));
+
+        String invalidBanner = objectMapper.writeValueAsString(java.util.Map.of(
+                "title", "Bad image",
+                "imageUrl", "javascript:alert(1)",
+                "targetUrl", "javascript:alert(1)",
+                "isActive", true,
+                "displayOrder", 1));
+        mockMvc.perform(post("/api/v1/admin/banners")
+                        .header("X-User-Role", "ADMIN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidBanner))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(delete("/api/v1/admin/campaigns/{id}", campaignId)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/banners/active"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/v1/admin/banners/{id}", bannerId)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/banners/{id}", bannerId)
+                        .header("X-User-Role", "ADMIN"))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/admin/banners")
+                        .header("X-User-Role", "ADMIN")
+                        .param("search", "summer")
+                        .param("status", "ACTIVE")
+                        .param("page", "0")
+                        .param("size", "5"))
+                .andExpect(status().isOk());
     }
 }

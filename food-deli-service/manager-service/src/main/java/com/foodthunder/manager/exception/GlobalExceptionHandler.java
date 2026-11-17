@@ -28,6 +28,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error(409, ex.getMessage()));
     }
 
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> badRequest(BadRequestException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, ex.getMessage()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> dataConflict(DataIntegrityViolationException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
