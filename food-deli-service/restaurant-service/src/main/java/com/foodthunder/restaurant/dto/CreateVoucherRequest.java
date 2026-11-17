@@ -15,6 +15,9 @@ public class CreateVoucherRequest {
 
     private Integer restaurantId; // null = global voucher (Admin), not null = shop voucher (Merchant)
 
+    @Pattern(regexp = "^[A-Za-z0-9_]{2,50}$", message = "Danh mục voucher chỉ chứa chữ, số, gạch dưới")
+    private String voucherCategory; // FREESHIP, DISCOUNT_FOOD, NEW_USER
+
     @NotBlank(message = "Mã voucher không được để trống")
     @Pattern(regexp = "^[A-Za-z0-9_]{3,20}$", message = "Mã voucher chỉ chứa chữ, số, gạch dưới và dài từ 3-20 ký tự")
     private String code;

@@ -97,15 +97,37 @@ CREATE TABLE `system_settings` (
 -- 2. RESTAURANT-SERVICE DOMAIN
 -- =================================================================================
 
+CREATE TABLE `voucher_categories` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `code` varchar(50) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_voucher_categories_code` (`code`)
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE `vouchers` (
   `id` int NOT NULL AUTO_INCREMENT,
+  `restaurant_id` int DEFAULT NULL,
+  `voucher_category` varchar(50) NOT NULL DEFAULT 'DISCOUNT_FOOD',
   `code` varchar(20) NOT NULL,
-  `discount_amount` decimal(10,2) NOT NULL,
+  `discount_type` varchar(20) NOT NULL DEFAULT 'FIXED',
+  `discount_value` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `discount_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
+  `max_discount_amount` decimal(10,2) DEFAULT NULL,
   `min_order_value` decimal(10,2) DEFAULT '0.00',
+  `usage_limit` int DEFAULT NULL,
+  `used_count` int NOT NULL DEFAULT '0',
+  `start_date` datetime DEFAULT NULL,
   `expiry_date` datetime DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT '1',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `code` (`code`)
+  UNIQUE KEY `code` (`code`),
+  KEY `idx_vouchers_restaurant_id` (`restaurant_id`),
+  KEY `idx_vouchers_category` (`voucher_category`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- [Logical FK]: owner_id, approved_by trỏ sang auth-service
@@ -205,6 +227,9 @@ CREATE TABLE `orders` (
   `restaurant_id` int NOT NULL,
   `driver_id` int DEFAULT NULL,
   `voucher_id` int DEFAULT NULL,
+  `voucher_code` varchar(30) DEFAULT NULL,
+  `system_voucher_id` int DEFAULT NULL,
+  `system_voucher_code` varchar(30) DEFAULT NULL,
   `receiver_address` text,
   `receiver_lat` double DEFAULT NULL,
   `receiver_lng` double DEFAULT NULL,
@@ -212,6 +237,7 @@ CREATE TABLE `orders` (
   `subtotal_amount` decimal(10,2) DEFAULT NULL,
   `tax_amount` decimal(10,2) DEFAULT '0.00',
   `shipping_fee` decimal(10,2) DEFAULT NULL,
+  `shipping_discount_amount` decimal(10,2) DEFAULT '0.00',
   `discount_amount` decimal(10,2) DEFAULT '0.00',
   `total_amount` decimal(10,2) DEFAULT NULL,
   `status_id` int NOT NULL,
@@ -380,8 +406,13 @@ INSERT INTO system_settings (id, config_key, config_value, description) VALUES
 (1, 'shipping_config', '{"base_km":2,"base_fee":15000,"extra_per_km":5000}', 'Shipping fee config'),
 (2, 'tax_config', '{"vat_rate":0.08}', 'VAT config');
 
-INSERT INTO vouchers (id, code, discount_amount, min_order_value, expiry_date, is_active) VALUES
-(1, 'FREESHIP', '15000.00', '50000.00', '2026-12-31 16:59:59', 1);
+INSERT INTO voucher_categories (id, code, name, description, is_active) VALUES
+(1, 'FREESHIP', 'Miễn phí vận chuyển', 'Mã ưu đãi giảm trực tiếp vào phí giao hàng', 1),
+(2, 'DISCOUNT_FOOD', 'Giảm giá món ăn', 'Mã giảm giá áp dụng cho giá trị món ăn', 1),
+(3, 'NEW_USER', 'Khách hàng mới', 'Mã khuyến mãi cho đơn hàng đầu tiên', 1);
+
+INSERT INTO vouchers (id, restaurant_id, voucher_category, code, discount_type, discount_value, discount_amount, min_order_value, expiry_date, is_active) VALUES
+(1, NULL, 'FREESHIP', 'FREESHIP', 'FIXED', '15000.00', '15000.00', '50000.00', '2026-12-31 16:59:59', 1);
 
 INSERT INTO restaurants (id, owner_id, name, address, latitude, longitude, opening_time, closing_time, is_open, is_open_today, temporary_closed_reason, temporary_closed_until, image_url, rating_avg, approval_status, approved_by, approved_at, reject_reason, deleted_at) VALUES
 (1, 3, 'Hanh Dung - Am Thuc Chay Man', '111-113 Au Co, P.14, Q.11', 10.771, 106.649, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://example.com/merchant.jpg', '4.80', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),

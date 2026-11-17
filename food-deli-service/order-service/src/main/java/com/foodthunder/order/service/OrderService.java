@@ -5,12 +5,15 @@ import com.foodthunder.order.dto.OrderResponse;
 import com.foodthunder.order.dto.PageResponse;
 import com.foodthunder.order.dto.ReviewOrderContextResponse;
 import com.foodthunder.order.dto.UpdateOrderStatusRequest;
+import com.foodthunder.order.dto.VoucherEligibilityResponse;
 
 import java.util.List;
 
 public interface OrderService {
 
     OrderResponse createOrder(CreateOrderRequest request, Integer customerId);
+
+    VoucherEligibilityResponse getVoucherEligibility(Integer customerId);
 
     PageResponse<OrderResponse> getMyOrders(Integer customerId, int page, int size);
 

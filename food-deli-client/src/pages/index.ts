@@ -10,6 +10,7 @@ export * from './merchant';
 export * from './order';
 export * from './admin/AdminUserPage';
 export * from './admin/AdminApprovalPage';
+export * from './admin/AdminVoucherPage';
 export * from './admin/AdminAnalyticsPage';
 export * from './driver/ShipperHubPage';
 export * from './driver/ShipperHistoryPage';

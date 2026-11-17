@@ -39,6 +39,7 @@ DROP TABLE IF EXISTS `categories`;
 DROP TABLE IF EXISTS `restaurant_change_requests`;
 DROP TABLE IF EXISTS `restaurants`;
 DROP TABLE IF EXISTS `vouchers`;
+DROP TABLE IF EXISTS `voucher_categories`;
 DROP TABLE IF EXISTS `system_settings`;
 DROP TABLE IF EXISTS `user_addresses`;
 DROP TABLE IF EXISTS `merchant_details`;
@@ -214,9 +215,22 @@ CREATE TABLE `food_toppings` (
   CONSTRAINT `fk_food_toppings_topping` FOREIGN KEY (`topping_id`) REFERENCES `toppings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `voucher_categories` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(50) NOT NULL,               -- VD: FREESHIP, DISCOUNT_FOOD, NEW_USER
+  `name` VARCHAR(100) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_voucher_categories_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `vouchers` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `restaurant_id` INT DEFAULT NULL,          -- [Logical FK] NULL = Voucher toàn sàn, NOT NULL = Voucher riêng của quán (restaurants.id)
+  `voucher_category` VARCHAR(50) NOT NULL DEFAULT 'DISCOUNT_FOOD', -- FREESHIP, DISCOUNT_FOOD, NEW_USER
   `code` VARCHAR(20) NOT NULL,
   `discount_type` VARCHAR(20) NOT NULL DEFAULT 'FIXED', -- FIXED (giảm tiền mặt), PERCENTAGE (giảm %)
   `discount_value` DECIMAL(10,2) NOT NULL DEFAULT '0.00', -- Giá trị giảm (tiền hoặc %)
@@ -230,7 +244,8 @@ CREATE TABLE `vouchers` (
   `is_active` TINYINT(1) DEFAULT '1',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_vouchers_code` (`code`),
-  KEY `idx_vouchers_restaurant_id` (`restaurant_id`)
+  KEY `idx_vouchers_restaurant_id` (`restaurant_id`),
+  KEY `idx_vouchers_category` (`voucher_category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================================
@@ -255,7 +270,10 @@ CREATE TABLE `orders` (
   `customer_id` INT NOT NULL,             -- [Logical FK] trỏ sang auth-service: users.id
   `restaurant_id` INT NOT NULL,           -- [Logical FK] trỏ sang restaurant-service: restaurants.id
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
-  `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id
+  `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher quán / chính)
+  `voucher_code` VARCHAR(30) DEFAULT NULL,-- Snapshot mã voucher chính
+  `system_voucher_id` INT DEFAULT NULL,   -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher toàn sàn)
+  `system_voucher_code` VARCHAR(30) DEFAULT NULL, -- Snapshot mã voucher toàn sàn
   `receiver_address` TEXT,                -- Snapshot dữ liệu lúc đặt đơn
   `note` TEXT DEFAULT NULL,               -- Ghi chú của khách cho Quán ăn & Tài xế
   `receiver_lat` DOUBLE DEFAULT NULL,
@@ -264,6 +282,7 @@ CREATE TABLE `orders` (
   `subtotal_amount` DECIMAL(10,2) DEFAULT NULL,
   `tax_amount` DECIMAL(10,2) DEFAULT '0.00',
   `shipping_fee` DECIMAL(10,2) DEFAULT NULL,
+  `shipping_discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `total_amount` DECIMAL(10,2) DEFAULT NULL,
   `status_id` INT NOT NULL,               -- [Physical FK] trỏ sang order_statuses nội bộ

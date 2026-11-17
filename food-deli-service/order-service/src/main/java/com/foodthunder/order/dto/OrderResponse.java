@@ -28,6 +28,9 @@ public class OrderResponse {
     private String driverName;
     private String driverPhone;
     private Integer voucherId;
+    private String voucherCode;
+    private Integer systemVoucherId;
+    private String systemVoucherCode;
     private String receiverAddress;
     private String note;
     private Double receiverLat;
@@ -36,6 +39,7 @@ public class OrderResponse {
     private BigDecimal subtotalAmount;
     private BigDecimal taxAmount;
     private BigDecimal shippingFee;
+    private BigDecimal shippingDiscountAmount;
     private BigDecimal discountAmount;
     private BigDecimal totalAmount;
     private String paymentMethod;

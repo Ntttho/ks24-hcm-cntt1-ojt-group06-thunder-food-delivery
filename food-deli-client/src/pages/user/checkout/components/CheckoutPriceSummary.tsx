@@ -7,6 +7,8 @@ interface CheckoutPriceSummaryProps {
   vatAmount?: number;
   vatIncluded?: boolean;
   totalDiscount: number;
+  shippingDiscount?: number;
+  foodDiscount?: number;
   originalTotal: number;
   finalTotal: number;
   itemCount?: number;
@@ -16,10 +18,12 @@ interface CheckoutPriceSummaryProps {
 export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   itemsSubtotal,
   shippingFee,
-  serviceFee: _serviceFee,
-  vatAmount: _vatAmount = 0,
+  serviceFee,
+  vatAmount = 0,
   vatIncluded = true,
   totalDiscount,
+  shippingDiscount = 0,
+  foodDiscount = 0,
   originalTotal,
   finalTotal,
   itemCount = 1,
@@ -32,7 +36,7 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
           Chi tiết thanh toán
         </span>
         <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
-          {vatIncluded ? 'Giá đã gồm thuế' : 'Giao nhanh'}
+          {vatIncluded ? 'Giá đã gồm thuế' : 'Chưa gồm VAT'}
         </span>
       </div>
 
@@ -50,7 +54,39 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
         </span>
       </div>
 
-      {totalDiscount > 0 && (
+      {serviceFee > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span>Phí dịch vụ nền tảng</span>
+          <span className="text-gray-900 font-semibold">
+            {serviceFee.toLocaleString('vi-VN')}đ
+          </span>
+        </div>
+      )}
+
+      {!vatIncluded && vatAmount > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span>Thuế VAT</span>
+          <span className="text-gray-900 font-semibold">
+            {vatAmount.toLocaleString('vi-VN')}đ
+          </span>
+        </div>
+      )}
+
+      {foodDiscount > 0 && (
+        <div className="flex items-center justify-between text-xs text-orange-600 font-semibold">
+          <span>Giảm giá món ăn (Voucher)</span>
+          <span>-{foodDiscount.toLocaleString('vi-VN')}đ</span>
+        </div>
+      )}
+
+      {shippingDiscount > 0 && (
+        <div className="flex items-center justify-between text-xs text-cyan-600 font-semibold">
+          <span>Hỗ trợ phí vận chuyển (Freeship)</span>
+          <span>-{shippingDiscount.toLocaleString('vi-VN')}đ</span>
+        </div>
+      )}
+
+      {foodDiscount === 0 && shippingDiscount === 0 && totalDiscount > 0 && (
         <div className="flex items-center justify-between text-xs text-orange-600 font-semibold">
           <span>Khuyến mãi &amp; giảm giá</span>
           <span>-{totalDiscount.toLocaleString('vi-VN')}đ</span>

@@ -60,6 +60,15 @@ public class Order {
     @Column(name = "voucher_id")
     private Integer voucherId;
 
+    @Column(name = "voucher_code", length = 30)
+    private String voucherCode;
+
+    @Column(name = "system_voucher_id")
+    private Integer systemVoucherId;
+
+    @Column(name = "system_voucher_code", length = 30)
+    private String systemVoucherCode;
+
     @Column(name = "receiver_address", columnDefinition = "TEXT")
     private String receiverAddress;
 
@@ -84,6 +93,10 @@ public class Order {
 
     @Column(name = "shipping_fee", precision = 10, scale = 2)
     private BigDecimal shippingFee;
+
+    @Column(name = "shipping_discount_amount", precision = 10, scale = 2)
+    @Builder.Default
+    private BigDecimal shippingDiscountAmount = BigDecimal.ZERO;
 
     @Column(name = "discount_amount", precision = 10, scale = 2)
     @Builder.Default

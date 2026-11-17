@@ -55,23 +55,14 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("Bắt đầu sinh mã SePay QR cho đơn hàng orderId={}, số tiền={}", orderId, amount);
 
-        // 1. Kiểm tra đơn hàng có tồn tại bên order-service (nếu khả dụng)
-        try {
-            ResponseEntity<ApiResponse<RemoteOrderDto>> orderResp = orderClient.getOrderDetail(orderId, "SYSTEM", "0");
-            if (orderResp != null && orderResp.getBody() != null && orderResp.getBody().data() != null) {
-                RemoteOrderDto order = orderResp.getBody().data();
-                if ("CANCELLED".equalsIgnoreCase(order.getStatus()) || "COMPLETED".equalsIgnoreCase(order.getStatus())) {
-                    throw new BadRequestException("Không thể tạo thanh toán cho đơn hàng đã " + order.getStatus());
-                }
-            }
-        } catch (BadRequestException e) {
-            throw e;
-        } catch (Exception e) {
-            log.warn("Không thể kiểm tra thông tin order-service cho orderId={}, tiếp tục: {}", orderId, e.getMessage());
+        // 1. Kiểm tra đơn hàng và đồng bộ số tiền cuối cùng từ order-service (sau khi đã trừ voucher quán & toàn sàn)
+        BigDecimal effectiveAmount = resolveAuthoritativeAmount(orderId, amount, true);
+        if (effectiveAmount.compareTo(BigDecimal.valueOf(1000)) < 0) {
+            throw new BadRequestException("Đơn hàng có tổng thanh toán dưới 1.000đ sau khi áp dụng voucher, không thể tạo mã SePay QR");
         }
 
         // 2. Tạo hoặc tái sử dụng bản ghi Payment
-        Payment payment = findOrCreatePayment(orderId, amount, request.getIdempotencyKey());
+        Payment payment = findOrCreatePayment(orderId, effectiveAmount, request.getIdempotencyKey());
 
         // 3. Sinh cú pháp chuyển khoản và link ảnh mã QR SePay
         String paymentContent = SepayUtil.buildPaymentContent(sepayConfig.getOrderPrefix(), orderId);
@@ -80,15 +71,15 @@ public class PaymentServiceImpl implements PaymentService {
                 sepayConfig.getBankName(),
                 sepayConfig.getAccountNo(),
                 sepayConfig.getTemplate(),
-                amount,
+                effectiveAmount,
                 paymentContent
         );
 
-        log.info("Sinh mã SePay QR thành công cho orderId={}, QR URL: {}", orderId, qrCodeUrl);
+        log.info("Sinh mã SePay QR thành công cho orderId={}, amount={}, QR URL: {}", orderId, effectiveAmount, qrCodeUrl);
 
         return SepayGenerateResponse.builder()
                 .orderId(orderId)
-                .amount(amount)
+                .amount(effectiveAmount)
                 .qrCodeUrl(qrCodeUrl)
                 .bankName(sepayConfig.getBankName())
                 .bankBin(sepayConfig.getBankBin())
@@ -271,14 +262,15 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public PaymentResponseDto createCodPayment(Long orderId, BigDecimal amount, String idempotencyKey) {
-        log.info("Khởi tạo thanh toán COD cho đơn hàng orderId={}, số tiền={}", orderId, amount);
+        BigDecimal effectiveAmount = resolveAuthoritativeAmount(orderId, amount, false);
+        log.info("Khởi tạo thanh toán COD cho đơn hàng orderId={}, số tiền={}", orderId, effectiveAmount);
 
         Optional<Payment> existingOpt = paymentRepository.findByOrderId(orderId);
         Payment payment;
         if (existingOpt.isPresent()) {
             payment = existingOpt.get();
             payment.setPaymentMethod(PaymentMethod.CASH);
-            payment.setAmount(amount);
+            payment.setAmount(effectiveAmount);
         } else {
             String key = (idempotencyKey != null && !idempotencyKey.isBlank())
                     ? idempotencyKey
@@ -286,7 +278,7 @@ public class PaymentServiceImpl implements PaymentService {
 
             payment = Payment.builder()
                     .orderId(orderId)
-                    .amount(amount)
+                    .amount(effectiveAmount)
                     .paymentMethod(PaymentMethod.CASH)
                     .status(PaymentStatus.PENDING)
                     .idempotencyKey(key)
@@ -304,6 +296,28 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt() != null ? payment.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant() : Instant.now())
                 .updatedAt(payment.getUpdatedAt() != null ? payment.getUpdatedAt().atZone(ZoneId.systemDefault()).toInstant() : Instant.now())
                 .build();
+    }
+
+    private BigDecimal resolveAuthoritativeAmount(Long orderId, BigDecimal requestedAmount, boolean rejectTerminalStatus) {
+        try {
+            ResponseEntity<ApiResponse<RemoteOrderDto>> orderResp = orderClient.getOrderDetail(orderId, "SYSTEM", "0");
+            if (orderResp != null && orderResp.getBody() != null && orderResp.getBody().data() != null) {
+                RemoteOrderDto order = orderResp.getBody().data();
+                if (rejectTerminalStatus
+                        && ("CANCELLED".equalsIgnoreCase(order.getStatus()) || "COMPLETED".equalsIgnoreCase(order.getStatus()))) {
+                    throw new BadRequestException("Không thể tạo thanh toán cho đơn hàng đã " + order.getStatus());
+                }
+                if (order.getTotalAmount() != null && order.getTotalAmount().compareTo(BigDecimal.ZERO) >= 0) {
+                    return order.getTotalAmount();
+                }
+            }
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Không thể đồng bộ số tiền từ order-service cho orderId={}, dùng số tiền yêu cầu {}: {}",
+                    orderId, requestedAmount, e.getMessage());
+        }
+        return requestedAmount != null ? requestedAmount : BigDecimal.ZERO;
     }
 
     private Payment findOrCreatePayment(Long orderId, BigDecimal amount, String customIdempotency) {

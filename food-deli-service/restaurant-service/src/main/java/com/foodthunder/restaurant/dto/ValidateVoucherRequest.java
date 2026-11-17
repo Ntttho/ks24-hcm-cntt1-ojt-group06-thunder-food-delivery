@@ -22,5 +22,12 @@ public class ValidateVoucherRequest {
     @NotNull(message = "Tổng tiền đơn hàng không được để trống")
     @DecimalMin(value = "0.00", message = "Tổng tiền đơn hàng không được âm")
     private BigDecimal orderAmount;
+
+    @DecimalMin(value = "0.00", message = "Phí giao hàng không được âm")
+    private BigDecimal shippingFee;
+
+    private Integer customerId;
+
+    private Boolean isNewUser;
 }
 

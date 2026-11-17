@@ -64,7 +64,12 @@ export interface CustomerOrder {
   subtotalAmount: number;
   taxAmount?: number;
   shippingFee: number;
+  shippingDiscountAmount?: number;
   discountAmount?: number;
+  voucherId?: number;
+  voucherCode?: string;
+  systemVoucherId?: number;
+  systemVoucherCode?: string;
   totalAmount: number;
   paymentMethod: 'COD' | 'VNPAY' | 'MOMO' | 'WALLET' | string;
   statusCode: OrderStatusCode | string;

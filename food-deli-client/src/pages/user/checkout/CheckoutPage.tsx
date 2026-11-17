@@ -14,6 +14,7 @@ import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
 import { clearPurchasedItems } from '@/store/slices/cartSlice';
+import { calculateVoucherDiscount } from '@/utils/voucherUtils';
 import { APP_ROUTES } from '@/constants';
 import { AddressSelectorModal } from '../../components/AddressSelectorModal';
 import type { DeliveryAddressItem } from '../types';
@@ -72,9 +73,27 @@ export const CheckoutPage: React.FC = () => {
   const [sepayQrData, setSepayQrData] = useState<SepayGenerateResponse | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<number>(0);
   const [createdOrderCode, setCreatedOrderCode] = useState<string>('');
+  const [createdOrderTotal, setCreatedOrderTotal] = useState<number | null>(null);
 
-  // Applied Voucher State (Only 1 voucher per order)
-  const [appliedVoucher, setAppliedVoucher] = useState<VoucherItem | null>(null);
+  // Applied Vouchers State (Supports 1 Restaurant Voucher + 1 System Voucher)
+  const [appliedRestaurantVoucher, setAppliedRestaurantVoucher] = useState<VoucherItem | null>(null);
+  const [appliedSystemVoucher, setAppliedSystemVoucher] = useState<VoucherItem | null>(null);
+  const [isNewUser, setIsNewUser] = useState<boolean>(true);
+
+  useEffect(() => {
+    setAppliedRestaurantVoucher(null);
+  }, [activeRestaurantId]);
+
+  useEffect(() => {
+    orderApi
+      .getVoucherEligibility()
+      .then((res) => {
+        if (res?.data && typeof res.data.isNewUser === 'boolean') {
+          setIsNewUser(res.data.isNewUser);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Countdown timer (07:59)
   const [countdown, setCountdown] = useState<number>(7 * 60 + 59);
@@ -214,28 +233,64 @@ export const CheckoutPage: React.FC = () => {
     return orderCostConfig.baseFee + extraKm * orderCostConfig.extraPerKm;
   }, [selectedItems.length, orderCostConfig]);
 
-  const shippingFee = baseShippingFee;
-  const serviceFee = 0;
-  const vatAmount = 0;
+  const shippingFee = useMemo(() => {
+    if (selectedItems.length === 0) return 0;
+    const priorityExtra = deliverySpeed === 'priority' ? Number(orderCostConfig.priorityFee || 0) : 0;
+    return baseShippingFee + priorityExtra;
+  }, [selectedItems.length, baseShippingFee, deliverySpeed, orderCostConfig.priorityFee]);
 
-  // Single Voucher Calculation
-  const voucherDiscount = useMemo(() => {
-    if (!appliedVoucher) return 0;
-    const minVal = appliedVoucher.minOrderValue || 0;
-    if (itemsSubtotal < minVal) return 0;
-
-    if (appliedVoucher.discountType === 'PERCENTAGE') {
-      const calc = (itemsSubtotal * appliedVoucher.discountValue) / 100;
-      if (appliedVoucher.maxDiscountAmount && appliedVoucher.maxDiscountAmount > 0) {
-        return Math.min(calc, appliedVoucher.maxDiscountAmount);
-      }
-      return calc;
+  const serviceFee = selectedItems.length > 0 && orderCostConfig.serviceFee > 0 ? orderCostConfig.serviceFee : 0;
+  const vatAmount = useMemo(() => {
+    if (orderCostConfig.vatIncluded === false && orderCostConfig.vatRate > 0) {
+      return Math.round(itemsSubtotal * orderCostConfig.vatRate);
     }
-    return appliedVoucher.discountValue || appliedVoucher.discountAmount || 0;
-  }, [appliedVoucher, itemsSubtotal]);
+    return 0;
+  }, [itemsSubtotal, orderCostConfig.vatIncluded, orderCostConfig.vatRate]);
+
+  // Combined Shop + System Voucher Calculation synced with order-service
+  const voucherBreakdown = useMemo(() => {
+    let remainingFood = itemsSubtotal;
+    let remainingShipping = shippingFee;
+    let shopDiscount = 0;
+    let systemDiscount = 0;
+    let foodDiscount = 0;
+    let shippingDiscount = 0;
+
+    const applyVoucherSlot = (voucher: VoucherItem | null, isSystemSlot: boolean) => {
+      if (!voucher) return;
+      const cat = (voucher.voucherCategory || 'DISCOUNT_FOOD').toUpperCase();
+      const raw = calculateVoucherDiscount(voucher, itemsSubtotal, shippingFee, isNewUser);
+      const applied =
+        cat === 'FREESHIP' ? Math.min(raw, remainingShipping) : Math.min(raw, remainingFood);
+
+      if (cat === 'FREESHIP') {
+        remainingShipping = Math.max(0, remainingShipping - applied);
+        shippingDiscount += applied;
+      } else {
+        remainingFood = Math.max(0, remainingFood - applied);
+        foodDiscount += applied;
+      }
+      if (isSystemSlot) {
+        systemDiscount += applied;
+      } else {
+        shopDiscount += applied;
+      }
+    };
+
+    applyVoucherSlot(appliedRestaurantVoucher, false);
+    applyVoucherSlot(appliedSystemVoucher, true);
+
+    return {
+      shopDiscount,
+      systemDiscount,
+      foodDiscount,
+      shippingDiscount,
+      totalVoucherDiscount: foodDiscount + shippingDiscount,
+    };
+  }, [appliedRestaurantVoucher, appliedSystemVoucher, itemsSubtotal, shippingFee, isNewUser]);
 
   const paymentMethodDiscount = paymentMethod.extraDiscount;
-  const totalDiscount = voucherDiscount + paymentMethodDiscount;
+  const totalDiscount = voucherBreakdown.totalVoucherDiscount + paymentMethodDiscount;
   const originalTotal = itemsSubtotal + shippingFee + serviceFee + vatAmount;
   const finalTotal = Math.max(0, originalTotal - totalDiscount);
 
@@ -278,7 +333,10 @@ export const CheckoutPage: React.FC = () => {
         receiverLng: 106.721,
         distanceKm: checkoutDistanceKm,
         deliverySpeed,
-        voucherId: appliedVoucher?.id || undefined,
+        voucherId: appliedRestaurantVoucher?.id || undefined,
+        voucherCode: appliedRestaurantVoucher?.code || undefined,
+        systemVoucherId: appliedSystemVoucher?.id || undefined,
+        systemVoucherCode: appliedSystemVoucher?.code || undefined,
         note: fullNote,
         items: selectedItems.map((it) => ({
           foodId: Number(it.productId),
@@ -296,16 +354,21 @@ export const CheckoutPage: React.FC = () => {
 
       const orderId = createdData.id;
       const orderCode = createdData.orderCode || `#ORD-${orderId}`;
+      const authoritativeTotal =
+        createdData.totalAmount !== undefined && createdData.totalAmount !== null
+          ? Number(createdData.totalAmount)
+          : finalTotal;
 
       setCreatedOrderId(orderId);
       setCreatedOrderCode(orderCode);
+      setCreatedOrderTotal(authoritativeTotal);
 
       // Loại bỏ ngay lập tức những món ăn đã order và bấm thanh toán khỏi giỏ hàng
       const purchasedIds = selectedItems.map((it) => it.id);
       dispatch(clearPurchasedItems(purchasedIds));
 
-      if (paymentMethod.id === 'vietqr') {
-        // SePay VietQR Flow: AWAITING_PAYMENT, wait for balance change
+      if (paymentMethod.id === 'vietqr' && authoritativeTotal >= 1000) {
+        // SePay VietQR Flow synced with authoritative server order total
         try {
           const qrRes = await paymentApi.generateSepayQr({
             orderId,
@@ -319,9 +382,9 @@ export const CheckoutPage: React.FC = () => {
         setIsSepayModalOpen(true);
         setOrderState('idle');
       } else {
-        // COD Flow
+        // COD or 0đ / <1000đ order after voucher discount
         try {
-          await paymentApi.createCod(orderId, finalTotal);
+          await paymentApi.createCod(orderId, authoritativeTotal);
         } catch {
           // Proceed
         }
@@ -384,12 +447,16 @@ export const CheckoutPage: React.FC = () => {
               shopName={currentShopName}
             />
 
-            {/* 6. Vouchers & Promotions Box (Supports selecting 1 dynamic voucher) */}
+            {/* 6. Vouchers & Promotions Box (Supports 1 Restaurant Voucher + 1 System Voucher) */}
             <CheckoutVoucherCard
-              totalDiscount={voucherDiscount}
-              appliedVoucher={appliedVoucher}
+              totalDiscount={voucherBreakdown.totalVoucherDiscount}
+              shopDiscount={voucherBreakdown.shopDiscount}
+              systemDiscount={voucherBreakdown.systemDiscount}
+              appliedRestaurantVoucher={appliedRestaurantVoucher}
+              appliedSystemVoucher={appliedSystemVoucher}
               onOpenVoucherPicker={() => setIsVoucherModalOpen(true)}
-              onRemoveVoucher={() => setAppliedVoucher(null)}
+              onRemoveRestaurantVoucher={() => setAppliedRestaurantVoucher(null)}
+              onRemoveSystemVoucher={() => setAppliedSystemVoucher(null)}
             />
 
             {/* 7. Payment Method Selector */}
@@ -407,6 +474,8 @@ export const CheckoutPage: React.FC = () => {
               vatAmount={vatAmount}
               vatIncluded={orderCostConfig.vatIncluded}
               totalDiscount={totalDiscount}
+              shippingDiscount={voucherBreakdown.shippingDiscount}
+              foodDiscount={voucherBreakdown.foodDiscount}
               originalTotal={originalTotal}
               finalTotal={finalTotal}
               itemCount={selectedItems.length}
@@ -451,14 +520,20 @@ export const CheckoutPage: React.FC = () => {
         totalAmount={finalTotal}
       />
 
-      {/* 12. Dynamic Single Voucher Selector Modal */}
+      {/* 12. Dynamic Dual Voucher Selector Modal (1 Restaurant + 1 System) */}
       <VoucherSelectorModal
         isOpen={isVoucherModalOpen}
         onClose={() => setIsVoucherModalOpen(false)}
         restaurantId={Number(activeRestaurantId) || 1}
         subtotal={itemsSubtotal}
-        appliedVoucher={appliedVoucher}
-        onSelectVoucher={(v) => setAppliedVoucher(v)}
+        shippingFee={shippingFee}
+        appliedRestaurantVoucher={appliedRestaurantVoucher}
+        appliedSystemVoucher={appliedSystemVoucher}
+        isNewUser={isNewUser}
+        onApplyVouchers={({ restaurantVoucher, systemVoucher }) => {
+          setAppliedRestaurantVoucher(restaurantVoucher);
+          setAppliedSystemVoucher(systemVoucher);
+        }}
       />
 
       {/* 13. SePay VietQR Modal with Dynamic QR & Live Polling (8 mins) */}
@@ -467,13 +542,13 @@ export const CheckoutPage: React.FC = () => {
         onClose={() => setIsSepayModalOpen(false)}
         qrData={sepayQrData}
         orderId={createdOrderId}
-        totalAmount={finalTotal}
+        totalAmount={createdOrderTotal ?? finalTotal}
       />
 
       {/* 14. Success Modal Dialogue if COD Order Placed -> Redirect to Home */}
       <CheckoutSuccessModal
         isOpen={orderState === 'success'}
-        finalTotal={finalTotal}
+        finalTotal={createdOrderTotal ?? finalTotal}
         onReset={() => {
           setOrderState('idle');
           navigate('/');

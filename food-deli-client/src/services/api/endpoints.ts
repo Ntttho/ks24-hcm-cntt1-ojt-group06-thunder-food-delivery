@@ -42,12 +42,14 @@ export const API_ENDPOINTS = {
     RESTAURANT_TOPPINGS: (restaurantId: number | string) => `/restaurants/${restaurantId}/toppings`,
     PRODUCT_TOPPINGS: (productId: number | string) => `/products/${productId}/toppings`,
   },
-  // Vouchers
+  // Vouchers & Voucher Categories
   VOUCHERS: {
     LIST: '/vouchers',
     DETAIL: (id: number | string) => `/vouchers/${id}`,
+    VALIDATE: '/vouchers/validate',
     BY_RESTAURANT: (restaurantId: number | string) => `/vouchers?restaurantId=${restaurantId}`,
     RESTAURANT_VOUCHERS: (restaurantId: number | string) => `/restaurants/${restaurantId}/vouchers`,
+    CATEGORIES: '/voucher-categories',
   },
   // Cart Service (Redis Sync)
   CART: {
@@ -62,6 +64,7 @@ export const API_ENDPOINTS = {
   ORDERS: {
     CREATE: '/orders',
     LIST: '/orders',
+    VOUCHER_ELIGIBILITY: '/orders/voucher-eligibility',
     DETAIL: (id: number | string) => `/orders/${id}`,
     CANCEL: (id: number | string) => `/orders/${id}/cancel`,
     STATUS: (id: number | string) => `/orders/${id}/status`,

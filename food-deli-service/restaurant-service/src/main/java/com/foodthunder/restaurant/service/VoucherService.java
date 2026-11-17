@@ -22,6 +22,12 @@ public interface VoucherService {
 
     List<VoucherDto> getVouchers(Integer restaurantId);
 
+    List<VoucherDto> getVouchers(Integer restaurantId, String scope, String category, Boolean activeOnly);
+
     VoucherDto getVoucherById(Integer id);
+
+    VoucherDto redeemVoucher(Integer id);
+
+    VoucherDto releaseVoucher(Integer id);
 }
 

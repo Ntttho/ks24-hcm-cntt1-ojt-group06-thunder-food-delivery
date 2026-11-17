@@ -23,6 +23,7 @@ import {
   OrderDetailPage,
   AdminUserPage,
   AdminApprovalPage,
+  AdminVoucherPage,
   AdminAnalyticsPage,
   ShipperHubPage,
   ShipperHistoryPage,
@@ -157,6 +158,10 @@ export const router = createBrowserRouter([
       {
         path: 'approvals',
         element: <AdminApprovalPage />,
+      },
+      {
+        path: 'vouchers',
+        element: <AdminVoucherPage />,
       },
       {
         path: 'reviews/restaurants',

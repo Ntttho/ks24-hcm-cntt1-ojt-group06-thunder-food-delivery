@@ -69,6 +69,18 @@ public class RestaurantClientFallbackFactory implements FallbackFactory<Restaura
             }
 
             @Override
+            public ResponseEntity<ApiResponse<Void>> redeemVoucher(Integer id) {
+                log.error("Fallback triggered for redeemVoucher with id: {}, cause: {}", id, cause != null ? cause.getMessage() : "unknown");
+                throw new com.foodthunder.order.exception.BadRequestException("Không thể ghi nhận lượt sử dụng voucher ID=" + id);
+            }
+
+            @Override
+            public ResponseEntity<ApiResponse<Void>> releaseVoucher(Integer id) {
+                log.warn("Fallback triggered for releaseVoucher with id: {}, cause: {}", id, cause != null ? cause.getMessage() : "unknown");
+                return ResponseEntity.ok(ApiResponse.success("Fallback releaseVoucher", null));
+            }
+
+            @Override
             public ResponseEntity<ApiResponse<RemoteRestaurantAnalyticsCountsDto>> getRestaurantAnalyticsCounts() {
                 log.warn("Fallback triggered for getRestaurantAnalyticsCounts, cause: {}",
                         cause != null ? cause.getMessage() : "unknown");

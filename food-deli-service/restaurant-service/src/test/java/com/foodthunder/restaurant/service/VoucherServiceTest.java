@@ -279,4 +279,135 @@ class VoucherServiceTest {
         assertThat(res.getIsValid()).isFalse();
         assertThat(res.getMessage()).contains("hết hạn");
     }
+
+    @Test
+    @DisplayName("Validate voucher toàn sàn (restaurantId == null) áp dụng được cho bất kỳ quán nào nếu đạt minOrderValue")
+    void validateVoucher_systemVoucher_appliesToAnyRestaurant_success() {
+        Voucher systemVoucher = Voucher.builder()
+                .id(1)
+                .restaurantId(null)
+                .voucherCategory("DISCOUNT_FOOD")
+                .code("FLASHFOOD20")
+                .discountType("FIXED")
+                .discountValue(BigDecimal.valueOf(20000))
+                .discountAmount(BigDecimal.valueOf(20000))
+                .minOrderValue(BigDecimal.valueOf(80000))
+                .usageLimit(100)
+                .usedCount(5)
+                .expiryDate(LocalDateTime.now().plusDays(15))
+                .isActive(true)
+                .build();
+
+        when(voucherRepository.findByCodeIgnoreCase("FLASHFOOD20")).thenReturn(Optional.of(systemVoucher));
+
+        ValidateVoucherRequest reqForShop99 = ValidateVoucherRequest.builder()
+                .code("FLASHFOOD20")
+                .restaurantId(99)
+                .orderAmount(BigDecimal.valueOf(100000))
+                .build();
+
+        VoucherValidationResponse res = voucherService.validateVoucher(reqForShop99);
+
+        assertThat(res.getIsValid()).isTrue();
+        assertThat(res.getIsSystemVoucher()).isTrue();
+        assertThat(res.getRestaurantId()).isNull();
+        assertThat(res.getVoucherCategory()).isEqualTo("DISCOUNT_FOOD");
+        assertThat(res.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
+    }
+
+    @Test
+    @DisplayName("Validate voucher FREESHIP tính giảm tối đa bằng shippingFee và kiểm tra minOrderValue")
+    void validateVoucher_freeshipCategory_capsAtShippingFee() {
+        Voucher freeshipVoucher = Voucher.builder()
+                .id(2)
+                .restaurantId(null)
+                .voucherCategory("FREESHIP")
+                .code("FREESHIP")
+                .discountType("FIXED")
+                .discountValue(BigDecimal.valueOf(25000))
+                .discountAmount(BigDecimal.valueOf(25000))
+                .minOrderValue(BigDecimal.valueOf(50000))
+                .expiryDate(LocalDateTime.now().plusDays(15))
+                .isActive(true)
+                .build();
+
+        when(voucherRepository.findByCodeIgnoreCase("FREESHIP")).thenReturn(Optional.of(freeshipVoucher));
+
+        ValidateVoucherRequest req = ValidateVoucherRequest.builder()
+                .code("FREESHIP")
+                .restaurantId(5)
+                .orderAmount(BigDecimal.valueOf(90000))
+                .shippingFee(BigDecimal.valueOf(18000))
+                .build();
+
+        VoucherValidationResponse res = voucherService.validateVoucher(req);
+
+        assertThat(res.getIsValid()).isTrue();
+        assertThat(res.getVoucherCategory()).isEqualTo("FREESHIP");
+        assertThat(res.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(18000));
+        assertThat(res.getShippingDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(18000));
+    }
+
+    @Test
+    @DisplayName("Validate voucher NEW_USER từ chối khách hàng đã có đơn hàng trước đó")
+    void validateVoucher_newUser_rejectsReturningUser() {
+        Voucher newUserVoucher = Voucher.builder()
+                .id(3)
+                .restaurantId(null)
+                .voucherCategory("NEW_USER")
+                .code("WELCOME50")
+                .discountType("FIXED")
+                .discountValue(BigDecimal.valueOf(50000))
+                .minOrderValue(BigDecimal.valueOf(100000))
+                .expiryDate(LocalDateTime.now().plusDays(15))
+                .isActive(true)
+                .build();
+
+        when(voucherRepository.findByCodeIgnoreCase("WELCOME50")).thenReturn(Optional.of(newUserVoucher));
+
+        ValidateVoucherRequest req = ValidateVoucherRequest.builder()
+                .code("WELCOME50")
+                .restaurantId(2)
+                .orderAmount(BigDecimal.valueOf(150000))
+                .isNewUser(false)
+                .build();
+
+        VoucherValidationResponse res = voucherService.validateVoucher(req);
+
+        assertThat(res.getIsValid()).isFalse();
+        assertThat(res.getMessage()).contains("khách hàng mới");
+    }
+
+    @Test
+    @DisplayName("Chặn Merchant tự tạo hoặc chỉnh sửa Voucher toàn hệ thống")
+    void createVoucher_systemVoucherByMerchant_throwsForbidden() {
+        CreateVoucherRequest request = CreateVoucherRequest.builder()
+                .restaurantId(null)
+                .voucherCategory("FREESHIP")
+                .code("HACKSYS")
+                .discountType("FIXED")
+                .discountValue(BigDecimal.valueOf(15000))
+                .expiryDate(LocalDateTime.now().plusDays(5))
+                .build();
+
+        when(voucherRepository.existsByCodeIgnoreCase("HACKSYS")).thenReturn(false);
+
+        assertThatThrownBy(() -> voucherService.createVoucher(request, 3, "ROLE_MERCHANT"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Admin");
+    }
+
+    @Test
+    @DisplayName("Redeem voucher trừ lượt dùng thành công và ném lỗi khi hết lượt")
+    void redeemVoucher_successAndOutOfLimit() {
+        when(voucherRepository.findById(10)).thenReturn(Optional.of(sampleVoucher));
+        when(voucherRepository.incrementUsedCountIfAvailable(10)).thenReturn(1).thenReturn(0);
+
+        VoucherDto firstRedeem = voucherService.redeemVoucher(10);
+        assertThat(firstRedeem).isNotNull();
+
+        assertThatThrownBy(() -> voucherService.redeemVoucher(10))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("hết lượt");
+    }
 }

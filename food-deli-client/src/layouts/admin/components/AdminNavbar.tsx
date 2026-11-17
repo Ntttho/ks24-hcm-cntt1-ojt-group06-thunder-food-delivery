@@ -15,6 +15,7 @@ import {
   DashboardOutlined,
   TeamOutlined,
   AuditOutlined,
+  GiftOutlined,
   StarOutlined,
   CarOutlined,
   SettingOutlined,
@@ -109,6 +110,12 @@ export const AdminNavbar: React.FC = () => {
       label: 'Kiểm duyệt Hồ sơ',
       icon: <AuditOutlined className="text-base" />,
       badgeCount: pendingApprovalsCount,
+    },
+    {
+      key: 'vouchers',
+      path: '/admin/vouchers',
+      label: 'Quản lý Voucher',
+      icon: <GiftOutlined className="text-base" />,
     },
     {
       key: 'reviews-restaurants',

@@ -13,5 +13,8 @@ public class RemoteValidateVoucherRequest {
     private String code;
     private Integer restaurantId;
     private BigDecimal orderAmount;
+    private BigDecimal shippingFee;
+    private Integer customerId;
+    private Boolean isNewUser;
 }
 

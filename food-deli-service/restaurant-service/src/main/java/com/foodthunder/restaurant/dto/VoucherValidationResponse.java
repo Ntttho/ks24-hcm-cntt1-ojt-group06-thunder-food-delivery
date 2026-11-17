@@ -12,10 +12,14 @@ import java.math.BigDecimal;
 public class VoucherValidationResponse {
 
     private Integer voucherId;
+    private Integer restaurantId;
+    private Boolean isSystemVoucher;
+    private String voucherCategory;
     private String code;
     private String discountType;
     private BigDecimal discountValue;
     private BigDecimal discountAmount;
+    private BigDecimal shippingDiscountAmount;
     private BigDecimal minOrderValue;
     private Boolean isValid;
     private String message;
