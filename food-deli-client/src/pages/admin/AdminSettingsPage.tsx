@@ -54,13 +54,14 @@ const DEFAULT_FORM_VALUES: SettingsFormValues = {
   serviceFee: DEFAULT_ORDER_COST_CONFIG.serviceFee,
   vatPercent: Math.round(DEFAULT_ORDER_COST_CONFIG.vatRate * 1000) / 10,
   vatIncluded: DEFAULT_ORDER_COST_CONFIG.vatIncluded,
-  platformCommissionPercent: 15,
+  platformCommissionPercent: DEFAULT_ORDER_COST_CONFIG.platformCommissionPercent,
 };
 
 export const AdminSettingsPage: React.FC = () => {
   const [form] = Form.useForm<SettingsFormValues>();
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Live preview simulator state
   const [simSubtotal, setSimSubtotal] = useState<number>(100000);
@@ -71,65 +72,39 @@ export const AdminSettingsPage: React.FC = () => {
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const res = await adminSettingsApi.getAdminSettings();
       const data = res?.data;
-      if (data) {
-        form.setFieldsValue({
-          baseKm: Number(data.baseKm ?? 2),
-          baseFee: Number(data.baseFee ?? 15000),
-          extraPerKm: Number(data.extraPerKm ?? 5000),
-          priorityFee: Number(data.priorityFee ?? 5000),
-          serviceFee: Number(data.serviceFee ?? 3000),
-          vatPercent: Math.round(Number(data.vatRate ?? 0.08) * 1000) / 10,
-          vatIncluded: data.vatIncluded ?? true,
-          platformCommissionPercent: Number(data.platformCommissionPercent ?? 15),
-        });
-      } else {
-        form.setFieldsValue(DEFAULT_FORM_VALUES);
+      if (!data) {
+        throw new Error('Máy chủ không trả về cấu hình hệ thống.');
       }
-    } catch (err: any) {
-      message.error(err?.response?.data?.message || 'Không thể tải cấu hình hệ thống');
-      form.setFieldsValue(DEFAULT_FORM_VALUES);
+      form.setFieldsValue({
+        baseKm: Number(data.baseKm),
+        baseFee: Number(data.baseFee),
+        extraPerKm: Number(data.extraPerKm),
+        priorityFee: Number(data.priorityFee),
+        serviceFee: Number(data.serviceFee),
+        vatPercent: Number(data.vatRate),
+        vatIncluded: Boolean(data.vatIncluded),
+        platformCommissionPercent: Number(data.platformCommissionPercent),
+      });
+    } catch (err: unknown) {
+      const apiMessage =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      const messageText = apiMessage || (err instanceof Error ? err.message : 'Không thể tải cấu hình hệ thống');
+      setLoadError(messageText);
+      message.error(messageText);
     } finally {
       setLoading(false);
     }
   }, [form]);
 
   useEffect(() => {
-    let active = true;
-    adminSettingsApi
-      .getAdminSettings()
-      .then((res) => {
-        if (!active) return;
-        const data = res?.data;
-        if (data) {
-          form.setFieldsValue({
-            baseKm: Number(data.baseKm ?? 2),
-            baseFee: Number(data.baseFee ?? 15000),
-            extraPerKm: Number(data.extraPerKm ?? 5000),
-            priorityFee: Number(data.priorityFee ?? 5000),
-            serviceFee: Number(data.serviceFee ?? 3000),
-            vatPercent: Math.round(Number(data.vatRate ?? 0.08) * 1000) / 10,
-            vatIncluded: data.vatIncluded ?? true,
-            platformCommissionPercent: Number(data.platformCommissionPercent ?? 15),
-          });
-        } else {
-          form.setFieldsValue(DEFAULT_FORM_VALUES);
-        }
-      })
-      .catch((err: any) => {
-        if (!active) return;
-        message.error(err?.response?.data?.message || 'Không thể tải cấu hình hệ thống');
-        form.setFieldsValue(DEFAULT_FORM_VALUES);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [form]);
+    void fetchSettings();
+  }, [fetchSettings]);
 
   const handleSave = async (values: SettingsFormValues) => {
     setSaving(true);
@@ -140,12 +115,25 @@ export const AdminSettingsPage: React.FC = () => {
         extraPerKm: Number(values.extraPerKm),
         priorityFee: Number(values.priorityFee),
         serviceFee: Number(values.serviceFee),
-        vatRate: Number(((values.vatPercent ?? 0) / 100).toFixed(4)),
+        vatRate: Number(values.vatPercent),
         vatIncluded: Boolean(values.vatIncluded),
         platformCommissionPercent: Number(values.platformCommissionPercent),
       };
 
-      await adminSettingsApi.updateAdminSettings(payload);
+      const response = await adminSettingsApi.updateAdminSettings(payload);
+      if (!response.data) {
+        throw new Error('Máy chủ không trả về cấu hình sau khi cập nhật.');
+      }
+      form.setFieldsValue({
+        baseKm: Number(response.data.baseKm),
+        baseFee: Number(response.data.baseFee),
+        extraPerKm: Number(response.data.extraPerKm),
+        priorityFee: Number(response.data.priorityFee),
+        serviceFee: Number(response.data.serviceFee),
+        vatPercent: Number(response.data.vatRate),
+        vatIncluded: Boolean(response.data.vatIncluded),
+        platformCommissionPercent: Number(response.data.platformCommissionPercent),
+      });
       message.success('Đã lưu cấu hình chi phí đơn hàng & hệ thống thành công');
     } catch (err: any) {
       message.error(err?.response?.data?.message || 'Lưu cấu hình thất bại, vui lòng kiểm tra lại');
@@ -166,12 +154,12 @@ export const AdminSettingsPage: React.FC = () => {
     const extraPerKm = Number(v.extraPerKm ?? 5000);
     const priorityFee = Number(v.priorityFee ?? 5000);
     const serviceFee = Number(v.serviceFee ?? 3000);
-    const vatRate = Number(v.vatPercent ?? 8) / 100;
+    const vatRate = Number(v.vatPercent ?? DEFAULT_FORM_VALUES.vatPercent) / 100;
     const vatIncluded = Boolean(v.vatIncluded ?? true);
-    const commissionPct = Number(v.platformCommissionPercent ?? 15);
+    const commissionPct = Number(v.platformCommissionPercent ?? DEFAULT_FORM_VALUES.platformCommissionPercent);
 
-    const extraKm = simDistanceKm > baseKm ? Math.ceil(simDistanceKm - baseKm) : 0;
-    const distanceShipping = baseFee + extraKm * extraPerKm;
+    const extraDistance = Math.max(0, simDistanceKm - baseKm);
+    const distanceShipping = Math.round(baseFee + extraDistance * extraPerKm);
     const prioritySurcharge = simSpeed === 'priority' ? priorityFee : 0;
     const totalShipping = distanceShipping + prioritySurcharge;
     const vatAmount = vatIncluded ? 0 : Math.round(simSubtotal * vatRate);
@@ -179,7 +167,7 @@ export const AdminSettingsPage: React.FC = () => {
     const platformCommission = Math.round((simSubtotal * commissionPct) / 100);
 
     return {
-      extraKm,
+      extraDistance,
       distanceShipping,
       prioritySurcharge,
       totalShipping,
@@ -238,6 +226,16 @@ export const AdminSettingsPage: React.FC = () => {
         className="rounded-xl"
       />
 
+      {loadError && (
+        <Alert
+          type="error"
+          showIcon
+          message="Không thể tải cấu hình đã lưu"
+          description={loadError}
+          action={<Button onClick={() => void fetchSettings()}>Thử lại</Button>}
+        />
+      )}
+
       <Spin spinning={loading}>
         <Row gutter={[20, 20]}>
           {/* Left Column: Config Form */}
@@ -245,8 +243,8 @@ export const AdminSettingsPage: React.FC = () => {
             <Form
               form={form}
               layout="vertical"
-              initialValues={DEFAULT_FORM_VALUES}
               onFinish={handleSave}
+              disabled={Boolean(loadError) || loading}
             >
               {/* Section 1: Shipping Config */}
               <Card
@@ -303,7 +301,7 @@ export const AdminSettingsPage: React.FC = () => {
                     <Form.Item
                       name="extraPerKm"
                       label="Phí mỗi km vượt mức (VNĐ/km)"
-                      tooltip="Áp dụng cho phần quãng đường vượt quá khoảng cách cơ bản (làm tròn lên theo km)"
+                      tooltip="Áp dụng chính xác cho phần quãng đường vượt quá khoảng cách cơ bản"
                       rules={[
                         { required: true, message: 'Vui lòng nhập phí vượt km' },
                         { type: 'number', min: 0, message: 'Không được âm' },
@@ -424,14 +422,14 @@ export const AdminSettingsPage: React.FC = () => {
                       label="Tỷ lệ hoa hồng thu từ đối tác quán (%)"
                       rules={[
                         { required: true, message: 'Vui lòng nhập tỷ lệ hoa hồng' },
-                        { type: 'number', min: 0, max: 50, message: 'Từ 0% đến 50%' },
+                        { type: 'number', min: 0, max: 100, message: 'Từ 0% đến 100%' },
                       ]}
                       className="!mb-0"
                     >
                       <InputNumber
                         className="w-full"
                         min={0}
-                        max={50}
+                        max={100}
                         step={0.5}
                         addonAfter="%"
                       />
@@ -507,7 +505,7 @@ export const AdminSettingsPage: React.FC = () => {
                   <div className="flex justify-between text-slate-600">
                     <span>
                       Phí vận chuyển ({simDistanceKm} km
-                      {previewBreakdown.extraKm > 0 ? `, vượt ${previewBreakdown.extraKm} km` : ''})
+                      {previewBreakdown.extraDistance > 0 ? `, vượt ${previewBreakdown.extraDistance.toFixed(2)} km` : ''})
                     </span>
                     <span className="font-semibold text-slate-900">
                       {previewBreakdown.distanceShipping.toLocaleString('vi-VN')}đ

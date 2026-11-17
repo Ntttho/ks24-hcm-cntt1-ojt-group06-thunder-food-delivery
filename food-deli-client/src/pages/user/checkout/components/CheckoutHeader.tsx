@@ -9,7 +9,7 @@ interface CheckoutHeaderProps {
 
 export const CheckoutHeader: React.FC<CheckoutHeaderProps> = ({
   shopName = 'Thunder Food Delivery',
-  distance = '1.8 km',
+  distance = '',
 }) => {
   const navigate = useNavigate();
 

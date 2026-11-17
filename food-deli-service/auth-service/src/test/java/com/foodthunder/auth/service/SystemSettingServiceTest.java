@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -37,20 +38,13 @@ class SystemSettingServiceTest {
     }
 
     @Test
-    @DisplayName("Trả về cấu hình mặc định khi bảng system_settings chưa có dữ liệu")
-    void getSystemSettings_returnsDefaultsWhenEmpty() {
+    @DisplayName("Báo lỗi khi system_settings thiếu cấu hình thay vì trả giá trị giả")
+    void getSystemSettings_failsWhenSettingsAreMissing() {
         when(systemSettingRepository.findByConfigKey(any())).thenReturn(Optional.empty());
 
-        SystemSettingsResponse response = systemSettingService.getSystemSettings();
-
-        assertThat(response.getBaseKm()).isEqualTo(2.0);
-        assertThat(response.getBaseFee()).isEqualByComparingTo(BigDecimal.valueOf(15000));
-        assertThat(response.getExtraPerKm()).isEqualByComparingTo(BigDecimal.valueOf(5000));
-        assertThat(response.getPriorityFee()).isEqualByComparingTo(BigDecimal.valueOf(5000));
-        assertThat(response.getServiceFee()).isEqualByComparingTo(BigDecimal.valueOf(3000));
-        assertThat(response.getVatRate()).isEqualByComparingTo(new BigDecimal("0.08"));
-        assertThat(response.getVatIncluded()).isTrue();
-        assertThat(response.getPlatformCommissionPercent()).isEqualByComparingTo(new BigDecimal("15.0"));
+        assertThatThrownBy(() -> systemSettingService.getSystemSettings())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Thiếu hoặc sai kiểu cấu hình");
     }
 
     @Test
@@ -71,6 +65,11 @@ class SystemSettingServiceTest {
                         .configKey(SystemSettingServiceImpl.KEY_TAX_CONFIG)
                         .configValue("{\"vat_rate\": 0.10, \"vat_included\": false}")
                         .build()));
+        when(systemSettingRepository.findByConfigKey(SystemSettingServiceImpl.KEY_COMMISSION_CONFIG))
+                .thenReturn(Optional.of(SystemSetting.builder()
+                        .configKey(SystemSettingServiceImpl.KEY_COMMISSION_CONFIG)
+                        .configValue("{\"platform_fee_percent\": 10}")
+                        .build()));
 
         OrderCostConfigDto dto = systemSettingService.getOrderCostConfig();
 
@@ -81,6 +80,7 @@ class SystemSettingServiceTest {
         assertThat(dto.getServiceFee()).isEqualByComparingTo(BigDecimal.valueOf(4000));
         assertThat(dto.getVatRate()).isEqualByComparingTo(new BigDecimal("0.10"));
         assertThat(dto.getVatIncluded()).isFalse();
+        assertThat(dto.getPlatformCommissionPercent()).isEqualByComparingTo(BigDecimal.TEN);
     }
 
     @Test
@@ -95,7 +95,7 @@ class SystemSettingServiceTest {
                 .extraPerKm(BigDecimal.valueOf(5500))
                 .priorityFee(BigDecimal.valueOf(6000))
                 .serviceFee(BigDecimal.valueOf(3500))
-                .vatRate(new BigDecimal("0.08"))
+                .vatRate(new BigDecimal("8"))
                 .vatIncluded(false)
                 .platformCommissionPercent(new BigDecimal("16.0"))
                 .build();
@@ -108,13 +108,14 @@ class SystemSettingServiceTest {
         assertThat(response.getPlatformCommissionPercent()).isEqualByComparingTo(new BigDecimal("16.0"));
 
         ArgumentCaptor<SystemSetting> captor = ArgumentCaptor.forClass(SystemSetting.class);
-        verify(systemSettingRepository, times(4)).save(captor.capture());
+        verify(systemSettingRepository, times(5)).save(captor.capture());
         List<String> savedKeys = captor.getAllValues().stream().map(SystemSetting::getConfigKey).toList();
         assertThat(savedKeys).containsExactlyInAnyOrder(
                 SystemSettingServiceImpl.KEY_SHIPPING_CONFIG,
                 SystemSettingServiceImpl.KEY_ORDER_FEE_CONFIG,
                 SystemSettingServiceImpl.KEY_TAX_CONFIG,
-                SystemSettingServiceImpl.KEY_COMMISSION_CONFIG
+                SystemSettingServiceImpl.KEY_COMMISSION_CONFIG,
+                "platform_commission_rate"
         );
     }
 }

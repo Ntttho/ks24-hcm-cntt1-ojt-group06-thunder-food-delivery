@@ -377,8 +377,11 @@ INSERT INTO merchant_details (user_id, business_license, tax_code) VALUES
 (6, 'GPKD-987654321', 'MST-123456789');
 
 INSERT INTO system_settings (id, config_key, config_value, description) VALUES
-(1, 'shipping_config', '{"base_km":2,"base_fee":15000,"extra_per_km":5000}', 'Shipping fee config'),
-(2, 'tax_config', '{"vat_rate":0.08}', 'VAT config');
+(1, 'shipping_config', '{"base_km":2,"base_fee":15000,"extra_per_km":5000,"priority_fee":5000}', 'Shipping fee config'),
+(2, 'tax_config', '{"vat_rate":0.10,"vat_included":true}', 'VAT config'),
+(3, 'order_fee_config', '{"service_fee":3000}', 'Order service fee config'),
+(4, 'commission_config', '{"platform_fee_percent":10}', 'Platform commission config'),
+(5, 'platform_commission_rate', '{"value":10,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00","history":[{"value":10,"updatedAt":"2026-01-01T00:00:00"}]}', 'Platform commission rate');
 
 INSERT INTO vouchers (id, code, discount_amount, min_order_value, expiry_date, is_active) VALUES
 (1, 'FREESHIP', '15000.00', '50000.00', '2026-12-31 16:59:59', 1);

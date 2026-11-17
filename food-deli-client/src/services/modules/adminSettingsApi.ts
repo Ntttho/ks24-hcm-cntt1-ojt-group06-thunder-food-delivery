@@ -9,6 +9,7 @@ export interface OrderCostConfig {
   serviceFee: number;
   vatRate: number;
   vatIncluded: boolean;
+  platformCommissionPercent: number;
 }
 
 export interface SystemSettingsConfig extends OrderCostConfig {
@@ -23,8 +24,9 @@ export const DEFAULT_ORDER_COST_CONFIG: OrderCostConfig = {
   extraPerKm: 5000,
   priorityFee: 5000,
   serviceFee: 3000,
-  vatRate: 0.08,
+  vatRate: 0.1,
   vatIncluded: true,
+  platformCommissionPercent: 10,
 };
 
 export const adminSettingsApi = {

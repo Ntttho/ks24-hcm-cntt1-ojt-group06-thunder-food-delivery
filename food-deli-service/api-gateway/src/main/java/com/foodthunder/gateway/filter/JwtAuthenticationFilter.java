@@ -78,6 +78,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             "/api/v1/drivers/**/location",
             "/api/v1/settings/order-fees",
             "/api/v1/settings/shipping",
+            "/api/v1/settings",
             "/api/v1/system-settings/shipping"
     );
 

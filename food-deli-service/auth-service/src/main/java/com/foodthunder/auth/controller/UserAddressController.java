@@ -33,6 +33,16 @@ public class UserAddressController {
         return ResponseEntity.ok(ApiResponse.success(addresses));
     }
 
+    @GetMapping("/api/v1/addresses/mine/{id}")
+    public ResponseEntity<ApiResponse<AddressResponse>> getMyAddress(
+            @PathVariable("id") Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestHeader(value = "X-User-Id", required = false) Long headerUserId
+    ) {
+        Long userId = resolveUserId(principal, headerUserId);
+        return ResponseEntity.ok(ApiResponse.success(addressService.getUserAddress(userId, id)));
+    }
+
     @PostMapping({"/api/v1/users/addresses", "/api/v1/addresses/mine"})
     public ResponseEntity<ApiResponse<AddressResponse>> createAddress(
             @AuthenticationPrincipal UserPrincipal principal,

@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { message } from 'antd';
+import { Alert, message } from 'antd';
 import { orderApi, type CreateOrderPayload } from '@/services/modules/orderApi';
 import { addressApi } from '@/services/modules/addressApi';
+import { restaurantApi, type Shop } from '@/services/modules/restaurantApi';
 import { paymentApi, type SepayGenerateResponse } from '@/services/modules/paymentApi';
 import { type VoucherItem } from '@/services/modules/restaurantApi';
 import {
   adminSettingsApi,
-  DEFAULT_ORDER_COST_CONFIG,
   type OrderCostConfig,
 } from '@/services/modules/adminSettingsApi';
+import type { UserAddress } from '@/types';
+import { calculateHaversineDistanceKm, calculateShippingFee, calculateVatAmount } from '@/utils/orderPricing';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,7 +58,7 @@ export const CheckoutPage: React.FC = () => {
   // Restaurant ID and Name of the active shop
   const activeRestaurantId = useMemo(() => {
     if (selectedItems.length > 0) return selectedItems[0].shopId;
-    return cart.shopId || 1;
+    return cart.shopId;
   }, [selectedItems, cart.shopId]);
 
   const currentShopName = useMemo(() => {
@@ -93,39 +95,54 @@ export const CheckoutPage: React.FC = () => {
   };
 
   // Delivery Address State
-  const [selectedAddress, setSelectedAddress] = useState<DeliveryAddressItem>({
-    id: 'addr-default',
-    label: 'Nhà riêng',
-    title: 'Địa chỉ nhận hàng',
-    fullAddress: '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-    recipientName: user?.fullName || 'Khách hàng',
-    phone: user?.phone || '0909 000 888',
-    isDefault: true,
-  });
+  const [selectedAddress, setSelectedAddress] = useState<DeliveryAddressItem | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<DeliveryAddressItem[]>([]);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [restaurant, setRestaurant] = useState<Shop | null>(null);
+  const [restaurantLoading, setRestaurantLoading] = useState(true);
+  const [restaurantError, setRestaurantError] = useState<string | null>(null);
 
   // Fetch real user addresses on mount
   useEffect(() => {
+    let active = true;
+    setAddressLoading(true);
+    setAddressError(null);
     const loadAddresses = async () => {
       try {
         const res = await addressApi.getMyAddresses();
-        const list = res?.data;
-        if (list && list.length > 0) {
-          const def = list.find((a) => a.isDefault) || list[0];
-          setSelectedAddress({
-            id: String(def.id),
-            label: def.label || 'Địa chỉ',
-            title: user?.fullName || 'Địa chỉ nhận hàng',
-            fullAddress: def.address || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-            recipientName: user?.fullName || 'Khách hàng',
-            phone: user?.phone || '0909 000 888',
-            isDefault: Boolean(def.isDefault),
-          });
+        const list = res?.data || [];
+        const mappedAddresses: DeliveryAddressItem[] = list.map((address: UserAddress) => ({
+          id: String(address.id),
+          latitude: address.latitude,
+          longitude: address.longitude,
+          label: address.label || 'Địa chỉ',
+          title: address.label || 'Địa chỉ nhận hàng',
+          fullAddress: address.address,
+          recipientName: user?.fullName || '',
+          phone: user?.phone || '',
+          isDefault: Boolean(address.isDefault),
+        }));
+        if (active) {
+          setSavedAddresses(mappedAddresses);
+          setSelectedAddress(mappedAddresses.find((address) => address.isDefault) || mappedAddresses[0] || null);
         }
-      } catch {
-        // Keep fallback address
+      } catch (error: unknown) {
+        if (active) {
+          const apiMessage =
+            error && typeof error === 'object' && 'response' in error
+              ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+              : undefined;
+          setAddressError(apiMessage || (error instanceof Error ? error.message : 'Không thể tải địa chỉ giao hàng.'));
+        }
+      } finally {
+        if (active) setAddressLoading(false);
       }
     };
-    loadAddresses();
+    void loadAddresses();
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   // Drop-off spot: 'door' | 'lobby' | 'curb'
@@ -136,7 +153,7 @@ export const CheckoutPage: React.FC = () => {
   const [isEditingDriverNote, setIsEditingDriverNote] = useState(false);
 
   // Delivery speed: 'priority' | 'standard' | 'schedule'
-  const [deliverySpeed, setDeliverySpeed] = useState<'priority' | 'standard' | 'schedule'>('priority');
+  const [deliverySpeed, setDeliverySpeed] = useState<'priority' | 'standard' | 'schedule'>('standard');
 
   // Order items collapsible
   const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(true);
@@ -158,32 +175,73 @@ export const CheckoutPage: React.FC = () => {
 
   // Submission State
   const [orderState, setOrderState] = useState<'idle' | 'loading' | 'success'>('idle');
-  const [orderCostConfig, setOrderCostConfig] = useState<OrderCostConfig>(DEFAULT_ORDER_COST_CONFIG);
+  const [orderCostConfig, setOrderCostConfig] = useState<OrderCostConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [confirmedTotal, setConfirmedTotal] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
+    setConfigLoading(true);
+    setConfigError(null);
     adminSettingsApi
       .getPublicOrderFeeConfig()
       .then((res) => {
         if (active && res?.data) {
-          setOrderCostConfig({
-            baseKm: Number(res.data.baseKm ?? DEFAULT_ORDER_COST_CONFIG.baseKm),
-            baseFee: Number(res.data.baseFee ?? DEFAULT_ORDER_COST_CONFIG.baseFee),
-            extraPerKm: Number(res.data.extraPerKm ?? DEFAULT_ORDER_COST_CONFIG.extraPerKm),
-            priorityFee: Number(res.data.priorityFee ?? DEFAULT_ORDER_COST_CONFIG.priorityFee),
-            serviceFee: Number(res.data.serviceFee ?? DEFAULT_ORDER_COST_CONFIG.serviceFee),
-            vatRate: Number(res.data.vatRate ?? DEFAULT_ORDER_COST_CONFIG.vatRate),
-            vatIncluded: res.data.vatIncluded ?? DEFAULT_ORDER_COST_CONFIG.vatIncluded,
-          });
+          setOrderCostConfig(res.data);
+        } else if (active) {
+          throw new Error('Máy chủ không trả về biểu phí đơn hàng.');
         }
       })
-      .catch(() => {
-        // Fallback silently to defaults
+      .catch((error: unknown) => {
+        if (!active) return;
+        const apiMessage =
+          error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined;
+        setConfigError(apiMessage || (error instanceof Error ? error.message : 'Không thể tải biểu phí đơn hàng.'));
+      })
+      .finally(() => {
+        if (active) setConfigLoading(false);
       });
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!activeRestaurantId) {
+      setRestaurant(null);
+      setRestaurantError('Không xác định được nhà hàng đang đặt món.');
+      setRestaurantLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    setRestaurantLoading(true);
+    setRestaurantError(null);
+    restaurantApi
+      .getById(activeRestaurantId)
+      .then((response) => {
+        if (!response?.data) throw new Error('Máy chủ không trả về thông tin nhà hàng.');
+        if (active) setRestaurant(response.data);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const apiMessage =
+          error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined;
+        setRestaurantError(apiMessage || (error instanceof Error ? error.message : 'Không thể tải thông tin nhà hàng.'));
+      })
+      .finally(() => {
+        if (active) setRestaurantLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeRestaurantId]);
 
   // Real Items from Selected Cart Items
   const orderItemsData = useMemo(() => {
@@ -204,19 +262,33 @@ export const CheckoutPage: React.FC = () => {
     }, 0);
   }, [selectedItems]);
 
-  const checkoutDistanceKm = 1.8;
-  const baseShippingFee = useMemo(() => {
-    if (selectedItems.length === 0) return 0;
-    const extraKm =
-      checkoutDistanceKm > orderCostConfig.baseKm
-        ? Math.ceil(checkoutDistanceKm - orderCostConfig.baseKm)
-        : 0;
-    return orderCostConfig.baseFee + extraKm * orderCostConfig.extraPerKm;
-  }, [selectedItems.length, orderCostConfig]);
-
-  const shippingFee = baseShippingFee;
-  const serviceFee = 0;
-  const vatAmount = 0;
+  const checkoutDistanceKm = useMemo(
+    () =>
+      calculateHaversineDistanceKm(
+        restaurant?.latitude,
+        restaurant?.longitude,
+        selectedAddress?.latitude,
+        selectedAddress?.longitude
+      ),
+    [restaurant, selectedAddress]
+  );
+  const feesReady = Boolean(
+    orderCostConfig &&
+      checkoutDistanceKm != null &&
+      selectedAddress &&
+      !addressLoading &&
+      !configLoading &&
+      !restaurantLoading
+  );
+  const checkoutDistanceLabel =
+    checkoutDistanceKm == null ? 'Chưa xác định' : `${checkoutDistanceKm.toFixed(2)} km`;
+  const shippingFee =
+    feesReady && orderCostConfig && checkoutDistanceKm != null
+      ? calculateShippingFee(checkoutDistanceKm, orderCostConfig, deliverySpeed)
+      : 0;
+  const serviceFee = feesReady && orderCostConfig ? orderCostConfig.serviceFee : 0;
+  const vatAmount =
+    feesReady && orderCostConfig ? calculateVatAmount(itemsSubtotal, orderCostConfig) : 0;
 
   // Single Voucher Calculation
   const voucherDiscount = useMemo(() => {
@@ -225,19 +297,19 @@ export const CheckoutPage: React.FC = () => {
     if (itemsSubtotal < minVal) return 0;
 
     if (appliedVoucher.discountType === 'PERCENTAGE') {
-      const calc = (itemsSubtotal * appliedVoucher.discountValue) / 100;
+      const calc = Math.round((itemsSubtotal * appliedVoucher.discountValue) / 100);
       if (appliedVoucher.maxDiscountAmount && appliedVoucher.maxDiscountAmount > 0) {
-        return Math.min(calc, appliedVoucher.maxDiscountAmount);
+        return Math.min(calc, appliedVoucher.maxDiscountAmount, itemsSubtotal);
       }
-      return calc;
+      return Math.min(calc, itemsSubtotal);
     }
-    return appliedVoucher.discountValue || appliedVoucher.discountAmount || 0;
+    return Math.min(appliedVoucher.discountValue || appliedVoucher.discountAmount || 0, itemsSubtotal);
   }, [appliedVoucher, itemsSubtotal]);
 
   const paymentMethodDiscount = paymentMethod.extraDiscount;
   const totalDiscount = voucherDiscount + paymentMethodDiscount;
-  const originalTotal = itemsSubtotal + shippingFee + serviceFee + vatAmount;
-  const finalTotal = Math.max(0, originalTotal - totalDiscount);
+  const originalTotal = feesReady ? itemsSubtotal + shippingFee + serviceFee + vatAmount : 0;
+  const finalTotal = feesReady ? Math.max(0, originalTotal - totalDiscount) : 0;
 
   const handleToggleKitchenChip = (chip: string) => {
     setSelectedKitchenChips((prev) =>
@@ -258,8 +330,18 @@ export const CheckoutPage: React.FC = () => {
       navigate(APP_ROUTES.CART);
       return;
     }
+    if (!feesReady || !selectedAddress || !Number.isInteger(Number(selectedAddress.id)) || !activeRestaurantId) {
+      message.error(
+        configError ||
+          addressError ||
+          restaurantError ||
+          'Vui lòng chọn địa chỉ có tọa độ hợp lệ và chờ biểu phí được tải.'
+      );
+      return;
+    }
 
     setOrderState('loading');
+    setConfirmedTotal(null);
     try {
       const kitchenParts = [kitchenNote.trim(), selectedKitchenChips.join(', ')].filter(Boolean).join(' - ');
       const fullNote = [
@@ -270,13 +352,11 @@ export const CheckoutPage: React.FC = () => {
         .join(' • ');
 
       const createPayload: CreateOrderPayload = {
-        restaurantId: Number(activeRestaurantId) || 1,
-        customerName: selectedAddress?.recipientName || (user as any)?.fullName || 'Khách hàng',
-        customerPhone: selectedAddress?.phone || (user as any)?.phone || '0900000001',
-        receiverAddress: selectedAddress?.fullAddress || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-        receiverLat: 10.795,
-        receiverLng: 106.721,
-        distanceKm: checkoutDistanceKm,
+        restaurantId: Number(activeRestaurantId),
+        addressId: Number(selectedAddress.id),
+        customerName: selectedAddress.recipientName || user?.fullName || 'Khách hàng',
+        customerPhone: selectedAddress.phone || user?.phone || '',
+        receiverAddress: selectedAddress.fullAddress,
         deliverySpeed,
         voucherId: appliedVoucher?.id || undefined,
         note: fullNote,
@@ -293,12 +373,17 @@ export const CheckoutPage: React.FC = () => {
       if (!createdData || !createdData.id) {
         throw new Error('Không nhận được dữ liệu xác nhận đơn hàng từ máy chủ');
       }
+      const serverTotal = Number(createdData.totalAmount);
+      if (!Number.isFinite(serverTotal) || serverTotal < 0) {
+        throw new Error('Máy chủ không trả về tổng tiền hợp lệ cho đơn hàng.');
+      }
 
       const orderId = createdData.id;
       const orderCode = createdData.orderCode || `#ORD-${orderId}`;
 
       setCreatedOrderId(orderId);
       setCreatedOrderCode(orderCode);
+      setConfirmedTotal(serverTotal);
 
       // Loại bỏ ngay lập tức những món ăn đã order và bấm thanh toán khỏi giỏ hàng
       const purchasedIds = selectedItems.map((it) => it.id);
@@ -309,7 +394,7 @@ export const CheckoutPage: React.FC = () => {
         try {
           const qrRes = await paymentApi.generateSepayQr({
             orderId,
-            amount: finalTotal,
+            amount: serverTotal,
             orderInfo: `FDL${orderId < 100 ? String(orderId).padStart(3, '0') : orderId}`,
           });
           setSepayQrData(qrRes.data);
@@ -321,7 +406,7 @@ export const CheckoutPage: React.FC = () => {
       } else {
         // COD Flow
         try {
-          await paymentApi.createCod(orderId, finalTotal);
+          await paymentApi.createCod(orderId, serverTotal);
         } catch {
           // Proceed
         }
@@ -341,7 +426,7 @@ export const CheckoutPage: React.FC = () => {
   return (
     <div className="bg-gray-50 flex flex-col min-h-screen font-sans">
       {/* 1. Top Header with Hover Animation & Click Home */}
-      <CheckoutHeader shopName={currentShopName} distance={`${checkoutDistanceKm} km`} />
+      <CheckoutHeader shopName={currentShopName} distance={checkoutDistanceLabel} />
 
       {/* Main Body */}
       <main className="flex-1 w-full pt-16 pb-36">
@@ -350,9 +435,32 @@ export const CheckoutPage: React.FC = () => {
           <CheckoutCountdownBanner countdownText={formatTimer(countdown)} />
 
           <div className="p-4 flex flex-col gap-3">
+            {(configError || addressError || restaurantError || (selectedAddress && checkoutDistanceKm == null)) && (
+              <Alert
+                type="error"
+                showIcon
+                message="Chưa thể xác định đầy đủ chi phí đơn hàng"
+                description={
+                  configError ||
+                  addressError ||
+                  restaurantError ||
+                  'Địa chỉ hoặc nhà hàng chưa có tọa độ hợp lệ để tính phí giao hàng.'
+                }
+              />
+            )}
+
             {/* 3. Delivery Address Card */}
             <CheckoutAddressCard
-              selectedAddress={selectedAddress}
+              selectedAddress={selectedAddress || {
+                id: '',
+                latitude: null,
+                longitude: null,
+                label: '',
+                title: '',
+                fullAddress: '',
+                recipientName: '',
+                phone: '',
+              }}
               dropoffSpot={dropoffSpot}
               onSelectDropoffSpot={setDropoffSpot}
               driverNote={driverNote}
@@ -367,8 +475,8 @@ export const CheckoutPage: React.FC = () => {
             <CheckoutDeliverySpeed
               deliverySpeed={deliverySpeed}
               onSelectDeliverySpeed={setDeliverySpeed}
-              distance={`${checkoutDistanceKm} km`}
-              priorityFee={orderCostConfig.priorityFee}
+              distance={checkoutDistanceLabel}
+              priorityFee={orderCostConfig?.priorityFee ?? 0}
             />
 
             {/* 5. Order Summary Card (Real items from Redux) */}
@@ -405,10 +513,11 @@ export const CheckoutPage: React.FC = () => {
               shippingFee={shippingFee}
               serviceFee={serviceFee}
               vatAmount={vatAmount}
-              vatIncluded={orderCostConfig.vatIncluded}
+              vatIncluded={orderCostConfig?.vatIncluded ?? false}
               totalDiscount={totalDiscount}
               originalTotal={originalTotal}
               finalTotal={finalTotal}
+              feesReady={feesReady}
               itemCount={selectedItems.length}
               paymentMethodDiscount={paymentMethodDiscount}
             />
@@ -426,16 +535,19 @@ export const CheckoutPage: React.FC = () => {
       <CheckoutBottomBar
         paymentMethodName={paymentMethod.name}
         originalTotal={originalTotal}
-        finalTotal={finalTotal}
+        finalTotal={confirmedTotal ?? finalTotal}
         orderState={orderState}
         onPlaceOrder={handlePlaceOrder}
+        feesReady={feesReady}
       />
 
       {/* 10. Address Selector Modal */}
       <AddressSelectorModal
         isOpen={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
-        selectedAddressId={selectedAddress.id}
+        selectedAddressId={selectedAddress?.id}
+        addresses={savedAddresses}
+        distanceKm={checkoutDistanceKm}
         onSelectAddress={(addr: DeliveryAddressItem) => setSelectedAddress(addr)}
         restaurantName={currentShopName}
       />
@@ -448,7 +560,7 @@ export const CheckoutPage: React.FC = () => {
         onSelectMethod={(id: string, name: string, extraDiscount?: number) => {
           setPaymentMethod({ id, name, extraDiscount: extraDiscount || 0 });
         }}
-        totalAmount={finalTotal}
+        totalAmount={confirmedTotal ?? finalTotal}
       />
 
       {/* 12. Dynamic Single Voucher Selector Modal */}
@@ -467,13 +579,13 @@ export const CheckoutPage: React.FC = () => {
         onClose={() => setIsSepayModalOpen(false)}
         qrData={sepayQrData}
         orderId={createdOrderId}
-        totalAmount={finalTotal}
+        totalAmount={confirmedTotal ?? finalTotal}
       />
 
       {/* 14. Success Modal Dialogue if COD Order Placed -> Redirect to Home */}
       <CheckoutSuccessModal
         isOpen={orderState === 'success'}
-        finalTotal={finalTotal}
+        finalTotal={confirmedTotal ?? finalTotal}
         onReset={() => {
           setOrderState('idle');
           navigate('/');

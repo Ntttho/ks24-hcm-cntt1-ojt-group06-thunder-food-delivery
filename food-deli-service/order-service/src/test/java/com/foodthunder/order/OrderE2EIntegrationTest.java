@@ -2,7 +2,10 @@ package com.foodthunder.order;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodthunder.order.client.RestaurantClient;
+import com.foodthunder.order.client.AuthClient;
 import com.foodthunder.order.dto.*;
+import com.foodthunder.order.dto.client.RemoteAddressDto;
+import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
@@ -29,6 +32,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -55,6 +59,9 @@ public class OrderE2EIntegrationTest {
     private RestaurantClient restaurantClient;
 
     @MockBean
+    private AuthClient authClient;
+
+    @MockBean
     private SystemSettingsService systemSettingsService;
 
     private RemoteRestaurantDto validRestaurant;
@@ -68,6 +75,29 @@ public class OrderE2EIntegrationTest {
                         .shippingFeePerKilometer(BigDecimal.valueOf(5000))
                         .build()
         );
+        when(authClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(
+                RemoteOrderCostConfigDto.builder()
+                        .baseKm(2.0)
+                        .baseFee(BigDecimal.valueOf(15000))
+                        .extraPerKm(BigDecimal.valueOf(5000))
+                        .priorityFee(BigDecimal.valueOf(5000))
+                        .serviceFee(BigDecimal.ZERO)
+                        .vatRate(0.10)
+                        .vatIncluded(true)
+                        .platformCommissionPercent(10.0)
+                        .build()
+        )));
+        when(authClient.getMyAddress(anyLong(), anyLong())).thenAnswer(invocation -> {
+            long addressId = invocation.getArgument(0);
+            long userId = invocation.getArgument(1);
+            return ResponseEntity.ok(ApiResponse.success(RemoteAddressDto.builder()
+                    .id(addressId)
+                    .userId(userId)
+                    .address("Tòa Keangnam, Phạm Hùng, Cầu Giấy, Hà Nội")
+                    .latitude(10.77)
+                    .longitude(106.69)
+                    .build()));
+        });
         // Seed order statuses if not already present in in-memory H2
         ensureStatusExists(OrderStatus.AWAITING_PAYMENT, "Chờ thanh toán VNPay", 1);
         ensureStatusExists(OrderStatus.PENDING, "Chờ xác nhận", 2);
@@ -83,6 +113,8 @@ public class OrderE2EIntegrationTest {
         validRestaurant = RemoteRestaurantDto.builder()
                 .id(1)
                 .name("Trà Sữa XiangPiao")
+                .latitude(10.77)
+                .longitude(106.69)
                 .isOpen(true)
                 .approvalStatus("APPROVED")
                 .build();
@@ -127,6 +159,7 @@ public class OrderE2EIntegrationTest {
         // --- 2. TẠO ĐƠN HÀNG COD (POST /api/v1/orders) ---
         CreateOrderRequest createRequest = CreateOrderRequest.builder()
                 .restaurantId(1)
+                .addressId(1L)
                 .receiverAddress("Tòa Keangnam, Phạm Hùng, Cầu Giấy, Hà Nội")
                 .receiverLat(21.0173)
                 .receiverLng(105.7842)
@@ -158,10 +191,9 @@ public class OrderE2EIntegrationTest {
                 .andExpect(jsonPath("$.data.paymentMethod").value("COD"))
                 // Tiền món: 45k * 2 = 90k, Topping: 10k * 1 * 2 = 20k => Subtotal: 110k
                 .andExpect(jsonPath("$.data.subtotalAmount").value(110000.0))
-                // Phí ship 3.2km: 15k + (3.2 * 5k) = 31k
-                .andExpect(jsonPath("$.data.shippingFee").value(31000.0))
-                // Tổng: 110k + 31k = 141k
-                .andExpect(jsonPath("$.data.totalAmount").value(141000.0))
+                // Khoảng cách từ vị trí lưu trong Auth-Service bằng 0 km nên chỉ tính phí cơ bản.
+                .andExpect(jsonPath("$.data.shippingFee").value(15000.0))
+                .andExpect(jsonPath("$.data.totalAmount").value(125000.0))
                 .andExpect(jsonPath("$.data.items[0].foodName").value("Trà Sữa Ô Long Nướng"))
                 .andExpect(jsonPath("$.data.items[0].toppings[0].toppingId").value(10))
                 .andReturn();
@@ -295,6 +327,7 @@ public class OrderE2EIntegrationTest {
 
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(1)
+                .addressId(1L)
                 .receiverAddress("Hà Nội")
                 .distanceKm(2.0)
                 .idempotencyKey("E2E-VNPAY-001")
@@ -331,6 +364,7 @@ public class OrderE2EIntegrationTest {
 
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(1)
+                .addressId(1L)
                 .receiverAddress("Hà Nội")
                 .items(List.of(
                         CreateOrderItemRequest.builder().foodId(999).quantity(1).build()

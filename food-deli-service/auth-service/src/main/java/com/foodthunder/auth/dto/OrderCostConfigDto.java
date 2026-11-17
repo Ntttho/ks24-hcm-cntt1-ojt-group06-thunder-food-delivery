@@ -22,5 +22,6 @@ public class OrderCostConfigDto {
     private BigDecimal serviceFee;
     private BigDecimal vatRate;
     private Boolean vatIncluded;
+    private BigDecimal platformCommissionPercent;
 }
 

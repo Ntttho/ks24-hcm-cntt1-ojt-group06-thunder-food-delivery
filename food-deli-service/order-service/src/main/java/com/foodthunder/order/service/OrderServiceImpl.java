@@ -4,6 +4,7 @@ import com.foodthunder.order.client.AuthClient;
 import com.foodthunder.order.client.RestaurantClient;
 import com.foodthunder.order.dto.*;
 import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
+import com.foodthunder.order.dto.client.RemoteAddressDto;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
@@ -56,8 +57,7 @@ public class OrderServiceImpl implements OrderService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.foodthunder.order.client.NotificationClient notificationClient;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private AuthClient authClient;
+    private final AuthClient authClient;
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
@@ -65,7 +65,8 @@ public class OrderServiceImpl implements OrderService {
             OrderStatusLogRepository orderStatusLogRepository,
             RestaurantClient restaurantClient,
             SimpMessagingTemplate messagingTemplate,
-            SystemSettingsService systemSettingsService
+            SystemSettingsService systemSettingsService,
+            AuthClient authClient
     ) {
         this.orderRepository = orderRepository;
         this.orderStatusRepository = orderStatusRepository;
@@ -73,6 +74,7 @@ public class OrderServiceImpl implements OrderService {
         this.restaurantClient = restaurantClient;
         this.messagingTemplate = messagingTemplate;
         this.systemSettingsService = systemSettingsService;
+        this.authClient = authClient;
     }
 
     // Defined State Machine transitions: Current Status -> Set of allowed Next Statuses
@@ -131,6 +133,9 @@ public class OrderServiceImpl implements OrderService {
         if (Boolean.FALSE.equals(restaurantDto.getIsOpen())) {
             throw new BadRequestException("Quán ăn '" + restaurantDto.getName() + "' hiện đang đóng cửa hoặc tạm ngưng nhận đơn");
         }
+
+        RemoteAddressDto deliveryAddress = fetchCustomerAddress(request.getAddressId(), customerId);
+        Double distanceKm = calculateDistanceKm(restaurantDto, deliveryAddress);
 
         // 3. Fetch products and validate single-shop constraint via OpenFeign
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -218,17 +223,10 @@ public class OrderServiceImpl implements OrderService {
 
         // 4. Calculate shipping fee, service fee & VAT dynamically from auth-service Admin Settings (or fallback to shipping settings)
         RemoteOrderCostConfigDto costConfig = fetchOrderCostConfig();
-        Double distanceKm = request.getDistanceKm();
-        if (distanceKm == null || distanceKm <= 0) {
-            distanceKm = (costConfig != null && costConfig.getBaseKm() != null && costConfig.getBaseKm() > 0)
-                    ? costConfig.getBaseKm() : 2.0;
-        }
         BigDecimal shippingFee = calculateShippingFee(distanceKm, request.getDeliverySpeed(), costConfig);
-        BigDecimal serviceFee = (costConfig != null && costConfig.getServiceFee() != null && costConfig.getServiceFee().compareTo(BigDecimal.ZERO) > 0)
-                ? costConfig.getServiceFee() : BigDecimal.ZERO;
+        BigDecimal serviceFee = costConfig.getServiceFee();
         BigDecimal vatAmount = BigDecimal.ZERO;
-        if (costConfig != null && Boolean.FALSE.equals(costConfig.getVatIncluded())
-                && costConfig.getVatRate() != null && costConfig.getVatRate() > 0) {
+        if (Boolean.FALSE.equals(costConfig.getVatIncluded()) && costConfig.getVatRate() > 0) {
             vatAmount = subtotal.multiply(BigDecimal.valueOf(costConfig.getVatRate()))
                     .setScale(0, java.math.RoundingMode.HALF_UP);
         }
@@ -316,10 +314,10 @@ public class OrderServiceImpl implements OrderService {
                 .customerPhone(finalCustomerPhone)
                 .restaurantId(targetRestaurantId)
                 .voucherId(appliedVoucherId)
-                .receiverAddress(request.getReceiverAddress())
+                .receiverAddress(deliveryAddress.getAddress())
                 .note(request.getNote())
-                .receiverLat(request.getReceiverLat())
-                .receiverLng(request.getReceiverLng())
+                .receiverLat(deliveryAddress.getLatitude())
+                .receiverLng(deliveryAddress.getLongitude())
                 .distanceKm(distanceKm)
                 .subtotalAmount(subtotal)
                 .taxAmount(taxAmount)
@@ -601,51 +599,100 @@ public class OrderServiceImpl implements OrderService {
 
     private RemoteOrderCostConfigDto fetchOrderCostConfig() {
         if (authClient == null) {
-            return null;
+            throw new IllegalStateException("Auth-Service không được cấu hình để tải biểu phí đơn hàng");
         }
         try {
             ResponseEntity<ApiResponse<RemoteOrderCostConfigDto>> res = authClient.getOrderFeeConfig();
-            if (res != null && res.getBody() != null && res.getBody().getData() != null
-                    && !res.getBody().getData().isFallback()) {
-                return res.getBody().getData();
+            RemoteOrderCostConfigDto config = res != null && res.getBody() != null
+                    ? res.getBody().getData()
+                    : null;
+            if (res != null && res.getStatusCode().is2xxSuccessful()
+                    && config != null && !config.isFallback()
+                    && config.getBaseKm() != null && config.getBaseKm() > 0
+                    && config.getBaseFee() != null && config.getExtraPerKm() != null
+                    && config.getPriorityFee() != null && config.getServiceFee() != null
+                    && config.getVatRate() != null && config.getVatRate() >= 0 && config.getVatRate() <= 1
+                    && config.getPlatformCommissionPercent() != null
+                    && config.getPlatformCommissionPercent() >= 0
+                    && config.getPlatformCommissionPercent() <= 100
+                    && config.getVatIncluded() != null) {
+                return config;
             }
-        } catch (Exception ex) {
-            log.warn("Could not fetch order cost config from auth-service, using shipping settings fallback: {}", ex.getMessage());
+            throw new IllegalStateException("Auth-Service trả về cấu hình chi phí đơn hàng không hợp lệ");
+        } catch (RuntimeException ex) {
+            log.error("Could not load authoritative order cost config from auth-service", ex);
+            throw ex;
         }
-        return null;
     }
 
     private BigDecimal calculateShippingFee(Double distanceKm, String deliverySpeed, RemoteOrderCostConfigDto cfg) {
-        if (cfg == null) {
-            if (systemSettingsService != null) {
-                var settings = systemSettingsService.getShippingSettings();
-                return settings.getDefaultShippingFee().add(
-                        settings.getShippingFeePerKilometer().multiply(BigDecimal.valueOf(distanceKm))
-                );
-            }
-            BigDecimal baseFee = BigDecimal.valueOf(15000);
-            if (distanceKm <= 2.0) {
-                return baseFee;
-            }
-            double extraKm = Math.ceil(distanceKm - 2.0);
-            return baseFee.add(BigDecimal.valueOf(extraKm * 5000));
-        }
-
-        double baseKm = (cfg.getBaseKm() != null && cfg.getBaseKm() > 0) ? cfg.getBaseKm() : 2.0;
-        BigDecimal baseFee = cfg.getBaseFee() != null ? cfg.getBaseFee() : BigDecimal.valueOf(15000);
-        BigDecimal extraPerKm = cfg.getExtraPerKm() != null ? cfg.getExtraPerKm() : BigDecimal.valueOf(5000);
-
-        BigDecimal total = baseFee;
-        if (distanceKm > baseKm) {
-            double extraKm = Math.ceil(distanceKm - baseKm);
-            total = total.add(extraPerKm.multiply(BigDecimal.valueOf(extraKm)));
-        }
+        BigDecimal distance = BigDecimal.valueOf(distanceKm);
+        BigDecimal extraDistance = distance.subtract(BigDecimal.valueOf(cfg.getBaseKm())).max(BigDecimal.ZERO);
+        BigDecimal total = cfg.getBaseFee().add(cfg.getExtraPerKm().multiply(extraDistance));
         if ("priority".equalsIgnoreCase(deliverySpeed)
-                && cfg.getPriorityFee() != null
                 && cfg.getPriorityFee().compareTo(BigDecimal.ZERO) > 0) {
             total = total.add(cfg.getPriorityFee());
         }
-        return total;
+        return total.setScale(0, java.math.RoundingMode.HALF_UP);
+    }
+
+    private RemoteAddressDto fetchCustomerAddress(Long addressId, Integer customerId) {
+        if (addressId == null) {
+            throw new BadRequestException("Vui lòng chọn địa chỉ giao hàng đã lưu");
+        }
+        if (authClient == null) {
+            throw new IllegalStateException("Auth-Service không được cấu hình để xác minh địa chỉ giao hàng");
+        }
+        try {
+            ResponseEntity<ApiResponse<RemoteAddressDto>> response =
+                    authClient.getMyAddress(addressId, customerId.longValue());
+            RemoteAddressDto address = response != null && response.getBody() != null
+                    ? response.getBody().getData()
+                    : null;
+            if (response == null || !response.getStatusCode().is2xxSuccessful() || address == null) {
+                throw new ResourceNotFoundException("Không tìm thấy địa chỉ giao hàng đã lưu");
+            }
+            if (!Objects.equals(address.getUserId(), Long.valueOf(customerId.longValue()))) {
+                throw new ForbiddenException("Địa chỉ giao hàng không thuộc tài khoản hiện tại");
+            }
+            if (address.getAddress() == null || address.getAddress().isBlank()) {
+                throw new BadRequestException("Địa chỉ giao hàng chưa có nội dung hợp lệ");
+            }
+            return address;
+        } catch (ResourceNotFoundException | ForbiddenException | BadRequestException ex) {
+            throw ex;
+        } catch (RuntimeException ex) {
+            log.error("Could not verify delivery address id={} for customerId={}", addressId, customerId, ex);
+            throw new IllegalStateException("Không thể xác minh địa chỉ giao hàng với Auth-Service", ex);
+        }
+    }
+
+    private Double calculateDistanceKm(RemoteRestaurantDto restaurant, RemoteAddressDto address) {
+        Double restaurantLat = restaurant.getLatitude();
+        Double restaurantLng = restaurant.getLongitude();
+        Double customerLat = address.getLatitude();
+        Double customerLng = address.getLongitude();
+        if (!isValidCoordinate(restaurantLat, -90, 90)
+                || !isValidCoordinate(customerLat, -90, 90)
+                || !isValidCoordinate(restaurantLng, -180, 180)
+                || !isValidCoordinate(customerLng, -180, 180)
+                || (restaurantLat == 0 && restaurantLng == 0)
+                || (customerLat == 0 && customerLng == 0)) {
+            throw new BadRequestException("Quán ăn hoặc địa chỉ giao hàng chưa có tọa độ hợp lệ để tính phí");
+        }
+
+        double deltaLat = Math.toRadians(customerLat - restaurantLat);
+        double deltaLng = Math.toRadians(customerLng - restaurantLng);
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+                + Math.cos(Math.toRadians(restaurantLat))
+                * Math.cos(Math.toRadians(customerLat))
+                * Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+        double boundedA = Math.min(1, Math.max(0, a));
+        return 2 * 6371 * Math.atan2(Math.sqrt(boundedA), Math.sqrt(1 - boundedA));
+    }
+
+    private boolean isValidCoordinate(Double coordinate, double min, double max) {
+        return coordinate != null && Double.isFinite(coordinate) && coordinate >= min && coordinate <= max;
     }
 
     private OrderStatus getOrCreateStatus(String code, String defaultLabel, String defaultDescription, int sortOrder) {

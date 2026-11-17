@@ -531,8 +531,11 @@ INSERT INTO `merchant_details` (`user_id`, `business_license`, `tax_code`) VALUE
 
 -- 7. System Settings
 INSERT INTO `system_settings` (`id`, `config_key`, `config_value`, `description`) VALUES
-(1, 'shipping_config', '{"base_km": 2, "base_fee": 15000, "extra_per_km": 5000}', 'Cấu hình tính phí giao hàng'),
-(2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT');
+(1, 'shipping_config', '{"base_km": 2, "base_fee": 15000, "extra_per_km": 5000, "priority_fee": 5000}', 'Cấu hình tính phí giao hàng'),
+(2, 'tax_config', '{"vat_rate": 0.10, "vat_included": true}', 'Cấu hình thuế VAT'),
+(3, 'order_fee_config', '{"service_fee": 3000}', 'Cấu hình phí dịch vụ mỗi đơn hàng'),
+(4, 'commission_config', '{"platform_fee_percent": 10}', 'Cấu hình tỷ lệ hoa hồng sàn'),
+(5, 'platform_commission_rate', '{"value": 10, "type": "NUMBER", "updatedAt": "2026-01-01T00:00:00", "history": [{"value": 10, "updatedAt": "2026-01-01T00:00:00"}]}', 'Tỷ lệ hoa hồng nền tảng (%)');
 
 -- 8. Vouchers
 INSERT INTO `vouchers` (`id`, `restaurant_id`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES

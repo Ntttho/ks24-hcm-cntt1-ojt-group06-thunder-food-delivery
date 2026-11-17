@@ -38,6 +38,7 @@ class OrderControllerTest {
     void testCreateOrderEndpoint_Success() throws Exception {
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(100L)
                 .receiverAddress("Keangnam Tower, Hà Nội")
                 .distanceKm(2.5)
                 .items(List.of(
@@ -205,6 +206,7 @@ class OrderControllerTest {
     void testCreateOrderEndpoint_MissingUserId_Returns401() throws Exception {
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(100L)
                 .receiverAddress("Keangnam Tower")
                 .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(1).build()))
                 .build();

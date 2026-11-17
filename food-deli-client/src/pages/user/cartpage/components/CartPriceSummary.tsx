@@ -4,6 +4,11 @@ interface CartPriceSummaryProps {
   totalItemCount: number;
   subtotal: number;
   shippingFee: number;
+  serviceFee: number;
+  vatAmount: number;
+  vatIncluded: boolean;
+  pricingReady: boolean;
+  pricingError?: string | null;
   discountAmount?: number;
 }
 
@@ -11,6 +16,11 @@ export const CartPriceSummary: React.FC<CartPriceSummaryProps> = ({
   totalItemCount,
   subtotal,
   shippingFee,
+  serviceFee,
+  vatAmount,
+  vatIncluded,
+  pricingReady,
+  pricingError,
   discountAmount = 0,
 }) => {
   return (
@@ -26,7 +36,21 @@ export const CartPriceSummary: React.FC<CartPriceSummaryProps> = ({
           </div>
           <div className="flex justify-between items-center">
             <span>Phí giao hàng dự kiến</span>
-            <span className="font-semibold text-gray-800">{shippingFee.toLocaleString('vi-VN')}đ</span>
+            <span className="font-semibold text-gray-800">
+              {pricingReady ? `${shippingFee.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>Phí dịch vụ</span>
+            <span className="font-semibold text-gray-800">
+              {pricingReady ? `${serviceFee.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span>{vatIncluded ? 'VAT đã gồm trong giá món' : 'VAT'}</span>
+            <span className="font-semibold text-gray-800">
+              {pricingReady ? `${vatAmount.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
+            </span>
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between items-center text-orange-600 font-semibold">
@@ -34,6 +58,7 @@ export const CartPriceSummary: React.FC<CartPriceSummaryProps> = ({
               <span>-{discountAmount.toLocaleString('vi-VN')}đ</span>
             </div>
           )}
+          {pricingError && <p className="m-0 text-xs text-red-500">{pricingError}</p>}
         </div>
       </div>
     </section>

@@ -18,6 +18,9 @@ public class CreateOrderRequest {
     @NotNull(message = "Mã quán ăn (restaurantId) không được để trống")
     private Integer restaurantId;
 
+    @NotNull(message = "Địa chỉ giao hàng đã lưu (addressId) không được để trống")
+    private Long addressId;
+
     private String customerName;
 
     private String customerPhone;

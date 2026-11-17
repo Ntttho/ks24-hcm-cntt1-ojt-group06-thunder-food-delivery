@@ -14,6 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,15 +31,6 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     public static final String KEY_TAX_CONFIG = "tax_config";
     public static final String KEY_COMMISSION_CONFIG = "commission_config";
 
-    private static final double DEFAULT_BASE_KM = 2.0;
-    private static final BigDecimal DEFAULT_BASE_FEE = new BigDecimal("15000");
-    private static final BigDecimal DEFAULT_EXTRA_PER_KM = new BigDecimal("5000");
-    private static final BigDecimal DEFAULT_PRIORITY_FEE = new BigDecimal("5000");
-    private static final BigDecimal DEFAULT_SERVICE_FEE = new BigDecimal("3000");
-    private static final BigDecimal DEFAULT_VAT_RATE = new BigDecimal("0.08");
-    private static final boolean DEFAULT_VAT_INCLUDED = true;
-    private static final BigDecimal DEFAULT_COMMISSION_PERCENT = new BigDecimal("15.0");
-
     private final SystemSettingRepository systemSettingRepository;
     private final ObjectMapper objectMapper;
 
@@ -45,7 +39,8 @@ public class SystemSettingServiceImpl implements SystemSettingService {
     public SystemSettingsResponse getSystemSettings() {
         OrderCostConfigDto costConfig = getOrderCostConfig();
         Map<String, Object> commissionMap = readConfigMap(KEY_COMMISSION_CONFIG);
-        BigDecimal commissionPercent = readDecimal(commissionMap, "platform_fee_percent", DEFAULT_COMMISSION_PERCENT);
+        BigDecimal commissionPercent = readRequiredDecimal(
+                commissionMap, "platform_fee_percent", KEY_COMMISSION_CONFIG);
 
         return SystemSettingsResponse.builder()
                 .baseKm(costConfig.getBaseKm())
@@ -53,7 +48,7 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                 .extraPerKm(costConfig.getExtraPerKm())
                 .priorityFee(costConfig.getPriorityFee())
                 .serviceFee(costConfig.getServiceFee())
-                .vatRate(costConfig.getVatRate())
+                .vatRate(costConfig.getVatRate().multiply(BigDecimal.valueOf(100)))
                 .vatIncluded(costConfig.getVatIncluded())
                 .platformCommissionPercent(commissionPercent)
                 .build();
@@ -74,13 +69,14 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         upsertConfig(KEY_ORDER_FEE_CONFIG, orderFeeMap, "Cấu hình phí dịch vụ và đóng gói trên mỗi đơn hàng");
 
         Map<String, Object> taxMap = new LinkedHashMap<>();
-        taxMap.put("vat_rate", request.getVatRate());
+        taxMap.put("vat_rate", request.getVatRate().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
         taxMap.put("vat_included", request.getVatIncluded());
         upsertConfig(KEY_TAX_CONFIG, taxMap, "Cấu hình thuế VAT trên đơn hàng");
 
         Map<String, Object> commissionMap = new LinkedHashMap<>();
         commissionMap.put("platform_fee_percent", request.getPlatformCommissionPercent());
         upsertConfig(KEY_COMMISSION_CONFIG, commissionMap, "Cấu hình tỷ lệ hoa hồng sàn (%)");
+        upsertCommissionRate(request.getPlatformCommissionPercent());
 
         log.info("Updated system settings: baseKm={}, baseFee={}, extraPerKm={}, priorityFee={}, serviceFee={}, vatRate={}, vatIncluded={}, commission={}%",
                 request.getBaseKm(), request.getBaseFee(), request.getExtraPerKm(), request.getPriorityFee(),
@@ -106,14 +102,46 @@ public class SystemSettingServiceImpl implements SystemSettingService {
         Map<String, Object> taxMap = readConfigMap(KEY_TAX_CONFIG);
 
         return OrderCostConfigDto.builder()
-                .baseKm(readDouble(shippingMap, "base_km", DEFAULT_BASE_KM))
-                .baseFee(readDecimal(shippingMap, "base_fee", DEFAULT_BASE_FEE))
-                .extraPerKm(readDecimal(shippingMap, "extra_per_km", DEFAULT_EXTRA_PER_KM))
-                .priorityFee(readDecimal(shippingMap, "priority_fee", DEFAULT_PRIORITY_FEE))
-                .serviceFee(readDecimal(orderFeeMap, "service_fee", DEFAULT_SERVICE_FEE))
-                .vatRate(readDecimal(taxMap, "vat_rate", DEFAULT_VAT_RATE))
-                .vatIncluded(readBoolean(taxMap, "vat_included", DEFAULT_VAT_INCLUDED))
+                .baseKm(readRequiredDouble(shippingMap, "base_km", KEY_SHIPPING_CONFIG))
+                .baseFee(readRequiredDecimal(shippingMap, "base_fee", KEY_SHIPPING_CONFIG))
+                .extraPerKm(readRequiredDecimal(shippingMap, "extra_per_km", KEY_SHIPPING_CONFIG))
+                .priorityFee(readRequiredDecimal(shippingMap, "priority_fee", KEY_SHIPPING_CONFIG))
+                .serviceFee(readRequiredDecimal(orderFeeMap, "service_fee", KEY_ORDER_FEE_CONFIG))
+                .vatRate(readRequiredDecimal(taxMap, "vat_rate", KEY_TAX_CONFIG))
+                .vatIncluded(readRequiredBoolean(taxMap, "vat_included", KEY_TAX_CONFIG))
+                .platformCommissionPercent(readRequiredDecimal(
+                        readConfigMap(KEY_COMMISSION_CONFIG), "platform_fee_percent", KEY_COMMISSION_CONFIG))
                 .build();
+    }
+
+    private void upsertCommissionRate(BigDecimal newRate) {
+        LocalDateTime now = LocalDateTime.now();
+        Map<String, Object> previous = readConfigMap("platform_commission_rate");
+        var history = new ArrayList<Map<String, Object>>();
+        Object previousHistory = previous.get("history");
+        if (previousHistory instanceof Iterable<?> entries) {
+            for (Object entry : entries) {
+                if (entry instanceof Map<?, ?> map) {
+                    Map<String, Object> copy = new LinkedHashMap<>();
+                    map.forEach((key, value) -> copy.put(String.valueOf(key), value));
+                    history.add(copy);
+                }
+            }
+        } else if (previous.get("value") != null && previous.get("updatedAt") != null) {
+            history.add(Map.of("value", previous.get("value"), "updatedAt", previous.get("updatedAt")));
+        }
+
+        BigDecimal previousRate = readDecimal(previous, "value", null);
+        if (history.isEmpty() || previousRate == null || previousRate.compareTo(newRate) != 0) {
+            history.add(Map.of("value", newRate, "updatedAt", now.toString()));
+        }
+
+        Map<String, Object> commissionSetting = new LinkedHashMap<>();
+        commissionSetting.put("value", newRate);
+        commissionSetting.put("type", "NUMBER");
+        commissionSetting.put("updatedAt", now.toString());
+        commissionSetting.put("history", history);
+        upsertConfig("platform_commission_rate", commissionSetting, "Tỷ lệ hoa hồng nền tảng (%)");
     }
 
     private void upsertConfig(String key, Map<String, Object> payload, String description) {
@@ -141,25 +169,33 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                     try {
                         return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
                     } catch (Exception ex) {
-                        log.warn("Invalid JSON in system_settings for key {}: {}", key, ex.getMessage());
-                        return Collections.<String, Object>emptyMap();
+                        throw new IllegalStateException("Giá trị cấu hình không phải JSON hợp lệ: " + key, ex);
                     }
                 })
                 .orElse(Collections.emptyMap());
     }
 
-    private double readDouble(Map<String, Object> map, String key, double defaultVal) {
-        Object val = map.get(key);
-        if (val instanceof Number num) {
-            return num.doubleValue();
+    private double readRequiredDouble(Map<String, Object> map, String field, String configKey) {
+        Object value = map.get(field);
+        if (value instanceof Number number) {
+            double result = number.doubleValue();
+            if (Double.isFinite(result)) return result;
         }
-        if (val != null) {
-            try {
-                return Double.parseDouble(val.toString());
-            } catch (NumberFormatException ignored) {
-            }
+        throw new IllegalStateException("Thiếu hoặc sai kiểu cấu hình " + configKey + "." + field);
+    }
+
+    private BigDecimal readRequiredDecimal(Map<String, Object> map, String field, String configKey) {
+        BigDecimal value = readDecimal(map, field, null);
+        if (value == null) {
+            throw new IllegalStateException("Thiếu hoặc sai kiểu cấu hình " + configKey + "." + field);
         }
-        return defaultVal;
+        return value;
+    }
+
+    private boolean readRequiredBoolean(Map<String, Object> map, String field, String configKey) {
+        Object value = map.get(field);
+        if (value instanceof Boolean result) return result;
+        throw new IllegalStateException("Thiếu hoặc sai kiểu cấu hình " + configKey + "." + field);
     }
 
     private BigDecimal readDecimal(Map<String, Object> map, String key, BigDecimal defaultVal) {
@@ -175,17 +211,6 @@ public class SystemSettingServiceImpl implements SystemSettingService {
                 return new BigDecimal(val.toString());
             } catch (NumberFormatException ignored) {
             }
-        }
-        return defaultVal;
-    }
-
-    private boolean readBoolean(Map<String, Object> map, String key, boolean defaultVal) {
-        Object val = map.get(key);
-        if (val instanceof Boolean bool) {
-            return bool;
-        }
-        if (val != null) {
-            return Boolean.parseBoolean(val.toString());
         }
         return defaultVal;
     }

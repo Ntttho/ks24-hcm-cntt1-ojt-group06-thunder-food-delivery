@@ -47,7 +47,7 @@ class SystemSettingControllerTest {
                 .extraPerKm(BigDecimal.valueOf(5000))
                 .priorityFee(BigDecimal.valueOf(5000))
                 .serviceFee(BigDecimal.valueOf(3000))
-                .vatRate(new BigDecimal("0.08"))
+                .vatRate(new BigDecimal("8"))
                 .vatIncluded(true)
                 .platformCommissionPercent(new BigDecimal("15.0"))
                 .build();
@@ -102,7 +102,7 @@ class SystemSettingControllerTest {
                 .extraPerKm(BigDecimal.valueOf(6000))
                 .priorityFee(BigDecimal.valueOf(5000))
                 .serviceFee(BigDecimal.valueOf(4000))
-                .vatRate(new BigDecimal("0.08"))
+                .vatRate(new BigDecimal("8"))
                 .vatIncluded(false)
                 .platformCommissionPercent(new BigDecimal("16.0"))
                 .build();
@@ -149,5 +149,16 @@ class SystemSettingControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.serviceFee").value(3000))
                 .andExpect(jsonPath("$.data.priorityFee").value(5000));
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/settings trả về cấu hình thực tế")
+    void getPublicSettings_returns200() throws Exception {
+        when(systemSettingService.getSystemSettings()).thenReturn(sampleSettings());
+
+        mockMvc.perform(get("/api/v1/settings"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.vatRate").value(8))
+                .andExpect(jsonPath("$.data.platformCommissionPercent").value(15));
     }
 }

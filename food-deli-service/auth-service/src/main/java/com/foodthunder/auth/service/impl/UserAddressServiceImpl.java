@@ -30,6 +30,14 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public AddressResponse getUserAddress(Long userId, Long addressId) {
+        return addressRepository.findByIdAndUserId(addressId, userId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found with id: " + addressId));
+    }
+
+    @Override
     @Transactional
     public AddressResponse createAddress(Long userId, AddressRequest request) {
         long addressCount = addressRepository.countByUserId(userId);

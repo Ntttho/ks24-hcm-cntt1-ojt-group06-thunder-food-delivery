@@ -22,6 +22,8 @@ export interface UpsellItemType {
 
 export interface DeliveryAddressItem {
   id: string;
+  latitude: number | null;
+  longitude: number | null;
   label: string; // "Nhà riêng" | "Văn phòng" | "Bạn bè" | "Nhà bố mẹ"
   title: string;
   fullAddress: string;

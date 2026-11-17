@@ -5,117 +5,45 @@ export interface AddressSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedAddressId?: string;
+  addresses: DeliveryAddressItem[];
+  distanceKm?: number | null;
   onSelectAddress: (address: DeliveryAddressItem) => void;
   restaurantName?: string;
 }
 
-const INITIAL_SAVED_ADDRESSES: DeliveryAddressItem[] = [
-  {
-    id: 'addr-1',
-    label: 'Nhà riêng',
-    title: 'Tòa Landmark 81',
-    fullAddress: '720A Điện Biên Phủ, Phường 22, Quận Bình Thạnh, TP. Hồ Chí Minh',
-    recipientName: 'Nguyễn Văn An',
-    phone: '0909 *** 888',
-    isDefault: true,
-  },
-  {
-    id: 'addr-2',
-    label: 'Văn phòng',
-    title: 'Bitexco Financial Tower',
-    fullAddress: 'Số 2 Hải Triều, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
-    recipientName: 'Văn An',
-    phone: '0909 *** 888',
-    isDefault: false,
-  },
-  {
-    id: 'addr-3',
-    label: 'Bạn bè',
-    title: 'Chung cư Sunrise City',
-    fullAddress: '27 Nguyễn Hữu Thọ, Phường Tân Hưng, Quận 7, TP. Hồ Chí Minh',
-    recipientName: 'Thanh Hằng',
-    phone: '0933 *** 777',
-    isDefault: false,
-  },
-  {
-    id: 'addr-4',
-    label: 'Nhà bố mẹ',
-    title: 'Nhà Bố Mẹ - Bình Thạnh',
-    fullAddress: '125/4 Hoàng Hoa Thám, Phường 6, Quận Bình Thạnh, TP. Hồ Chí Minh',
-    recipientName: 'Nguyễn Văn Bình (Bố)',
-    phone: '0912 *** 345',
-    isDefault: false,
-  },
-];
-
-const RECENT_ADDRESSES = [
-  {
-    title: 'Cà phê The Coffee House',
-    address: '141 Nguyễn Thái Bình, Quận 1, TP. HCM',
-  },
-  {
-    title: 'Văn phòng Grab Sài Gòn',
-    address: 'Tầng 15, Tòa nhà Mapletree, Quận 7, TP. HCM',
-  },
-];
-
 export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
   isOpen,
   onClose,
-  selectedAddressId: propSelectedId = 'addr-1',
+  selectedAddressId: propSelectedId = '',
+  addresses: availableAddresses,
+  distanceKm,
   onSelectAddress,
   restaurantName = 'Cơm Tấm Sà Bì Chưởng',
 }) => {
-  const [addresses, setAddresses] = useState<DeliveryAddressItem[]>(INITIAL_SAVED_ADDRESSES);
-  const [selectedId, setSelectedId] = useState<string>(propSelectedId);
+  const [selectedId, setSelectedId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
-
-  // New Address Form State
-  const [newTitle, setNewTitle] = useState('');
-  const [newFullAddress, setNewFullAddress] = useState('');
-  const [newName, setNewName] = useState('Nguyễn Văn An');
-  const [newPhone, setNewPhone] = useState('0909 123 888');
-  const [newLabel, setNewLabel] = useState('Nhà riêng');
-  const [newIsDefault, setNewIsDefault] = useState(false);
 
   if (!isOpen) return null;
 
-  const currentSelected = addresses.find((a) => a.id === selectedId) || addresses[0];
-
-  const filteredAddresses = addresses.filter(
+  const effectiveSelectedId = selectedId || propSelectedId || availableAddresses[0]?.id || '';
+  const currentSelected = availableAddresses.find((address) => address.id === effectiveSelectedId);
+  const filteredAddresses = availableAddresses.filter(
     (addr) =>
       addr.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       addr.fullAddress.toLowerCase().includes(searchQuery.toLowerCase()) ||
       addr.recipientName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleSaveNewAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newFullAddress.trim()) return;
-
-    const newAddr: DeliveryAddressItem = {
-      id: `addr-${Date.now()}`,
-      title: newTitle.trim(),
-      fullAddress: newFullAddress.trim(),
-      recipientName: newName.trim() || 'Người nhận',
-      phone: newPhone.trim() || '0909 *** 888',
-      label: newLabel,
-      isDefault: newIsDefault,
-    };
-
-    setAddresses((prev) => [newAddr, ...prev]);
-    setSelectedId(newAddr.id);
-    setIsAddingNew(false);
-    // Reset form
-    setNewTitle('');
-    setNewFullAddress('');
-  };
-
   const handleConfirm = () => {
     if (currentSelected) {
       onSelectAddress(currentSelected);
     }
+    setSelectedId('');
+    onClose();
+  };
+
+  const handleClose = () => {
+    setSelectedId('');
     onClose();
   };
 
@@ -126,7 +54,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
       aria-modal="true"
     >
       {/* Click outside to close */}
-      <div className="flex-1 w-full" onClick={onClose} />
+      <div className="flex-1 w-full" onClick={handleClose} />
 
       {/* Main Drawer Container */}
       <div className="w-full max-w-xl mx-auto bg-surface font-body-md text-on-surface rounded-t-[28px] max-h-[92vh] flex flex-col shadow-2xl relative transition-all duration-300 overflow-hidden">
@@ -136,7 +64,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
             <button
               aria-label="Back"
               className="w-10 h-10 flex items-center justify-center rounded-full text-on-surface hover:bg-surface-container transition-colors flex-shrink-0 cursor-pointer"
-              onClick={onClose}
+              onClick={handleClose}
             >
               <span className="material-symbols-outlined text-[24px]">arrow_back</span>
             </button>
@@ -151,7 +79,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">close</span>
@@ -166,14 +94,6 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
               <span className="material-symbols-outlined text-primary text-[20px]">location_on</span>
               <h3 className="font-headline-sm text-headline-sm text-on-surface">Địa chỉ giao hàng</h3>
             </div>
-            <button
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-surface-container text-primary font-label-md text-label-md active:scale-95 transition-all cursor-pointer hover:bg-primary-fixed/30"
-              type="button"
-              onClick={() => setIsAddingNew(true)}
-            >
-              <span className="material-symbols-outlined text-[16px]">add</span>
-              <span>Thêm mới</span>
-            </button>
           </div>
 
           {/* Search Input Bar */}
@@ -212,7 +132,10 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
               <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2.5 py-1 bg-surface-container-lowest/90 backdrop-blur-md rounded-full shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-primary-container animate-pulse" />
                 <span className="font-label-sm text-label-sm text-on-surface">
-                  Cách {restaurantName}: <strong className="text-primary font-bold">1.8 km</strong> (~18 phút)
+                  Cách {restaurantName}:{' '}
+                  <strong className="text-primary font-bold">
+                    {distanceKm != null ? `${distanceKm.toFixed(2)} km` : 'chưa xác định'}
+                  </strong>
                 </span>
               </div>
               <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-surface-container-lowest">
@@ -221,138 +144,13 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
                     near_me
                   </span>
                   <span className="font-label-sm text-label-sm truncate">
-                    Đang định vị chuẩn xác tới sảnh chính tòa nhà
+                    Khoảng cách được tính từ tọa độ địa chỉ đã lưu
                   </span>
                 </div>
                 <span className="material-symbols-outlined text-[18px] opacity-80">tune</span>
               </div>
             </div>
           </div>
-
-          {/* Add New Address Form Modal/Section */}
-          {isAddingNew && (
-            <div className="mx-gutter mb-space-lg p-space-md bg-surface-container-lowest rounded-2xl shadow-md border border-primary/30 animate-in fade-in">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-headline-sm text-headline-sm text-on-surface flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-primary text-[20px]">add_location_alt</span>
-                  Thêm địa chỉ giao hàng mới
-                </h4>
-                <button
-                  type="button"
-                  className="w-7 h-7 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant cursor-pointer"
-                  onClick={() => setIsAddingNew(false)}
-                >
-                  <span className="material-symbols-outlined text-[16px]">close</span>
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveNewAddress} className="flex flex-col gap-3">
-                <div>
-                  <label className="block text-label-sm font-label-sm text-on-surface-variant mb-1">
-                    Tên gợi nhớ (VD: Tòa nhà Landmark, Cơ quan...)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Căn hộ Saigon Pearl"
-                    className="w-full px-3 py-2 text-body-md rounded-xl bg-surface-container-low border border-surface-container-high focus:outline-none focus:border-primary"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-label-sm text-on-surface-variant mb-1">
-                    Địa chỉ chi tiết (Số nhà, tên đường, phường, quận)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: 92 Nguyễn Hữu Cảnh, P.22, Bình Thạnh"
-                    className="w-full px-3 py-2 text-body-md rounded-xl bg-surface-container-low border border-surface-container-high focus:outline-none focus:border-primary"
-                    value={newFullAddress}
-                    onChange={(e) => setNewFullAddress(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-label-sm font-label-sm text-on-surface-variant mb-1">
-                      Tên người nhận
-                    </label>
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 text-body-md rounded-xl bg-surface-container-low border border-surface-container-high focus:outline-none focus:border-primary"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-label-sm font-label-sm text-on-surface-variant mb-1">
-                      Số điện thoại
-                    </label>
-                    <input
-                      type="tel"
-                      className="w-full px-3 py-2 text-body-md rounded-xl bg-surface-container-low border border-surface-container-high focus:outline-none focus:border-primary"
-                      value={newPhone}
-                      onChange={(e) => setNewPhone(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-label-sm font-label-sm text-on-surface-variant mb-1.5">
-                    Nhãn địa chỉ
-                  </label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {['Nhà riêng', 'Văn phòng', 'Bạn bè', 'Nhà bố mẹ', 'Khác'].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        className={`px-3 py-1 rounded-full text-label-sm font-label-sm cursor-pointer transition-all ${
-                          newLabel === tag
-                            ? 'bg-primary text-on-primary font-bold'
-                            : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
-                        }`}
-                        onClick={() => setNewLabel(tag)}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="set-default-cb"
-                    checked={newIsDefault}
-                    onChange={(e) => setNewIsDefault(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer"
-                  />
-                  <label htmlFor="set-default-cb" className="text-body-sm text-on-surface cursor-pointer">
-                    Đặt làm địa chỉ nhận hàng mặc định
-                  </label>
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 rounded-xl bg-primary text-on-primary font-label-md font-bold shadow-sm hover:bg-primary-container cursor-pointer transition-all"
-                  >
-                    Lưu địa chỉ
-                  </button>
-                  <button
-                    type="button"
-                    className="px-4 py-2.5 rounded-xl bg-surface-container text-on-surface-variant font-label-md font-semibold cursor-pointer"
-                    onClick={() => setIsAddingNew(false)}
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
 
           {/* Saved Addresses List */}
           <div className="px-gutter mb-space-lg">
@@ -367,7 +165,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
 
             <div className="flex flex-col gap-space-sm" id="saved-addresses-list">
               {filteredAddresses.map((addr) => {
-                const isSelected = addr.id === selectedId;
+                const isSelected = addr.id === effectiveSelectedId;
                 return (
                   <div
                     key={addr.id}
@@ -418,17 +216,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1">
-                        <button
-                          className="w-7 h-7 flex items-center justify-center rounded-full text-outline hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert(`Chỉnh sửa địa chỉ "${addr.title}"`);
-                          }}
-                        >
-                          <span className="material-symbols-outlined text-[18px]">edit</span>
-                        </button>
+                      <div className="flex items-center">
                         <div
                           className={`w-6 h-6 rounded-full flex items-center justify-center ${
                             isSelected
@@ -459,69 +247,14 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
                 );
               })}
 
-              {/* Add New Dashed Button */}
-              {!isAddingNew && (
-                <button
-                  type="button"
-                  className="w-full p-space-md rounded-xl border border-dashed border-primary/40 bg-surface-container-low hover:bg-surface-container flex items-center justify-center gap-2 text-primary font-label-lg text-label-lg transition-all active:scale-[0.99] cursor-pointer"
-                  onClick={() => setIsAddingNew(true)}
-                >
-                  <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                  <span>+ Thêm địa chỉ mới</span>
-                </button>
-              )}
             </div>
           </div>
 
-          {/* Recent Addresses History */}
-          <div className="px-gutter mb-space-lg">
-            <div className="flex items-center justify-between mb-space-xs">
-              <span className="font-label-lg text-label-lg text-on-surface font-semibold">
-                Địa chỉ gần đây
-              </span>
-              <span className="font-label-sm text-label-sm text-outline">Lịch sử giao</span>
-            </div>
-            <div className="flex flex-col gap-space-sm">
-              {RECENT_ADDRESSES.map((rec, idx) => (
-                <div
-                  key={idx}
-                  className="p-space-md rounded-xl bg-surface-container-lowest shadow-sm flex items-center justify-between cursor-pointer hover:bg-surface-container-low transition-all"
-                  onClick={() => {
-                    const tempAddr: DeliveryAddressItem = {
-                      id: `recent-${idx}`,
-                      title: rec.title,
-                      fullAddress: rec.address,
-                      recipientName: 'Nguyễn Văn An',
-                      phone: '0909 *** 888',
-                      label: 'Khác',
-                    };
-                    setAddresses((prev) => [tempAddr, ...prev]);
-                    setSelectedId(tempAddr.id);
-                  }}
-                >
-                  <div className="flex items-center gap-space-sm min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary flex-shrink-0">
-                      <span className="material-symbols-outlined text-[18px]">history</span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-label-lg text-label-lg text-on-surface truncate">
-                        {rec.title}
-                      </div>
-                      <div className="font-body-sm text-body-sm text-outline truncate">
-                        {rec.address}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="text-primary font-label-sm text-label-sm font-semibold flex-shrink-0 ml-2 hover:underline cursor-pointer"
-                  >
-                    Chọn
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
+          {!availableAddresses.length && (
+            <p className="px-gutter py-8 text-center text-sm text-outline">
+              Bạn chưa có địa chỉ giao hàng đã lưu. Hãy thêm địa chỉ trong hồ sơ trước khi đặt hàng.
+            </p>
+          )}
         </div>
 
         {/* Persistent Floating Bottom Action Bar */}
@@ -533,11 +266,11 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
                   check_circle
                 </span>
                 <span className="font-label-sm text-label-sm truncate">
-                  Giao tới: <strong>{currentSelected.title}</strong>
+                  Giao tới: <strong>{currentSelected?.title || 'Chưa chọn địa chỉ'}</strong>
                 </span>
               </div>
               <span className="font-label-sm text-label-sm text-primary font-semibold flex-shrink-0">
-                Ước tính 18 - 25p
+                {distanceKm != null ? `${distanceKm.toFixed(2)} km` : 'Chưa có khoảng cách'}
               </span>
             </div>
 
@@ -545,6 +278,7 @@ export const AddressSelectorModal: React.FC<AddressSelectorModalProps> = ({
               className="w-full h-12 rounded-xl bg-primary-container text-on-primary font-headline-sm text-headline-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-md hover:bg-primary cursor-pointer"
               type="button"
               onClick={handleConfirm}
+              disabled={!currentSelected}
             >
               <span>Giao đến địa chỉ này</span>
               <span className="material-symbols-outlined text-[20px]">arrow_forward</span>

@@ -23,6 +23,7 @@ export interface CreateOrderPayload {
   restaurantId: number;
   customerName?: string;
   customerPhone?: string;
+  addressId: number;
   receiverAddress: string;
   receiverLat?: number;
   receiverLng?: number;

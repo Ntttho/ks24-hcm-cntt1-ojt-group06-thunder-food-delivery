@@ -7,6 +7,7 @@ import java.util.List;
 
 public interface UserAddressService {
     List<AddressResponse> getUserAddresses(Long userId);
+    AddressResponse getUserAddress(Long userId, Long addressId);
     AddressResponse createAddress(Long userId, AddressRequest request);
     AddressResponse updateAddress(Long userId, Long addressId, AddressRequest request);
     AddressResponse setDefaultAddress(Long userId, Long addressId);

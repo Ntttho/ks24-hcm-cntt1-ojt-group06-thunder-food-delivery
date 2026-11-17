@@ -11,6 +11,7 @@ interface CheckoutPriceSummaryProps {
   finalTotal: number;
   itemCount?: number;
   paymentMethodDiscount?: number;
+  feesReady?: boolean;
 }
 
 export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
@@ -24,6 +25,7 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   finalTotal,
   itemCount = 1,
   paymentMethodDiscount: _paymentMethodDiscount = 0,
+  feesReady = true,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-2.5">
@@ -32,7 +34,7 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
           Chi tiết thanh toán
         </span>
         <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md">
-          {vatIncluded ? 'Giá đã gồm thuế' : 'Giao nhanh'}
+          {vatIncluded ? 'Giá đã gồm thuế' : 'VAT tính riêng'}
         </span>
       </div>
 
@@ -46,7 +48,21 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
       <div className="flex items-center justify-between text-xs text-gray-600">
         <span>Phí giao hàng</span>
         <span className="text-gray-900 font-semibold">
-          {shippingFee.toLocaleString('vi-VN')}đ
+          {feesReady ? `${shippingFee.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>Phí dịch vụ</span>
+        <span className="text-gray-900 font-semibold">
+          {feesReady ? `${_serviceFee.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between text-xs text-gray-600">
+        <span>{vatIncluded ? 'VAT đã gồm trong giá món' : 'VAT trên tiền món'}</span>
+        <span className="text-gray-900 font-semibold">
+          {feesReady ? `${_vatAmount.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
         </span>
       </div>
 
@@ -62,11 +78,11 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
         <div className="flex items-baseline gap-1.5">
           {originalTotal > finalTotal && (
             <span className="text-xs text-gray-400 line-through">
-              {originalTotal.toLocaleString('vi-VN')}đ
+              {feesReady ? `${originalTotal.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
             </span>
           )}
           <span className="text-lg font-extrabold text-orange-600">
-            {finalTotal.toLocaleString('vi-VN')}đ
+            {feesReady ? `${finalTotal.toLocaleString('vi-VN')}đ` : 'Chưa xác định'}
           </span>
         </div>
       </div>

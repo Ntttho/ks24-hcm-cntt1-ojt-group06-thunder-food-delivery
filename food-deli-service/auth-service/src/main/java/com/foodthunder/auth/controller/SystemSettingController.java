@@ -18,6 +18,13 @@ public class SystemSettingController {
 
     private final SystemSettingService systemSettingService;
 
+    @GetMapping("/settings")
+    public ResponseEntity<ApiResponse<SystemSettingsResponse>> getPublicSettings() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Lấy cấu hình hệ thống thành công",
+                systemSettingService.getSystemSettings()));
+    }
+
     /**
      * GET /api/v1/admin/settings
      * Lấy cấu hình tham số toàn sàn & chi phí Order cho Admin Portal.

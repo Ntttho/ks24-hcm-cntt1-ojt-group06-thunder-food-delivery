@@ -21,6 +21,10 @@ import {
   fetchCartFromRedis,
 } from '@/store/slices/cartSlice';
 import { orderApi } from '@/services/modules/orderApi';
+import { addressApi } from '@/services/modules/addressApi';
+import { restaurantApi } from '@/services/modules/restaurantApi';
+import { adminSettingsApi, type OrderCostConfig } from '@/services/modules/adminSettingsApi';
+import { calculateHaversineDistanceKm, calculateShippingFee, calculateVatAmount } from '@/utils/orderPricing';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import {
   CartHeader,
@@ -105,7 +109,10 @@ export const CartPage: React.FC = () => {
   }, [items]);
 
   const selectedSubtotal = useMemo(() => {
-    return selectedItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return selectedItems.reduce((sum, item) => {
+      const toppings = (item.toppings || []).reduce((total, topping) => total + topping.price, 0);
+      return sum + (item.price + toppings) * item.quantity;
+    }, 0);
   }, [selectedItems]);
 
   const selectedItemCount = useMemo(() => {
@@ -115,11 +122,6 @@ export const CartPage: React.FC = () => {
   const totalItemCount = useMemo(() => {
     return items.reduce((sum, item) => sum + item.quantity, 0);
   }, [items]);
-
-  const shippingFee = selectedItems.length > 0 ? 18000 : 0;
-  const freeshipThreshold = 200000;
-  const remainingForFreeship = Math.max(0, freeshipThreshold - selectedSubtotal);
-  const freeshipProgress = Math.min(100, Math.round((selectedSubtotal / freeshipThreshold) * 100));
 
   // Handlers
   const handleUpdateQuantity = (id: string, delta: number) => {
@@ -194,9 +196,96 @@ export const CartPage: React.FC = () => {
   }, [selectedItems, reduxCart.shopName]);
 
   const activeShopId = useMemo(() => {
-    if (selectedItems.length > 0) return selectedItems[0].shopId || 1;
-    return reduxCart.shopId || 1;
+    if (selectedItems.length > 0) return selectedItems[0].shopId || reduxCart.shopId;
+    return reduxCart.shopId;
   }, [selectedItems, reduxCart.shopId]);
+
+  const [orderCostConfig, setOrderCostConfig] = useState<OrderCostConfig | null>(null);
+  const [distanceKm, setDistanceKm] = useState<number | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [pricingError, setPricingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedItems.length) {
+      setOrderCostConfig(null);
+      setDistanceKm(null);
+      setPricingError(null);
+      setPricingLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!isAuthenticated || !activeShopId) {
+      setOrderCostConfig(null);
+      setDistanceKm(null);
+      setPricingError('Đăng nhập và chọn địa chỉ đã lưu để tính phí giao hàng.');
+      setPricingLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setOrderCostConfig(null);
+    setDistanceKm(null);
+    setPricingLoading(true);
+    setPricingError(null);
+    Promise.all([
+      adminSettingsApi.getPublicOrderFeeConfig(),
+      addressApi.getMyAddresses(),
+      restaurantApi.getById(activeShopId),
+    ])
+      .then(([settingsResponse, addressResponse, restaurantResponse]) => {
+        if (!active) return;
+        const config = settingsResponse?.data;
+        const address = addressResponse?.data?.find((candidate) => candidate.isDefault) ?? addressResponse?.data?.[0];
+        const restaurant = restaurantResponse?.data;
+        if (!config || !address || !restaurant) {
+          throw new Error('Thiếu cấu hình phí, địa chỉ giao hàng hoặc thông tin nhà hàng.');
+        }
+        const distance = calculateHaversineDistanceKm(
+          restaurant.latitude,
+          restaurant.longitude,
+          address.latitude,
+          address.longitude
+        );
+        if (distance == null) {
+          throw new Error('Địa chỉ hoặc nhà hàng chưa có tọa độ hợp lệ để tính phí giao hàng.');
+        }
+        setOrderCostConfig(config);
+        setDistanceKm(distance);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const apiMessage =
+          error && typeof error === 'object' && 'response' in error
+            ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+            : undefined;
+        setPricingError(apiMessage || (error instanceof Error ? error.message : 'Không thể tính chi phí đơn hàng.'));
+      })
+      .finally(() => {
+        if (active) setPricingLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, activeShopId, selectedItems.length]);
+
+  const pricingReady = orderCostConfig != null && distanceKm != null && !pricingLoading;
+  const shippingFee =
+    pricingReady && selectedItems.length > 0
+      ? calculateShippingFee(distanceKm, orderCostConfig, 'standard')
+      : 0;
+  const serviceFee = pricingReady && selectedItems.length > 0 ? orderCostConfig.serviceFee : 0;
+  const vatAmount = pricingReady && selectedItems.length > 0
+    ? calculateVatAmount(selectedSubtotal, orderCostConfig)
+    : 0;
+  const cartTotal = pricingReady ? selectedSubtotal + shippingFee + serviceFee + vatAmount : null;
+  const freeshipThreshold = 200000;
+  const remainingForFreeship = Math.max(0, freeshipThreshold - selectedSubtotal);
+  const freeshipProgress = Math.min(100, Math.round((selectedSubtotal / freeshipThreshold) * 100));
 
   // Separate non-awaiting ongoing orders
   const ongoingOrders = useMemo(() => {
@@ -366,7 +455,7 @@ export const CartPage: React.FC = () => {
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col font-sans">
       {/* 1. Header with Hover Animation & Click Home */}
-      <CartHeader shopName={activeShopName} distance="1.8 km" />
+      <CartHeader shopName={activeShopName} distance={distanceKm == null ? 'Chưa xác định' : `${distanceKm.toFixed(2)} km`} />
 
       {/* Main Body */}
       <main className="flex-1 w-full pt-16 pb-36">
@@ -404,8 +493,8 @@ export const CartPage: React.FC = () => {
           <CartRestaurantCard
             shopName={activeShopName}
             deliveryTime="20-25 phút"
-            distance="1.8 km"
-            shopId={activeShopId}
+            distance={distanceKm == null ? 'Chưa xác định' : `${distanceKm.toFixed(2)} km`}
+            shopId={activeShopId ?? undefined}
           />
 
           {/* 3. Freeship Milestone Bar */}
@@ -437,13 +526,18 @@ export const CartPage: React.FC = () => {
             totalItemCount={selectedItemCount}
             subtotal={selectedSubtotal}
             shippingFee={shippingFee}
+            serviceFee={serviceFee}
+            vatAmount={vatAmount}
+            vatIncluded={orderCostConfig?.vatIncluded ?? false}
+            pricingReady={pricingReady}
+            pricingError={pricingError}
           />
         </div>
       </main>
 
       {/* 7. Sticky Bottom Bar (Calculated on selected items) */}
       <CartBottomBar
-        totalAmount={selectedSubtotal + (selectedItemCount > 0 ? shippingFee : 0)}
+        totalAmount={cartTotal}
         itemCount={selectedItemCount}
         onProceedToCheckout={handleProceedToCheckout}
         disabled={selectedItemCount === 0}

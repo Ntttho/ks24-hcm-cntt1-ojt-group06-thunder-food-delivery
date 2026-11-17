@@ -1,7 +1,10 @@
 package com.foodthunder.order.service;
 
 import com.foodthunder.order.client.RestaurantClient;
+import com.foodthunder.order.client.AuthClient;
 import com.foodthunder.order.dto.*;
+import com.foodthunder.order.dto.client.RemoteAddressDto;
+import com.foodthunder.order.dto.client.RemoteOrderCostConfigDto;
 import com.foodthunder.order.dto.client.RemoteProductDto;
 import com.foodthunder.order.dto.client.RemoteRestaurantDto;
 import com.foodthunder.order.dto.client.RemoteToppingDto;
@@ -50,6 +53,9 @@ class OrderServiceTest {
     private RestaurantClient restaurantClient;
 
     @Mock
+    private AuthClient authClient;
+
+    @Mock
     private SystemSettingsService systemSettingsService;
 
     @InjectMocks
@@ -73,6 +79,27 @@ class OrderServiceTest {
                         .shippingFeePerKilometer(BigDecimal.valueOf(5000))
                         .build()
         );
+        lenient().when(authClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(
+                RemoteOrderCostConfigDto.builder()
+                        .baseKm(2.0)
+                        .baseFee(BigDecimal.valueOf(15000))
+                        .extraPerKm(BigDecimal.valueOf(5000))
+                        .priorityFee(BigDecimal.valueOf(5000))
+                        .serviceFee(BigDecimal.ZERO)
+                        .vatRate(0.10)
+                        .vatIncluded(true)
+                        .platformCommissionPercent(10.0)
+                        .build()
+        )));
+        lenient().when(authClient.getMyAddress(anyLong(), anyLong())).thenReturn(ResponseEntity.ok(ApiResponse.success(
+                RemoteAddressDto.builder()
+                        .id(1L)
+                        .userId(1L)
+                        .address("123 Phố Huế, Hà Nội")
+                        .latitude(10.77)
+                        .longitude(106.69)
+                        .build()
+        )));
         awaitingPaymentStatus = OrderStatus.builder().id(0).code(OrderStatus.AWAITING_PAYMENT).label("Chờ thanh toán VNPay").build();
         pendingStatus = OrderStatus.builder().id(1).code(OrderStatus.PENDING).label("Chờ xác nhận").build();
         confirmedStatus = OrderStatus.builder().id(4).code(OrderStatus.CONFIRMED).label("Đã xác nhận").build();
@@ -85,6 +112,8 @@ class OrderServiceTest {
         validRestaurantDto = RemoteRestaurantDto.builder()
                 .id(10)
                 .name("Quán Ăn Ngon")
+                .latitude(10.77)
+                .longitude(106.69)
                 .isOpen(true)
                 .approvalStatus("APPROVED")
                 .build();
@@ -96,6 +125,7 @@ class OrderServiceTest {
         // Given
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .distanceKm(3.2)
                 .idempotencyKey("KEY-123456")
@@ -148,10 +178,8 @@ class OrderServiceTest {
         assertThat(response.getRestaurantId()).isEqualTo(10);
         // Subtotal: (45000 * 2) + (10000 * 1 * 2) = 110,000
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(110000));
-        // Distance 3.2km: base 15,000 + (3.2 * 5,000) = 31,000
-        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(31000));
-        // Total: 110,000 + 31,000 = 141,000
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(141000));
+        assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(15000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(125000));
         assertThat(response.getItems()).hasSize(1);
         assertThat(response.getItems().get(0).getFoodName()).isEqualTo("Trà Sữa Ô Long");
         assertThat(response.getItems().get(0).getToppings()).hasSize(1);
@@ -163,6 +191,7 @@ class OrderServiceTest {
         // Given
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .distanceKm(2.0)
                 .idempotencyKey("KEY-VNPAY-01")
@@ -198,7 +227,7 @@ class OrderServiceTest {
         assertThat(response.getId()).isEqualTo(6001L);
         assertThat(response.getStatusCode()).isEqualTo(OrderStatus.AWAITING_PAYMENT);
         assertThat(response.getPaymentMethod()).isEqualTo("VNPAY");
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(70000)); // 45k + 25k ship
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(60000)); // 45k + base fee
     }
 
     @Test
@@ -207,6 +236,7 @@ class OrderServiceTest {
         // Given
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế")
                 .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(1).build()))
                 .build();
@@ -235,6 +265,7 @@ class OrderServiceTest {
         // Given
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .items(List.of(
                         CreateOrderItemRequest.builder().foodId(101).quantity(1).build()
@@ -280,6 +311,7 @@ class OrderServiceTest {
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .idempotencyKey("KEY-REPEAT")
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("Address")
                 .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(1).build()))
                 .build();
@@ -437,6 +469,7 @@ class OrderServiceTest {
     void testCreateOrder_WithValidVoucher_AppliesDiscount() {
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .distanceKm(2.0)
                 .paymentMethod("COD")
@@ -484,7 +517,7 @@ class OrderServiceTest {
         assertThat(response).isNotNull();
         assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
         assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(20000));
-        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(105000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(95000));
         assertThat(response.getVoucherId()).isEqualTo(99);
     }
 
@@ -493,6 +526,7 @@ class OrderServiceTest {
     void testCreateOrder_WithInvalidVoucher_ThrowsBadRequest() {
         CreateOrderRequest request = CreateOrderRequest.builder()
                 .restaurantId(10)
+                .addressId(1L)
                 .receiverAddress("123 Phố Huế, Hà Nội")
                 .distanceKm(2.0)
                 .paymentMethod("COD")
@@ -617,10 +651,6 @@ class OrderServiceTest {
     @Test
     @DisplayName("Áp dụng đúng cấu hình chi phí đơn hàng động (priority + serviceFee + VAT chưa gồm) từ auth-service")
     void testCreateOrder_AppliesDynamicOrderCostConfig() {
-        com.foodthunder.order.client.AuthClient mockAuthClient = mock(com.foodthunder.order.client.AuthClient.class);
-        org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", mockAuthClient);
-
-        try {
             com.foodthunder.order.dto.client.RemoteOrderCostConfigDto cfg = com.foodthunder.order.dto.client.RemoteOrderCostConfigDto.builder()
                     .baseKm(2.0)
                     .baseFee(BigDecimal.valueOf(20000))
@@ -629,9 +659,19 @@ class OrderServiceTest {
                     .serviceFee(BigDecimal.valueOf(4000))
                     .vatRate(0.10)
                     .vatIncluded(false)
+                    .platformCommissionPercent(10.0)
                     .build();
 
-            when(mockAuthClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(cfg)));
+            when(authClient.getOrderFeeConfig()).thenReturn(ResponseEntity.ok(ApiResponse.success(cfg)));
+            when(authClient.getMyAddress(anyLong(), anyLong())).thenReturn(ResponseEntity.ok(ApiResponse.success(
+                    RemoteAddressDto.builder()
+                            .id(1L)
+                            .userId(1L)
+                            .address("123 Cầu Giấy")
+                            .latitude(10.77)
+                            .longitude(106.73)
+                            .build()
+            )));
 
             RemoteProductDto productDto = RemoteProductDto.builder()
                     .id(101)
@@ -643,6 +683,7 @@ class OrderServiceTest {
 
             CreateOrderRequest request = CreateOrderRequest.builder()
                     .restaurantId(10)
+                    .addressId(1L)
                     .receiverAddress("123 Cầu Giấy")
                     .distanceKm(3.0)
                     .deliverySpeed("priority")
@@ -663,16 +704,17 @@ class OrderServiceTest {
 
             OrderResponse response = orderService.createOrder(request, 1);
 
-            // Subtotal: 100,000
-            // Shipping: 20,000 + ceil(3.0 - 2.0) * 6,000 + 7,000 (priority) = 33,000
+            // Subtotal: 100,000. Distance and shipping are calculated from the saved address coordinates.
             // TaxAmount: 4,000 (serviceFee) + 10% * 100,000 (VAT) = 14,000
-            // Total: 100,000 + 33,000 + 14,000 = 147,000
             assertThat(response.getSubtotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(100000));
-            assertThat(response.getShippingFee()).isEqualByComparingTo(BigDecimal.valueOf(33000));
+            double savedAddressDistance = response.getDistanceKm();
+            BigDecimal expectedShipping = BigDecimal.valueOf(20000)
+                    .add(BigDecimal.valueOf(Math.max(0, savedAddressDistance - 2.0) * 6000))
+                    .add(BigDecimal.valueOf(7000))
+                    .setScale(0, java.math.RoundingMode.HALF_UP);
+            assertThat(savedAddressDistance).isNotEqualTo(3.0);
+            assertThat(response.getShippingFee()).isEqualByComparingTo(expectedShipping);
             assertThat(response.getTaxAmount()).isEqualByComparingTo(BigDecimal.valueOf(14000));
-            assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(147000));
-        } finally {
-            org.springframework.test.util.ReflectionTestUtils.setField(orderService, "authClient", null);
-        }
+            assertThat(response.getTotalAmount()).isEqualByComparingTo(expectedShipping.add(BigDecimal.valueOf(114000)));
     }
 }

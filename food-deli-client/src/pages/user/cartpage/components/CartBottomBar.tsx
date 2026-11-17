@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { APP_ROUTES } from '@/constants';
 
 interface CartBottomBarProps {
-  totalAmount: number;
+  totalAmount: number | null;
   itemCount: number;
   onProceedToCheckout?: () => void;
   disabled?: boolean;
@@ -35,7 +35,7 @@ export const CartBottomBar: React.FC<CartBottomBarProps> = ({
             <span className="text-[11px] text-gray-400 font-medium">Tổng thanh toán</span>
             <div className="flex items-baseline gap-1">
               <span className="text-xl font-extrabold text-orange-600">
-                {totalAmount.toLocaleString('vi-VN')}đ
+                {totalAmount == null ? 'Tính tại thanh toán' : `${totalAmount.toLocaleString('vi-VN')}đ`}
               </span>
               <span className="text-xs text-gray-400 font-medium">
                 ({itemCount} món)

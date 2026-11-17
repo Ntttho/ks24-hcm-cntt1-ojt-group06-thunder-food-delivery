@@ -42,7 +42,7 @@ public class UpdateSystemSettingsRequest {
 
     @NotNull(message = "Thuế VAT không được để trống")
     @DecimalMin(value = "0", message = "Thuế VAT không được âm")
-    @DecimalMax(value = "1", message = "Thuế VAT phải nằm trong khoảng 0 đến 1 (vd: 0.08 = 8%)")
+    @DecimalMax(value = "100", message = "Thuế VAT phải nằm trong khoảng 0 đến 100%")
     private BigDecimal vatRate;
 
     @NotNull(message = "Tùy chọn giá món đã bao gồm VAT không được để trống")
@@ -50,7 +50,7 @@ public class UpdateSystemSettingsRequest {
 
     @NotNull(message = "Tỷ lệ hoa hồng sàn không được để trống")
     @DecimalMin(value = "0", message = "Tỷ lệ hoa hồng sàn không được âm")
-    @DecimalMax(value = "50", message = "Tỷ lệ hoa hồng sàn tối đa 50%")
+    @DecimalMax(value = "100", message = "Tỷ lệ hoa hồng sàn tối đa 100%")
     private BigDecimal platformCommissionPercent;
 }
 
