@@ -250,33 +250,38 @@ export const HomePage: React.FC = () => {
   // =========================================================================
   // 3. Xử Lý Thêm Nhanh Vào Giỏ Hàng & Single-Shop Constraint Modal
   // =========================================================================
-  const handleQuickAdd = (item: FeaturedFoodItem, e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Multi-Shop Cart: Thêm trực tiếp vào giỏ hàng, giữ nguyên các món của quán khác
-    applyAddToCart(item, false);
-  };
+  const applyAddToCart = useCallback(
+    (item: FeaturedFoodItem, replaceCart: boolean) => {
+      const cartItemId = `${item.productId}-base`;
 
-  const applyAddToCart = (item: FeaturedFoodItem, replaceCart: boolean) => {
-    const cartItemId = `${item.productId}-base`;
+      dispatch(
+        addToCartAsync({
+          item: {
+            id: cartItemId,
+            productId: item.productId,
+            productName: item.productName,
+            price: item.price,
+            quantity: 1,
+            imageUrl: item.imageUrl,
+            shopId: item.shopId,
+            shopName: item.shopName,
+          },
+          replaceCart,
+        })
+      );
 
-    dispatch(
-      addToCartAsync({
-        item: {
-          id: cartItemId,
-          productId: item.productId,
-          productName: item.productName,
-          price: item.price,
-          quantity: 1,
-          imageUrl: item.imageUrl,
-          shopId: item.shopId,
-          shopName: item.shopName,
-        },
-        replaceCart,
-      })
-    );
+      message.success(`Đã thêm "${item.productName}" vào giỏ hàng!`);
+    },
+    [dispatch]
+  );
 
-    message.success(`Đã thêm "${item.productName}" vào giỏ hàng!`);
-  };
+  const handleQuickAdd = useCallback(
+    (item: FeaturedFoodItem, e: React.MouseEvent) => {
+      e.stopPropagation();
+      applyAddToCart(item, false);
+    },
+    [applyAddToCart]
+  );
 
   return (
     <div className="space-y-10 pb-12">

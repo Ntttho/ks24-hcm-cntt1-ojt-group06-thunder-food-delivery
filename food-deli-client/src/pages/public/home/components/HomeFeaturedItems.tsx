@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Button, Row, Col, Pagination, Spin, Empty, Input } from 'antd';
 import {
@@ -47,6 +47,109 @@ interface HomeFeaturedItemsProps {
   onQuickAdd: (item: FeaturedFoodItem, e: React.MouseEvent) => void;
 }
 
+const FeaturedFoodCard = memo(function FeaturedFoodCard({
+  item,
+  onQuickAdd,
+  navigate,
+}: {
+  item: FeaturedFoodItem;
+  onQuickAdd: (item: FeaturedFoodItem, e: React.MouseEvent) => void;
+  navigate: (path: string) => void;
+}) {
+  const optimizedImageUrl = useMemo(
+    () => getOptimizedCloudinaryUrl(item.imageUrl, 400, 300),
+    [item.imageUrl]
+  );
+
+  const handleNavigate = useCallback(() => {
+    navigate(`/restaurants/${item.shopId}`);
+  }, [item.shopId, navigate]);
+
+  const handleShopClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      handleNavigate();
+    },
+    [handleNavigate]
+  );
+
+  const handleQuickAddClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onQuickAdd(item, e);
+    },
+    [item, onQuickAdd]
+  );
+
+  const formattedPrice = useMemo(() => formatCurrency(item.price), [item.price]);
+
+  return (
+    <Col xs={24} sm={12} lg={6}>
+      <Card
+        hoverable
+        onClick={handleNavigate}
+        cover={
+          <div className="relative h-48 w-full overflow-hidden cursor-pointer group bg-gray-100">
+            <img
+              alt={item.productName}
+              src={optimizedImageUrl}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src =
+                  'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80';
+              }}
+            />
+            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
+              <StarFilled className="text-amber-500" /> {item.rating}
+            </div>
+            {item.categoryName && (
+              <div className="absolute bottom-3 left-3 bg-black/65 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[11px] font-medium text-white shadow-xs">
+                {item.categoryName}
+              </div>
+            )}
+          </div>
+        }
+        className="rounded-2xl overflow-hidden border border-gray-100 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between h-full cursor-pointer"
+        bodyStyle={{ padding: 16 }}
+      >
+        <div>
+          <div
+            className="text-xs font-medium text-orange-600 mb-1 flex items-center gap-1 hover:underline cursor-pointer"
+            onClick={handleShopClick}
+          >
+            <ShopOutlined /> {item.shopName}
+          </div>
+          <h3 className="font-bold text-gray-900 text-base line-clamp-1 group-hover:text-orange-600 transition-colors">
+            {item.productName}
+          </h3>
+          {item.description && (
+            <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 leading-relaxed">
+              {item.description}
+            </p>
+          )}
+          <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
+            <ClockCircleOutlined /> {item.prepTime || '15-20 phút'}
+          </div>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+          <div className="font-extrabold text-orange-600 text-lg">{formattedPrice}</div>
+          <Button
+            type="primary"
+            shape="circle"
+            icon={<PlusOutlined />}
+            className="bg-orange-500 hover:bg-orange-600 shadow-xs active:scale-95 transition-transform"
+            onClick={handleQuickAddClick}
+            title="Thêm vào giỏ hàng"
+          />
+        </div>
+      </Card>
+    </Col>
+  );
+});
+
 export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
   items,
   loading = false,
@@ -63,9 +166,15 @@ export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
 }) => {
   const navigate = useNavigate();
 
+  const handlePageChange = useCallback(
+    (newPage: number, newPageSize: number) => {
+      onPageChange?.(newPage - 1, newPageSize);
+    },
+    [onPageChange]
+  );
+
   return (
     <section className="space-y-5 bg-white/60 backdrop-blur-xs p-6 rounded-3xl border border-gray-100 shadow-xs">
-      {/* 1. Header with Title & Inline Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
@@ -90,7 +199,6 @@ export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
         )}
       </div>
 
-      {/* 2. Category Filter Chips (Lọc gọi API) */}
       <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar pt-1">
         {categories.map((cat) => {
           const isSelected = selectedCategoryId === cat.id;
@@ -112,7 +220,6 @@ export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
         })}
       </div>
 
-      {/* 3. Items Grid or Loading/Empty State */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Spin size="large" />
@@ -133,84 +240,18 @@ export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
       ) : (
         <Row gutter={[20, 20]}>
           {items.map((item) => (
-            <Col key={item.id} xs={24} sm={12} lg={6}>
-              <Card
-                hoverable
-                onClick={() => navigate(`/restaurants/${item.shopId}`)}
-                cover={
-                  <div className="relative h-48 w-full overflow-hidden cursor-pointer group bg-gray-100">
-                    <img
-                      alt={item.productName}
-                      src={getOptimizedCloudinaryUrl(item.imageUrl, 400, 300)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&auto=format&fit=crop&q=80';
-                      }}
-                    />
-                    <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-xs px-2 py-1 rounded-md text-xs font-bold text-gray-700 flex items-center gap-1 shadow-xs">
-                      <StarFilled className="text-amber-500" /> {item.rating}
-                    </div>
-                    {item.categoryName && (
-                      <div className="absolute bottom-3 left-3 bg-black/65 backdrop-blur-xs px-2.5 py-0.5 rounded-full text-[11px] font-medium text-white shadow-xs">
-                        {item.categoryName}
-                      </div>
-                    )}
-                  </div>
-                }
-                className="rounded-2xl overflow-hidden border border-gray-100 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between h-full cursor-pointer"
-                bodyStyle={{ padding: 16 }}
-              >
-                <div>
-                  <div
-                    className="text-xs font-medium text-orange-600 mb-1 flex items-center gap-1 hover:underline cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/restaurants/${item.shopId}`);
-                    }}
-                  >
-                    <ShopOutlined /> {item.shopName}
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-base line-clamp-1 group-hover:text-orange-600 transition-colors">
-                    {item.productName}
-                  </h3>
-                  {item.description && (
-                    <p className="text-xs text-gray-400 mt-0.5 line-clamp-1 leading-relaxed">
-                      {item.description}
-                    </p>
-                  )}
-                  <div className="text-xs text-gray-400 mt-1 flex items-center gap-2">
-                    <ClockCircleOutlined /> {item.prepTime || '15-20 phút'}
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                  <div className="font-extrabold text-orange-600 text-lg">
-                    {formatCurrency(item.price)}
-                  </div>
-                  <Button
-                    type="primary"
-                    shape="circle"
-                    icon={<PlusOutlined />}
-                    className="bg-orange-500 hover:bg-orange-600 shadow-xs active:scale-95 transition-transform"
-                    onClick={(e) => onQuickAdd(item, e)}
-                    title="Thêm vào giỏ hàng"
-                  />
-                </div>
-              </Card>
-            </Col>
+            <FeaturedFoodCard key={item.id} item={item} onQuickAdd={onQuickAdd} navigate={navigate} />
           ))}
         </Row>
       )}
 
-      {/* 4. Server-Side Pagination Controls */}
       {totalElements > 0 && onPageChange && (
         <div className="flex justify-center pt-4">
           <Pagination
             current={page + 1}
             pageSize={pageSize}
             total={totalElements}
-            onChange={(newPage, newPageSize) => onPageChange(newPage - 1, newPageSize)}
+            onChange={handlePageChange}
             showSizeChanger={false}
             showTotal={(total) => `Tổng cộng ${total} món ăn`}
           />
@@ -220,4 +261,4 @@ export const HomeFeaturedItems: React.FC<HomeFeaturedItemsProps> = ({
   );
 };
 
-export default HomeFeaturedItems;
+export default memo(HomeFeaturedItems);
