@@ -1,12 +1,29 @@
+CREATE TABLE IF NOT EXISTS banner_campaigns (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  name VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  start_date DATETIME NOT NULL,
+  end_date DATETIME NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS banners (
-  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  id BIGINT NOT NULL AUTO_INCREMENT,
   title VARCHAR(255) NOT NULL,
+  description TEXT NULL,
   image_url TEXT NOT NULL,
   target_url TEXT NULL,
+  campaign_id BIGINT NULL,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  display_order INT NOT NULL DEFAULT 0,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_banners_active_order
-  ON banners (is_active, display_order);
+  display_order INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_banners_active_order (is_active, display_order),
+  KEY idx_banners_campaign_id (campaign_id),
+  CONSTRAINT fk_banners_campaign FOREIGN KEY (campaign_id)
+    REFERENCES banner_campaigns (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

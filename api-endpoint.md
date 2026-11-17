@@ -890,8 +890,9 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
 * `PUT /api/v1/admin/vouchers/{id}` & `DELETE /api/v1/admin/vouchers/{id}`.
 
 ### 15.2. Quản lý Tham số Hệ thống (System Settings)
-* `GET /api/v1/admin/system-settings` — Admin lấy phí ship mặc định, phí ship/km và tỷ lệ hoa hồng.
-* `PUT /api/v1/admin/system-settings` — Admin cập nhật đồng thời các cấu hình:
+* Các endpoint Admin được API Gateway định tuyến tới `manager-service` và yêu cầu JWT có role Admin.
+* `GET /api/v1/admin/system-settings` — Lấy phí ship mặc định, phí ship/km và tỷ lệ hoa hồng cho màn System Settings.
+* `PUT /api/v1/admin/system-settings` — Cập nhật các trường System Settings hiện có:
 ```json
 {
   "defaultShippingFee": 10000,
@@ -899,5 +900,17 @@ Mọi phản hồi từ Backend đều tuân thủ cấu trúc Generic Record:
   "platformCommissionRate": 15
 }
 ```
-* `GET /api/v1/system-settings/shipping` — Ứng dụng checkout đọc cấu hình phí giao hàng hiện tại.
-* Các giá trị, kiểu `NUMBER`, thời điểm cập nhật và lịch sử tỷ lệ hoa hồng được lưu trong JSON `config_value` của bảng `system_settings`; không cần thay đổi schema.
+* `GET /api/v1/admin/settings` — Lấy danh sách cấu hình key/value.
+* `GET /api/v1/admin/settings/{id}` và `GET /api/v1/admin/settings/key/{key}` — Lấy cấu hình theo ID hoặc key.
+* `POST /api/v1/admin/settings` — Thêm cấu hình; `PUT /api/v1/admin/settings/{id}` — cập nhật cấu hình.
+* `GET /api/v1/system-settings/shipping` — Ứng dụng checkout đọc cấu hình phí giao hàng hiện tại từ Order-Service.
+* `system_settings` có key duy nhất và lưu JSON value, mô tả cùng thời điểm tạo/cập nhật. Manager seed phí mặc định, phí/km, hoa hồng và `minimum_order_value` nếu chưa có; giá trị cũ trong `shipping_config`/`commission_config` được dùng khi khởi tạo các key mới.
+
+### 15.3. Quản lý Banner và chiến dịch
+* Các thao tác quản trị được API Gateway định tuyến tới service độc lập `manager-banner` và yêu cầu JWT có role Admin.
+* `GET /api/v1/admin/banners?search=&status=ALL&page=0&size=10&campaignId=` — Tìm kiếm, lọc trạng thái/chiến dịch và phân trang.
+* `GET /api/v1/admin/banners/{id}`, `POST /api/v1/admin/banners`, `PUT /api/v1/admin/banners/{id}`, `DELETE /api/v1/admin/banners/{id}`.
+* `PATCH /api/v1/admin/banners/{id}/status` với `{ "isActive": true }` — Bật/tắt banner.
+* `GET /api/v1/admin/campaigns`, `GET /api/v1/admin/campaigns/{id}`, `POST /api/v1/admin/campaigns`, `PUT /api/v1/admin/campaigns/{id}`, `DELETE /api/v1/admin/campaigns/{id}`.
+* `GET /api/v1/banners/active` — Public API trả về banner bật và thuộc chiến dịch đang hoạt động trong khung thời gian.
+* Ảnh dùng URL HTTP(S) đã tải lên qua Cloudinary hiện có ở frontend; campaign kết thúc trước thời điểm bắt đầu bị từ chối. Database dùng `banners` và `banner_campaigns`, khóa ngoại campaign xóa mềm liên kết (SET NULL).

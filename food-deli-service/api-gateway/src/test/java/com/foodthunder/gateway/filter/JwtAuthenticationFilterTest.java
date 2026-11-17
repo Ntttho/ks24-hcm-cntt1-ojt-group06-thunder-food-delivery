@@ -156,6 +156,36 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("Yêu cầu JWT cho thao tác quản trị banner và cho phép public banner list")
+    void filter_bannerEndpointsEnforceExpectedAccess() {
+        MockServerWebExchange adminExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/admin/banners")
+                        .header("X-User-Role", "ADMIN")
+                        .build()
+        );
+        AtomicReference<Boolean> adminChainInvoked = new AtomicReference<>(false);
+        filter.filter(adminExchange, ex -> {
+            adminChainInvoked.set(true);
+            return Mono.empty();
+        }).block();
+        assertThat(adminChainInvoked.get()).isFalse();
+        assertThat(adminExchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        MockServerWebExchange publicExchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/v1/banners/active")
+                        .header("X-User-Role", "ADMIN")
+                        .build()
+        );
+        AtomicReference<ServerWebExchange> forwarded = new AtomicReference<>();
+        filter.filter(publicExchange, ex -> {
+            forwarded.set(ex);
+            return Mono.empty();
+        }).block();
+        assertThat(forwarded.get()).isNotNull();
+        assertThat(forwarded.get().getRequest().getHeaders().getFirst("X-User-Role")).isNull();
+    }
+
+    @Test
     @DisplayName("Vẫn cho phép POST /api/v1/auth/login/admin đi qua không cần JWT")
     void filter_adminLoginEndpoint_remainsPublic() {
         MockServerWebExchange exchange = MockServerWebExchange.from(

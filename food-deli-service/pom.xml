@@ -24,6 +24,8 @@
         <module>config-server</module>
         <module>api-gateway</module>
         <module>auth-service</module>
+        <module>manager-service</module>
+        <module>manager-banner</module>
         <module>restaurant-service</module>
         <module>order-service</module>
         <module>delivery-service</module>

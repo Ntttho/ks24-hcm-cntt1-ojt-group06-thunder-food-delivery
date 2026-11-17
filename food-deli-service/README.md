@@ -10,6 +10,8 @@ Welcome to the **Food Thunder Deli** Spring Boot 3 Microservices Platform.
 | **Discovery Service** | `discovery-service` | `8761` | Netflix Eureka Service Registry & Instance Discovery Dashboard |
 | **Config Server** | `config-server` | `8888` | Centralized Spring Cloud Configuration Server (`classpath:/config`) |
 | **Auth & User Service** | `auth-service` | `8081` | Authentication (JWT 24h, BCrypt), User Profiles, and Delivery Address Book |
+| **System Manager** | `manager-service` | `8088` | Persistent system settings and admin configuration APIs |
+| **Banner Manager** | `manager-banner` | `8089` | Banner/campaign CRUD and active campaign delivery |
 | **Restaurant & Catalog Service** | `restaurant-service` | `8082` | Multi-shop management, menu categories, products, toppings & vouchers |
 
 ---
@@ -21,7 +23,7 @@ When running locally in your IDE or via command line, always start services in t
 1. **`discovery-service`** (`http://localhost:8761`): Start first so all subsequent services can register themselves.
 2. **`config-server`** (`http://localhost:8888`): Start second to serve centralized configuration properties.
 3. **`api-gateway`** (`http://localhost:8080`): Start third to listen for incoming HTTP requests and route via load balancing.
-4. **Business Services** (`auth-service`, `restaurant-service`, `order-service`, `delivery-service`, `review-service`, `chat-notification-service`).
+4. **Business Services** (`auth-service`, `manager-service`, `manager-banner`, `restaurant-service`, `order-service`, `delivery-service`, `review-service`, `chat-notification-service`).
 
 ---
 
@@ -30,6 +32,8 @@ When running locally in your IDE or via command line, always start services in t
 API Gateway is configured with `spring-cloud-starter-loadbalancer`. Routes automatically discover service instances registered in Eureka and load-balance client requests across available instances:
 
 - `/api/v1/auth/**`, `/api/v1/users/**` $\rightarrow$ `lb://auth-service`
+- `/api/v1/admin/settings/**`, `/api/v1/admin/system-settings/**` $\rightarrow$ `lb://manager-service`
+- `/api/v1/admin/banners/**`, `/api/v1/admin/campaigns/**`, `/api/v1/banners/**` $\rightarrow$ `lb://manager-banner`
 - `/api/v1/shops/**`, `/api/v1/products/**`, `/api/v1/categories/**`, `/api/v1/vouchers/**` $\rightarrow$ `lb://restaurant-service`
 - `/api/v1/orders/**`, `/api/v1/cart/**` $\rightarrow$ `lb://order-service`
 - `/api/v1/deliveries/**`, `/api/v1/shippers/**` $\rightarrow$ `lb://delivery-service`
@@ -57,6 +61,12 @@ Using the included Maven Wrapper:
 
 # Run Auth & User Service
 .\mvnw.cmd -pl auth-service spring-boot:run
+
+# Run System Settings Service
+.\mvnw.cmd -pl manager-service spring-boot:run
+
+# Run Banner & Campaign Service
+.\mvnw.cmd -pl manager-banner spring-boot:run
 ```
 
 ### Chạy qua Docker Compose:

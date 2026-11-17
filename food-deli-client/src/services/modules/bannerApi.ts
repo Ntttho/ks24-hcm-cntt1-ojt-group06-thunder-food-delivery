@@ -1,164 +1,95 @@
-import type { ApiResponse } from '@/types';
-import { storage } from '@/utils/storage';
+import { apiClient, API_ENDPOINTS } from '@/services/api';
+import type { ApiResponse, PaginatedData } from '@/types';
 
 export interface BannerItem {
   id: number | string;
   title: string;
+  description?: string;
   imageUrl: string;
   targetUrl?: string;
+  campaignId?: number | null;
+  status?: 'ACTIVE' | 'INACTIVE';
   isActive: boolean;
   displayOrder: number;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BannerPayload {
   title: string;
+  description?: string;
   imageUrl: string;
   targetUrl?: string;
-  isActive?: boolean;
-  displayOrder?: number;
+  campaignId?: number | null;
+  isActive: boolean;
+  displayOrder: number;
 }
 
-const STORAGE_KEY = 'thunder_banners';
-const FALLBACK_BANNERS: BannerItem[] = [
-  {
-    id: 1,
-    title: 'Flash Sale cuối tuần',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=1200&q=80',
-    targetUrl: '/restaurants',
-    isActive: true,
-    displayOrder: 1,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    title: 'Giảm 50% đơn đầu tiên',
-    imageUrl:
-      'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
-    targetUrl: '/restaurants',
-    isActive: true,
-    displayOrder: 2,
-    createdAt: new Date().toISOString(),
-  },
-];
+export interface BannerQuery {
+  page: number;
+  size: number;
+  search?: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'ALL';
+  campaignId?: number;
+}
 
-const sortBanners = (items: BannerItem[]) =>
-  [...items].sort((a, b) => Number(a.displayOrder || 0) - Number(b.displayOrder || 0));
+export type CampaignStatus = 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'COMPLETED';
 
-const normalizeBanner = (banner: Partial<BannerItem>): BannerItem => ({
-  id: banner.id ?? Date.now(),
-  title: banner.title?.trim() || 'Banner quảng cáo',
-  imageUrl: banner.imageUrl || '',
-  targetUrl: banner.targetUrl || '',
-  isActive: banner.isActive ?? true,
-  displayOrder: Number(banner.displayOrder ?? 0),
-  createdAt: banner.createdAt || new Date().toISOString(),
-});
+export interface CampaignItem {
+  id: number;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: CampaignStatus;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-const readBanners = (): BannerItem[] => {
-  const stored = storage.get<BannerItem[]>(STORAGE_KEY);
-  if (!stored || !Array.isArray(stored) || stored.length === 0) {
-    storage.set(STORAGE_KEY, FALLBACK_BANNERS);
-    return FALLBACK_BANNERS;
-  }
-
-  return sortBanners(stored.map((banner) => normalizeBanner(banner)));
-};
-
-const writeBanners = (items: BannerItem[]) => {
-  storage.set(STORAGE_KEY, sortBanners(items));
-};
-
-const toResponse = <T>(data: T): ApiResponse<T> => ({
-  status: 200,
-  message: 'Thành công',
-  data,
-  timestamp: new Date().toISOString(),
-});
+export interface CampaignPayload {
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: CampaignStatus;
+}
 
 export const bannerApi = {
-  getAll: async (): Promise<ApiResponse<BannerItem[]>> => {
-    return toResponse(readBanners());
-  },
+  getAll: (query: BannerQuery): Promise<ApiResponse<PaginatedData<BannerItem>>> =>
+    apiClient.get<PaginatedData<BannerItem>>(API_ENDPOINTS.ADMIN.BANNERS, { params: query }),
 
-  getActiveBanners: async (): Promise<ApiResponse<BannerItem[]>> => {
-    const active = readBanners().filter((banner) => banner.isActive);
-    return toResponse(active);
-  },
+  getActiveBanners: (): Promise<ApiResponse<BannerItem[]>> =>
+    apiClient.get<BannerItem[]>(API_ENDPOINTS.BANNERS.ACTIVE),
 
-  getById: async (id: number | string): Promise<ApiResponse<BannerItem | null>> => {
-    const banner = readBanners().find((item) => String(item.id) === String(id)) || null;
-    return toResponse(banner);
-  },
+  getById: (id: number | string): Promise<ApiResponse<BannerItem>> =>
+    apiClient.get<BannerItem>(API_ENDPOINTS.ADMIN.BANNER_DETAIL(id)),
 
-  create: async (payload: BannerPayload): Promise<ApiResponse<BannerItem>> => {
-    const banners = readBanners();
-    const nextOrder = Math.max(0, ...banners.map((item) => Number(item.displayOrder || 0))) + 1;
-    const newBanner: BannerItem = normalizeBanner({
-      id: Date.now(),
-      title: payload.title,
-      imageUrl: payload.imageUrl,
-      targetUrl: payload.targetUrl,
-      isActive: payload.isActive ?? true,
-      displayOrder: payload.displayOrder ?? nextOrder,
-      createdAt: new Date().toISOString(),
-    });
+  create: (payload: BannerPayload): Promise<ApiResponse<BannerItem>> =>
+    apiClient.post<BannerItem>(API_ENDPOINTS.ADMIN.BANNERS, payload),
 
-    const updated = sortBanners([...banners, newBanner]);
-    writeBanners(updated);
-    return toResponse(newBanner);
-  },
+  update: (id: number | string, payload: BannerPayload): Promise<ApiResponse<BannerItem>> =>
+    apiClient.put<BannerItem>(API_ENDPOINTS.ADMIN.BANNER_DETAIL(id), payload),
 
-  update: async (id: number | string, payload: BannerPayload): Promise<ApiResponse<BannerItem>> => {
-    const banners = readBanners();
-    const index = banners.findIndex((item) => String(item.id) === String(id));
-    if (index === -1) {
-      throw new Error('Không tìm thấy banner cần cập nhật.');
-    }
+  updateStatus: (id: number | string, isActive: boolean): Promise<ApiResponse<BannerItem>> =>
+    apiClient.patch<BannerItem>(API_ENDPOINTS.ADMIN.BANNER_STATUS(id), { isActive }),
 
-    const nextBanner = normalizeBanner({
-      ...banners[index],
-      ...payload,
-      id,
-      title: payload.title?.trim() || banners[index].title,
-      imageUrl: payload.imageUrl || banners[index].imageUrl,
-      targetUrl: payload.targetUrl ?? banners[index].targetUrl,
-      isActive: payload.isActive ?? banners[index].isActive,
-      displayOrder: Number(payload.displayOrder ?? banners[index].displayOrder),
-      createdAt: banners[index].createdAt || new Date().toISOString(),
-    });
+  delete: (id: number | string): Promise<ApiResponse<void>> =>
+    apiClient.delete<void>(API_ENDPOINTS.ADMIN.BANNER_DETAIL(id)),
 
-    const updated = [...banners];
-    updated[index] = nextBanner;
-    writeBanners(sortBanners(updated));
-    return toResponse(nextBanner);
-  },
+  getCampaigns: (): Promise<ApiResponse<CampaignItem[]>> =>
+    apiClient.get<CampaignItem[]>(API_ENDPOINTS.ADMIN.CAMPAIGNS),
 
-  updateStatus: async (id: number | string, isActive: boolean): Promise<ApiResponse<BannerItem>> => {
-    const banner = readBanners().find((item) => String(item.id) === String(id));
-    if (!banner) {
-      throw new Error('Không tìm thấy banner cần cập nhật trạng thái.');
-    }
+  getCampaign: (id: number): Promise<ApiResponse<CampaignItem>> =>
+    apiClient.get<CampaignItem>(API_ENDPOINTS.ADMIN.CAMPAIGN_DETAIL(id)),
 
-    const updatedBanner = normalizeBanner({ ...banner, isActive });
-    const banners = readBanners().map((item) =>
-      String(item.id) === String(id) ? updatedBanner : item
-    );
-    writeBanners(sortBanners(banners));
-    return toResponse(updatedBanner);
-  },
+  createCampaign: (payload: CampaignPayload): Promise<ApiResponse<CampaignItem>> =>
+    apiClient.post<CampaignItem>(API_ENDPOINTS.ADMIN.CAMPAIGNS, payload),
 
-  delete: async (id: number | string): Promise<ApiResponse<boolean>> => {
-    const banners = readBanners();
-    const filtered = banners.filter((item) => String(item.id) !== String(id));
-    if (filtered.length === banners.length) {
-      throw new Error('Không tìm thấy banner cần xóa.');
-    }
+  updateCampaign: (id: number, payload: CampaignPayload): Promise<ApiResponse<CampaignItem>> =>
+    apiClient.put<CampaignItem>(API_ENDPOINTS.ADMIN.CAMPAIGN_DETAIL(id), payload),
 
-    writeBanners(sortBanners(filtered));
-    return toResponse(true);
-  },
+  deleteCampaign: (id: number): Promise<ApiResponse<void>> =>
+    apiClient.delete<void>(API_ENDPOINTS.ADMIN.CAMPAIGN_DETAIL(id)),
 };
 
 export default bannerApi;

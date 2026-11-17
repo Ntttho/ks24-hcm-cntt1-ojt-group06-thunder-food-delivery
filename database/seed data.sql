@@ -89,6 +89,8 @@ CREATE TABLE `system_settings` (
   `config_key` varchar(50) NOT NULL,
   `config_value` json NOT NULL,
   `description` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `config_key` (`config_key`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
@@ -378,7 +380,11 @@ INSERT INTO merchant_details (user_id, business_license, tax_code) VALUES
 
 INSERT INTO system_settings (id, config_key, config_value, description) VALUES
 (1, 'shipping_config', '{"base_km":2,"base_fee":15000,"extra_per_km":5000}', 'Shipping fee config'),
-(2, 'tax_config', '{"vat_rate":0.08}', 'VAT config');
+(2, 'tax_config', '{"vat_rate":0.08}', 'VAT config'),
+(3, 'default_shipping_fee', '{"value":15000,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Default shipping fee'),
+(4, 'shipping_fee_per_kilometer', '{"value":5000,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Shipping fee per kilometer'),
+(5, 'platform_commission_rate', '{"value":15,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00","history":[{"value":15,"updatedAt":"2026-01-01T00:00:00"}]}', 'Platform commission rate'),
+(6, 'minimum_order_value', '{"value":0,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Minimum order value');
 
 INSERT INTO vouchers (id, code, discount_amount, min_order_value, expiry_date, is_active) VALUES
 (1, 'FREESHIP', '15000.00', '50000.00', '2026-12-31 16:59:59', 1);

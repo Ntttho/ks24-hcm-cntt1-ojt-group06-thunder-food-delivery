@@ -109,6 +109,8 @@ CREATE TABLE `system_settings` (
   `config_key` VARCHAR(50) NOT NULL,
   `config_value` JSON NOT NULL,
   `description` TEXT,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uniq_system_settings_config_key` (`config_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -526,7 +528,11 @@ INSERT INTO `merchant_details` (`user_id`, `business_license`, `tax_code`) VALUE
 -- 7. System Settings
 INSERT INTO `system_settings` (`id`, `config_key`, `config_value`, `description`) VALUES
 (1, 'shipping_config', '{"base_km": 2, "base_fee": 15000, "extra_per_km": 5000}', 'Cấu hình tính phí giao hàng'),
-(2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT');
+(2, 'tax_config', '{"vat_rate": 0.08}', 'Cấu hình thuế VAT'),
+(3, 'default_shipping_fee', '{"value":15000,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Phí giao hàng mặc định (VNĐ)'),
+(4, 'shipping_fee_per_kilometer', '{"value":5000,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Phí giao hàng trên mỗi kilomet (VNĐ/km)'),
+(5, 'platform_commission_rate', '{"value":15,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00","history":[{"value":15,"updatedAt":"2026-01-01T00:00:00"}]}', 'Tỷ lệ hoa hồng nền tảng (%)'),
+(6, 'minimum_order_value', '{"value":0,"type":"NUMBER","updatedAt":"2026-01-01T00:00:00"}', 'Giá trị đơn hàng tối thiểu (VNĐ)');
 
 -- 8. Vouchers
 INSERT INTO `vouchers` (`id`, `restaurant_id`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES
