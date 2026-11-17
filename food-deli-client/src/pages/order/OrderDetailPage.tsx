@@ -108,7 +108,12 @@ export const OrderDetailPage: React.FC = () => {
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
-  const [driverLiveCoords, setDriverLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverLiveCoords, setDriverLiveCoords] = useState<{
+    lat: number;
+    lng: number;
+    heading?: number;
+    speedKmh?: number;
+  } | null>(null);
 
   // 1. Initial Order Fetch
   useEffect(() => {
@@ -280,7 +285,12 @@ export const OrderDetailPage: React.FC = () => {
     // Realtime GPS updates for moving driver bike
     const unsubLocation = orderLiveTrackingWs.subscribeDriverLocation((loc) => {
       if (loc && loc.latitude && loc.longitude) {
-        setDriverLiveCoords({ lat: loc.latitude, lng: loc.longitude });
+        setDriverLiveCoords({
+          lat: loc.latitude,
+          lng: loc.longitude,
+          heading: loc.heading,
+          speedKmh: loc.speedKmh,
+        });
       }
     });
 

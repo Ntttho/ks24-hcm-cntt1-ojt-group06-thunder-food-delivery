@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Tag, Tooltip } from 'antd';
 import {
   CompassOutlined,
@@ -8,8 +8,14 @@ import {
   RightOutlined,
   SyncOutlined,
   InfoCircleOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useDriverSimulation } from '@/hooks/useDriverSimulation';
+import {
+  calculateHaversineDistance,
+  calculateBearing,
+  formatLiveEta,
+} from '@/utils/geoUtils';
 import {
   calculateGoogleDirections3Points,
   calculateHaversineFallback,
@@ -20,6 +26,13 @@ import {
   type Route3PointsResult,
 } from '@/services/map/googleMapService';
 
+export interface DriverLiveCoords {
+  lat: number;
+  lng: number;
+  heading?: number;
+  speedKmh?: number;
+}
+
 export interface GoogleMapRouteViewProps {
   restaurantName?: string;
   restaurantAddress?: string;
@@ -29,12 +42,35 @@ export interface GoogleMapRouteViewProps {
   customerAddress?: string;
   customerLat?: number | null;
   customerLng?: number | null;
-  driverLiveCoords?: { lat: number; lng: number } | null;
+  driverLiveCoords?: DriverLiveCoords | null;
   isDelivering?: boolean;
   orderCode?: string;
   statusCode?: string;
   height?: number | string;
 }
+
+/**
+ * Generates an SVG string of a motorcycle marker rotated to the specified bearing (0 - 360 deg)
+ * with a forward direction indicator cone and radar pulse ring.
+ */
+const getShipperSvg = (bearingDeg: number): string => `
+  <svg xmlns="http://www.w3.org/2000/svg" width="46" height="46" viewBox="0 0 46 46">
+    <!-- Outer Radar Pulse Ring -->
+    <circle cx="23" cy="23" r="21" fill="#10b981" fill-opacity="0.22" />
+    
+    <!-- Rotatable Vehicle Container -->
+    <g transform="rotate(${bearingDeg}, 23, 23)">
+      <!-- Direction Indicator Arrow -->
+      <polygon points="23,3 27,10 19,10" fill="#10b981" />
+      
+      <!-- Motorbike Badge Base -->
+      <circle cx="23" cy="23" r="14" fill="#059669" stroke="#ffffff" stroke-width="2.5" />
+      
+      <!-- Motorcycle Graphic -->
+      <path d="M16 25c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2H16v-2zm10-5h-5l-1.2 2h7.4l-1.2-2zm-7 8a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm8 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" fill="#ffffff" />
+    </g>
+  </svg>
+`;
 
 export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
   restaurantName = 'Quán ăn',
@@ -51,7 +87,7 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
   statusCode,
   height = 320,
 }) => {
-  // 1. Coordinates normalization
+  // 1. Normalize Coordinates
   const validRestaurantCoords: Coordinates = useMemo(() => ({
     lat: restaurantLat && Math.abs(restaurantLat) > 0.001 ? restaurantLat : 10.7769,
     lng: restaurantLng && Math.abs(restaurantLng) > 0.001 ? restaurantLng : 106.7009,
@@ -71,15 +107,14 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
     isDelivering,
   });
 
-  // Effective shipper coordinates (prioritize live GPS, fallback to simulation or slightly offset from restaurant)
+  // Effective shipper coordinates (prioritize live GPS, fallback to simulation or restaurant offset)
   const validShipperCoords: Coordinates = useMemo(() => {
     if (driverLiveCoords && Math.abs(driverLiveCoords.lat) > 0.001) {
-      return driverLiveCoords;
+      return { lat: driverLiveCoords.lat, lng: driverLiveCoords.lng };
     }
     if (currentDriverLocation) {
       return currentDriverLocation;
     }
-    // Default initial shipper position slightly southwest of the restaurant
     return {
       lat: validRestaurantCoords.lat - 0.0065,
       lng: validRestaurantCoords.lng - 0.0055,
@@ -99,6 +134,12 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
     leg2?: google.maps.Polyline;
   }>({});
 
+  // Realtime Animation & Bearing Refs for 60fps Smooth LERP
+  const currentPosRef = useRef<Coordinates>(validShipperCoords);
+  const currentBearingRef = useRef<number>(driverLiveCoords?.heading || 0);
+  const animFrameIdRef = useRef<number | null>(null);
+  const [currentBearingState, setCurrentBearingState] = useState<number>(driverLiveCoords?.heading || 0);
+
   // Route state
   const [routeData, setRouteData] = useState<Route3PointsResult>(() =>
     calculateHaversineFallback(validShipperCoords, validRestaurantCoords, validCustomerCoords)
@@ -106,7 +147,22 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
   const [isLoadingRoute, setIsLoadingRoute] = useState<boolean>(false);
 
-  // 2. Fetch 3-point Directions whenever coordinates change
+  // Live ETA Countdown state (seconds remaining to next milestone)
+  const activeMilestoneCoords = isDelivering ? validCustomerCoords : validRestaurantCoords;
+  const liveSpeedKmh = Math.max(15, driverLiveCoords?.speedKmh && driverLiveCoords.speedKmh > 3 ? driverLiveCoords.speedKmh : 24);
+
+  const initialRemainingDist = calculateHaversineDistance(
+    validShipperCoords.lat,
+    validShipperCoords.lng,
+    activeMilestoneCoords.lat,
+    activeMilestoneCoords.lng
+  );
+  const [countdownSeconds, setCountdownSeconds] = useState<number>(() =>
+    Math.max(30, Math.round((initialRemainingDist / liveSpeedKmh) * 3600))
+  );
+  const [liveDistanceKm, setLiveDistanceKm] = useState<number>(initialRemainingDist);
+
+  // 2. Fetch 3-point Directions when coordinates change
   useEffect(() => {
     let isCancelled = false;
 
@@ -180,7 +236,118 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
     };
   }, [validRestaurantCoords.lat, validRestaurantCoords.lng]);
 
-  // 4. Update Markers, Polylines and Camera Bounds on real map
+  // 4. Smooth Coordinate Interpolation (LERP 60fps) & Bearing Rotation
+  const animateMarkerToTarget = useCallback((target: Coordinates, targetBearing: number) => {
+    if (!markersRef.current.shipper) return;
+
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
+
+    const startLat = currentPosRef.current.lat;
+    const startLng = currentPosRef.current.lng;
+    const targetLat = target.lat;
+    const targetLng = target.lng;
+
+    const latDiff = Math.abs(targetLat - startLat);
+    const lngDiff = Math.abs(targetLng - startLng);
+
+    // If change is negligible, just set position directly
+    if (latDiff < 0.000005 && lngDiff < 0.000005) {
+      currentPosRef.current = target;
+      markersRef.current.shipper.setPosition(new google.maps.LatLng(targetLat, targetLng));
+      return;
+    }
+
+    const duration = 1400; // 1.4s smooth slide between GPS fixes
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(1, elapsed / duration);
+
+      // easeInOutQuad
+      const easedProgress = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      const currLat = startLat + (targetLat - startLat) * easedProgress;
+      const currLng = startLng + (targetLng - startLng) * easedProgress;
+
+      currentPosRef.current = { lat: currLat, lng: currLng };
+
+      if (markersRef.current.shipper) {
+        markersRef.current.shipper.setPosition(new google.maps.LatLng(currLat, currLng));
+      }
+
+      if (progress < 1) {
+        animFrameIdRef.current = requestAnimationFrame(animate);
+      } else {
+        currentPosRef.current = target;
+        animFrameIdRef.current = null;
+      }
+    };
+
+    animFrameIdRef.current = requestAnimationFrame(animate);
+
+    // Update rotated marker icon
+    markersRef.current.shipper.setIcon({
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(getShipperSvg(targetBearing)),
+      scaledSize: new google.maps.Size(46, 46),
+      anchor: new google.maps.Point(23, 23),
+    });
+  }, []);
+
+  // 5. Update Shipper Marker, Rotation and Dynamic ETA when live coords change
+  useEffect(() => {
+    // 5a. Calculate Bearing / Heading
+    let effectiveBearing = 0;
+    if (typeof driverLiveCoords?.heading === 'number' && driverLiveCoords.heading > 0) {
+      effectiveBearing = driverLiveCoords.heading;
+    } else {
+      effectiveBearing = calculateBearing(
+        currentPosRef.current.lat,
+        currentPosRef.current.lng,
+        validShipperCoords.lat,
+        validShipperCoords.lng
+      );
+    }
+
+    currentBearingRef.current = effectiveBearing;
+    setCurrentBearingState(effectiveBearing);
+
+    // 5b. Animate Marker on Map if ready
+    if (isMapReady && mapInstanceRef.current && markersRef.current.shipper) {
+      animateMarkerToTarget(validShipperCoords, effectiveBearing);
+    }
+
+    // 5c. Recalculate Live Remaining Distance & ETA
+    const newDist = calculateHaversineDistance(
+      validShipperCoords.lat,
+      validShipperCoords.lng,
+      activeMilestoneCoords.lat,
+      activeMilestoneCoords.lng
+    );
+    setLiveDistanceKm(newDist);
+
+    const calculatedSeconds = Math.max(30, Math.round((newDist / liveSpeedKmh) * 3600));
+    setCountdownSeconds(calculatedSeconds);
+  }, [validShipperCoords, driverLiveCoords, isMapReady, activeMilestoneCoords, liveSpeedKmh, animateMarkerToTarget]);
+
+  // 6. Live ETA Countdown Ticker (decrements every 1 second)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdownSeconds((prev) => {
+        if (prev <= 1) return 1; // Stay at 1 second minimum until arrived
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // 7. Initialize Map Markers and Polylines
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current || typeof google === 'undefined' || !google.maps) {
       return;
@@ -188,14 +355,6 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
 
     const map = mapInstanceRef.current;
     const bounds = new google.maps.LatLngBounds();
-
-    // SVG Marker Icons
-    const shipperSvg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
-        <circle cx="22" cy="22" r="20" fill="#10b981" fill-opacity="0.2" />
-        <circle cx="22" cy="22" r="15" fill="#059669" stroke="#ffffff" stroke-width="2.5" />
-        <path d="M15 24c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2v2H15v-2zm10-5h-5l-1.2 2h7.4l-1.2-2zm-7 8a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm8 0a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" fill="#ffffff" />
-      </svg>`;
 
     const restaurantSvg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
@@ -209,7 +368,7 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
         <path d="M20 12c-3.1 0-5.5 2.4-5.5 5.5 0 4.2 5.5 9.5 5.5 9.5s5.5-5.3 5.5-9.5c0-3.1-2.4-5.5-5.5-5.5zm0 7.8a2.3 2.3 0 110-4.6 2.3 2.3 0 010 4.6z" fill="#ffffff" />
       </svg>`;
 
-    // --- Update / Create Shipper Marker ---
+    // --- Create Shipper Marker ---
     const shipperPos = new google.maps.LatLng(validShipperCoords.lat, validShipperCoords.lng);
     bounds.extend(shipperPos);
     if (!markersRef.current.shipper) {
@@ -218,17 +377,15 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
         map,
         title: 'Tài xế (GPS Live)',
         icon: {
-          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(shipperSvg),
-          scaledSize: new google.maps.Size(44, 44),
-          anchor: new google.maps.Point(22, 22),
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(getShipperSvg(currentBearingRef.current)),
+          scaledSize: new google.maps.Size(46, 46),
+          anchor: new google.maps.Point(23, 23),
         },
         zIndex: 999,
       });
-    } else {
-      markersRef.current.shipper.setPosition(shipperPos);
     }
 
-    // --- Update / Create Restaurant Marker ---
+    // --- Create / Update Restaurant Marker ---
     const restPos = new google.maps.LatLng(validRestaurantCoords.lat, validRestaurantCoords.lng);
     bounds.extend(restPos);
     if (!markersRef.current.restaurant) {
@@ -247,7 +404,7 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
       markersRef.current.restaurant.setPosition(restPos);
     }
 
-    // --- Update / Create Customer Marker ---
+    // --- Create / Update Customer Marker ---
     const custPos = new google.maps.LatLng(validCustomerCoords.lat, validCustomerCoords.lng);
     bounds.extend(custPos);
     if (!markersRef.current.customer) {
@@ -308,17 +465,18 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
       });
     }
 
-    // Auto-fit bounds with padding
+    // Auto-fit bounds on initial mount or route refresh
     if (!bounds.isEmpty()) {
       map.fitBounds(bounds, { top: 40, right: 30, bottom: 40, left: 30 });
     }
-  }, [isMapReady, routeData, isDelivering, validShipperCoords, validRestaurantCoords, validCustomerCoords, restaurantName, customerName]);
+  }, [isMapReady, routeData, isDelivering, validRestaurantCoords, validCustomerCoords, restaurantName, customerName, validShipperCoords]);
 
   // Cleanup on unmount
   useEffect(() => {
     const markers = markersRef.current;
     const polylines = polylinesRef.current;
     return () => {
+      if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
       if (markers.shipper) markers.shipper.setMap(null);
       if (markers.restaurant) markers.restaurant.setMap(null);
       if (markers.customer) markers.customer.setMap(null);
@@ -439,18 +597,23 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
               />
             </svg>
 
-            {/* Point 1: Shipper Pin (Live GPS) */}
-            <div className="absolute left-[14%] bottom-[20%] flex flex-col items-center z-10 -translate-x-1/2">
+            {/* Point 1: Shipper Pin (Live GPS with Bearing Rotation) */}
+            <div
+              className="absolute left-[14%] bottom-[20%] flex flex-col items-center z-10 -translate-x-1/2 transition-transform duration-700 ease-out"
+              style={{
+                transform: `translate(-50%, 0) rotate(${currentBearingState}deg)`,
+              }}
+            >
               <div className="relative">
-                <div className="w-9 h-9 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border-2 border-white ring-4 ring-emerald-500/20">
-                  <CarOutlined className="text-sm animate-pulse" />
+                <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border-2 border-white ring-4 ring-emerald-500/20">
+                  <CarOutlined className="text-sm" />
                 </div>
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
                 </span>
               </div>
               <span className="text-[9px] font-extrabold bg-slate-900/90 text-emerald-300 px-2 py-0.5 rounded-md mt-1 border border-emerald-500/40">
-                Tài xế (GPS)
+                Tài xế ({liveSpeedKmh} km/h)
               </span>
             </div>
 
@@ -477,10 +640,34 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
         )}
       </div>
 
-      {/* 3. Bottom Metrics Bar - Chi tiết cả 3 chặng & ETA */}
+      {/* 3. Bottom Metrics Bar - Chi tiết cả 3 chặng & Live ETA Countdown */}
       <div className="bg-slate-900/95 border-t border-slate-800 p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Chặng 1: Shipper -> Quán */}
+          {/* Live Dynamic ETA Countdown to Next Destination */}
+          <div className="bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-500/50 flex items-center gap-2 shadow-sm">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
+            <div>
+              <span className="text-[10px] text-emerald-300/80 block font-medium">
+                {isDelivering ? 'Dự kiến đến nơi' : 'Dự kiến tới quán'}
+              </span>
+              <span className="font-extrabold text-sm text-emerald-300">
+                {formatLiveEta(countdownSeconds)} ({liveDistanceKm} km)
+              </span>
+            </div>
+          </div>
+
+          {/* Speed Indicator */}
+          <div className="bg-slate-800/90 px-2.5 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5">
+            <ThunderboltOutlined className="text-amber-400 text-xs" />
+            <div>
+              <span className="text-[10px] text-slate-400 block font-medium">Tốc độ xe</span>
+              <span className="font-extrabold text-xs text-slate-100">
+                {liveSpeedKmh} km/h
+              </span>
+            </div>
+          </div>
+
+          {/* Chặng 1 Info */}
           <div className={`px-2.5 py-1.5 rounded-xl border transition-all ${
             !isDelivering ? 'bg-amber-950/40 border-amber-500/50 text-amber-200' : 'bg-slate-800/80 border-slate-700 text-slate-300'
           }`}>
@@ -490,21 +677,13 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
             </span>
           </div>
 
-          {/* Chặng 2: Quán -> Khách */}
+          {/* Chặng 2 Info */}
           <div className={`px-2.5 py-1.5 rounded-xl border transition-all ${
             isDelivering ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-200 ring-2 ring-emerald-500/20' : 'bg-slate-800/80 border-slate-700 text-slate-300'
           }`}>
             <span className="text-[10px] text-slate-400 block font-medium">Chặng 2: Đến khách</span>
             <span className="font-extrabold text-xs">
               {routeData.leg2.distanceText} • ~{routeData.leg2.durationText}
-            </span>
-          </div>
-
-          {/* Tổng hành trình */}
-          <div className="bg-slate-800/90 px-2.5 py-1.5 rounded-xl border border-slate-700">
-            <span className="text-slate-400 text-[10px] block font-medium">Tổng quãng đường</span>
-            <span className="text-slate-100 font-extrabold text-xs">
-              {routeData.totalDistanceKm} km
             </span>
           </div>
         </div>
@@ -515,7 +694,7 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
           </span>
           <div className="flex items-center gap-1.5 mt-1">
             <Tag color={isDelivering ? 'processing' : 'default'} className="m-0 text-[10px] font-bold">
-              {isDelivering ? 'Đang tịnh tiến trực tiếp' : isDriverAcceptedStage ? 'Tài xế đang đến quán' : 'Sẵn sàng theo dõi'}
+              {isDelivering ? 'Tài xế đang giao đến bạn' : isDriverAcceptedStage ? 'Tài xế đang đến quán' : 'Sẵn sàng theo dõi'}
             </Tag>
           </div>
         </div>

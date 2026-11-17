@@ -67,3 +67,55 @@ export function interpolateRouteWaypoints(
   return points;
 }
 
+/**
+ * Calculates the forward azimuth bearing in degrees (0 - 360) between two coordinates.
+ * 0° = North, 90° = East, 180° = South, 270° = West.
+ */
+export function calculateBearing(
+  lat1?: number | null,
+  lon1?: number | null,
+  lat2?: number | null,
+  lon2?: number | null
+): number {
+  if (
+    lat1 === undefined || lat1 === null ||
+    lon1 === undefined || lon1 === null ||
+    lat2 === undefined || lat2 === null ||
+    lon2 === undefined || lon2 === null ||
+    (lat1 === lat2 && lon1 === lon2)
+  ) {
+    return 0;
+  }
+
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const deltaLambda = toRad(lon2 - lon1);
+
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x =
+    Math.cos(phi1) * Math.sin(phi2) -
+    Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+
+  const theta = Math.atan2(y, x);
+  return Math.round(((toDeg(theta) + 360) % 360) * 10) / 10;
+}
+
+/**
+ * Formats seconds into a human-readable live ETA string for countdown timers.
+ */
+export function formatLiveEta(seconds: number): string {
+  if (seconds <= 0) return 'Đã đến nơi';
+  if (seconds < 60) return `Còn ${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSecs = seconds % 60;
+  if (minutes < 60) {
+    return remainingSecs > 0 ? `${minutes} ph ${remainingSecs}s` : `${minutes} phút`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+  return `${hours}h ${remainingMins}ph`;
+}
+

@@ -18,16 +18,14 @@ import { DriverOrder, driverApi } from '@/services/modules/driverApi';
 import { GoogleMapRouteView } from '@/components/map/GoogleMapRouteView';
 import {
   RouteMapFocus,
-  DriverChatMessage,
   buildGoogleMapsDirectionsUrl,
-  buildGoogleMapsEmbedUrl,
   createDriverChatMessage,
   getDeliveryStageInfo,
   loadOrderChatMessages,
   saveOrderChatMessages,
 } from '../deliveryHelpers';
 import { DriverCustomerChatModal } from './DriverCustomerChatModal';
-import { chatApi, type ChatMessage } from '@/services/modules/chatApi';
+import { chatApi } from '@/services/modules/chatApi';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { soundManager } from '@/utils/soundNotification';
 
@@ -75,7 +73,12 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
   const [isMapExpanded, setIsMapExpanded] = useState<boolean>(true);
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
-  const [driverLiveCoords, setDriverLiveCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverLiveCoords, setDriverLiveCoords] = useState<{
+    lat: number;
+    lng: number;
+    heading?: number;
+    speedKmh?: number;
+  } | null>(null);
 
   // Realtime STOMP & API Chat Sync for order
   useEffect(() => {
@@ -93,7 +96,7 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
 
     orderLiveTrackingWs.connect(order.id);
 
-    const unsubscribe = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
+    const unsubscribeChat = orderLiveTrackingWs.subscribeChatMessages((newMsg) => {
       setChatMessages((prev) => {
         if (prev.some((m) => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
@@ -103,8 +106,21 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
       }
     });
 
+    // Realtime WebSocket broadcast listener on /topic/orders/{orderId}/location
+    const unsubscribeLocation = orderLiveTrackingWs.subscribeDriverLocation((loc) => {
+      if (loc && loc.latitude && loc.longitude) {
+        setDriverLiveCoords({
+          lat: loc.latitude,
+          lng: loc.longitude,
+          heading: loc.heading,
+          speedKmh: loc.speedKmh,
+        });
+      }
+    });
+
     return () => {
-      unsubscribe();
+      unsubscribeChat();
+      unsubscribeLocation();
     };
   }, [order.id]);
 
@@ -116,15 +132,22 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
       if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24;
+            const heading = pos.coords.heading || 0;
+            const coords = {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+              heading,
+              speedKmh: speed,
+            };
             setDriverLiveCoords(coords);
 
             if (stageInfo.stage === 'DELIVERING') {
               driverApi.updateLocation({
                 latitude: pos.coords.latitude,
                 longitude: pos.coords.longitude,
-                heading: pos.coords.heading || 0,
-                speedKmh: pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24,
+                heading,
+                speedKmh: speed,
                 orderId: order.id,
               }).catch(() => {});
             }
@@ -206,28 +229,6 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
         destinationAddress: order.receiverAddress,
       }),
     [
-      order.restaurantLat,
-      order.restaurantLng,
-      order.restaurantAddress,
-      order.receiverLat,
-      order.receiverLng,
-      order.receiverAddress,
-    ]
-  );
-
-  const mapEmbedUrl = useMemo(
-    () =>
-      buildGoogleMapsEmbedUrl({
-        mode: mapFocus,
-        pickupLat: order.restaurantLat,
-        pickupLng: order.restaurantLng,
-        pickupAddress: order.restaurantAddress,
-        dropoffLat: order.receiverLat,
-        dropoffLng: order.receiverLng,
-        dropoffAddress: order.receiverAddress,
-      }),
-    [
-      mapFocus,
       order.restaurantLat,
       order.restaurantLng,
       order.restaurantAddress,
