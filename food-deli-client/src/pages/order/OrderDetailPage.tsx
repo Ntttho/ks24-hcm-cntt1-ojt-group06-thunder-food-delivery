@@ -39,7 +39,7 @@ import {
   DriverReviewModal,
   OrderChatDrawer,
 } from './components';
-import { GoogleMapRouteView } from '@/components/map/GoogleMapRouteView';
+import { RealMapRouteView } from '@/components/map/RealMapRouteView';
 
 const { Title, Text } = Typography;
 
@@ -498,8 +498,8 @@ export const OrderDetailPage: React.FC = () => {
           statusCode={order.statusCode}
         />
 
-        {/* Live Interactive Map Route with Simulation & Realtime GPS */}
-        <GoogleMapRouteView
+        {/* Live Interactive Real-World Map Route with Simulation & Realtime GPS */}
+        <RealMapRouteView
           restaurantName={order.restaurantName}
           restaurantAddress={order.restaurantAddress || order.restaurantName}
           restaurantLat={order.restaurantLat || 10.7769}

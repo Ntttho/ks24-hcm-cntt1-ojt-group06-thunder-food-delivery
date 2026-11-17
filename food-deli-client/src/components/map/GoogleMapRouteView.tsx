@@ -25,6 +25,7 @@ import {
   type Coordinates,
   type Route3PointsResult,
 } from '@/services/map/googleMapService';
+import { RealMapRouteView } from './RealMapRouteView';
 
 export interface DriverLiveCoords {
   lat: number;
@@ -87,6 +88,26 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
   statusCode,
   height = 320,
 }) => {
+  if (!isGoogleMapsConfigured()) {
+    return (
+      <RealMapRouteView
+        restaurantName={restaurantName}
+        restaurantAddress={restaurantAddress}
+        restaurantLat={restaurantLat}
+        restaurantLng={restaurantLng}
+        customerName={customerName}
+        customerAddress={customerAddress}
+        customerLat={customerLat}
+        customerLng={customerLng}
+        driverLiveCoords={driverLiveCoords}
+        isDelivering={isDelivering}
+        orderCode={orderCode}
+        statusCode={statusCode}
+        height={height}
+      />
+    );
+  }
+
   // 1. Normalize Coordinates
   const validRestaurantCoords: Coordinates = useMemo(() => ({
     lat: restaurantLat && Math.abs(restaurantLat) > 0.001 ? restaurantLat : 10.7769,
@@ -161,6 +182,31 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
     Math.max(30, Math.round((initialRemainingDist / liveSpeedKmh) * 3600))
   );
   const [liveDistanceKm, setLiveDistanceKm] = useState<number>(initialRemainingDist);
+
+  // Fallback animation progress ratio along the SVG curve
+  const [initialCountdown] = useState<number>(() =>
+    Math.max(60, Math.round((initialRemainingDist / liveSpeedKmh) * 3600))
+  );
+  const progressRatio = useMemo(() => {
+    if (!initialCountdown || initialCountdown <= 0) return 0.5;
+    return Math.max(0.05, Math.min(0.95, 1 - countdownSeconds / initialCountdown));
+  }, [countdownSeconds, initialCountdown]);
+
+  const fallbackShipperPos = useMemo(() => {
+    if (isDelivering) {
+      // Curve 2: Restaurant (45, 55) -> Customer (85, 25)
+      const t = progressRatio;
+      const x = 45 + (85 - 45) * t;
+      const y = 55 + (25 - 55) * t;
+      return { x, y };
+    } else {
+      // Curve 1: Shipper Start (14, 80) -> Restaurant (45, 55)
+      const t = progressRatio;
+      const x = 14 + (45 - 14) * t;
+      const y = 80 + (55 - 80) * t;
+      return { x, y };
+    }
+  }, [isDelivering, progressRatio]);
 
   // 2. Fetch 3-point Directions when coordinates change
   useEffect(() => {
@@ -597,14 +643,20 @@ export const GoogleMapRouteView: React.FC<GoogleMapRouteViewProps> = ({
               />
             </svg>
 
-            {/* Point 1: Shipper Pin (Live GPS with Bearing Rotation) */}
+            {/* Point 1: Shipper Pin (Live GPS with Bearing Rotation & Dynamic Position) */}
             <div
-              className="absolute left-[14%] bottom-[20%] flex flex-col items-center z-10 -translate-x-1/2 transition-transform duration-700 ease-out"
+              className="absolute flex flex-col items-center z-10 -translate-x-1/2 -translate-y-1/2 transition-all duration-700 ease-out"
               style={{
-                transform: `translate(-50%, 0) rotate(${currentBearingState}deg)`,
+                left: `${fallbackShipperPos.x}%`,
+                top: `${fallbackShipperPos.y}%`,
               }}
             >
-              <div className="relative">
+              <div
+                className="relative transition-transform duration-700 ease-out"
+                style={{
+                  transform: `rotate(${currentBearingState}deg)`,
+                }}
+              >
                 <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg border-2 border-white ring-4 ring-emerald-500/20">
                   <CarOutlined className="text-sm" />
                 </div>

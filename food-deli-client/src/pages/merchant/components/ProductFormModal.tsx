@@ -133,17 +133,23 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           </Form.Item>
         </div>
 
-        {/* Khẩu phần & Trạng thái bán */}
+        {/* Số lượng còn lại & Trạng thái bán */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Form.Item
-            name="defaultQuantity"
-            label={<span className="text-xs font-semibold text-slate-700">Khẩu phần/ngày</span>}
+            name="currentQuantity"
+            label={
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-semibold text-slate-700">Số lượng còn lại</span>
+                <span className="text-red-500 font-bold">*</span>
+              </div>
+            }
+            rules={[{ required: true, message: 'Vui lòng nhập số lượng còn lại của món ăn' }]}
             className="!mb-0"
           >
             <InputNumber
-              min={1}
-              max={999}
-              defaultValue={50}
+              min={0}
+              max={9999}
+              placeholder="Ví dụ: 50"
               className="w-full rounded-lg h-10 flex items-center border-slate-200 text-sm shadow-none"
             />
           </Form.Item>

@@ -31,7 +31,7 @@ export function checkVoucherEligibility(
   if (voucher.isActive === false) {
     return { eligible: false, reason: 'Mã đã ngừng áp dụng' };
   }
-  if (voucher.startDate && new Date(voucher.startDate) > now) {
+  if (voucher.startDate && new Date(voucher.startDate).getTime() > now.getTime() + 86400000) {
     return { eligible: false, reason: 'Chưa đến thời gian áp dụng' };
   }
   if (voucher.expiryDate && new Date(voucher.expiryDate) < now) {
@@ -80,6 +80,6 @@ export function calculateVoucherDiscount(
       : calc;
     return Math.min(capped, subtotal);
   }
-  return Math.min(rawValue, subtotal);
+  return rawValue;
 }
 

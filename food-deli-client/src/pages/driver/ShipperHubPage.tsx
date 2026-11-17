@@ -8,7 +8,9 @@ import {
   DashboardOutlined,
   HistoryOutlined,
   ExclamationCircleOutlined,
+  CompassOutlined,
 } from '@ant-design/icons';
+import { RealMapRouteView } from '@/components/map/RealMapRouteView';
 import { calculateHaversineDistance } from '@/utils/geoUtils';
 import {
   Bike,
@@ -247,6 +249,8 @@ export const ShipperHubPage: React.FC = () => {
     }
   }, []);
 
+  const [previewMapOrder, setPreviewMapOrder] = useState<DriverOrder | null>(null);
+
   const filteredAvailableOrders = useMemo(() => {
     return availableOrders
       .map((order) => {
@@ -256,7 +260,21 @@ export const ShipperHubPage: React.FC = () => {
           order.restaurantLat || 10.7769,
           order.restaurantLng || 106.7009
         );
-        return { ...order, distanceToShop };
+        const distanceShopToCustomer = order.distanceKm && order.distanceKm > 0
+          ? order.distanceKm
+          : calculateHaversineDistance(
+              order.restaurantLat || 10.7769,
+              order.restaurantLng || 106.7009,
+              order.receiverLat || 10.7925,
+              order.receiverLng || 106.7214
+            );
+        const totalTripDistance = Math.round((distanceToShop + distanceShopToCustomer) * 10) / 10;
+        return {
+          ...order,
+          distanceToShop,
+          distanceShopToCustomer,
+          totalTripDistance,
+        };
       })
       .filter((o) => radarRadius >= 999 || o.distanceToShop <= radarRadius)
       .sort((a, b) => a.distanceToShop - b.distanceToShop);
@@ -891,26 +909,59 @@ export const ShipperHubPage: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Order Details: Distance, Payment, Addresses */}
-                      <div className="space-y-2 mb-4 text-xs">
+                      {/* Order Details: 2 Chặng Khoảng Cách, Tổng Hành Trình & Thanh Toán */}
+                      <div className="space-y-2.5 mb-4 text-xs">
+                        <div className="bg-slate-50/90 p-3 rounded-2xl border border-slate-200/80 space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            {/* Chặng 1: Tài xế -> Quán */}
+                            <div className="flex items-center gap-1.5 bg-emerald-50/80 border border-emerald-200/80 text-emerald-800 px-2 py-1.5 rounded-xl font-bold">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                              <div className="truncate">
+                                <span className="text-[10px] text-emerald-600 block font-normal">Cách bạn ➔ Quán</span>
+                                <span>{(order as any).distanceToShop?.toFixed(1) || '1.2'} km</span>
+                              </div>
+                            </div>
+
+                            {/* Chặng 2: Quán -> Khách */}
+                            <div className="flex items-center gap-1.5 bg-sky-50/80 border border-sky-200/80 text-sky-800 px-2 py-1.5 rounded-xl font-bold">
+                              <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                              <div className="truncate">
+                                <span className="text-[10px] text-sky-600 block font-normal">Quán ➔ Khách</span>
+                                <span>{(order as any).distanceShopToCustomer?.toFixed(1) || order.distanceKm || '2.5'} km</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Tổng hành trình & Nút xem bản đồ */}
+                          <div className="flex items-center justify-between pt-1.5 border-t border-slate-200/70 text-xs">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] text-slate-500 font-medium">Tổng hành trình:</span>
+                              <span className="bg-orange-500 text-white font-black px-2 py-0.5 rounded-lg text-xs shadow-xs">
+                                {(order as any).totalTripDistance?.toFixed(1) || '3.7'} km
+                              </span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setPreviewMapOrder(order)}
+                              className="px-2.5 py-1 bg-white hover:bg-slate-100 text-indigo-600 hover:text-indigo-800 border border-indigo-200 rounded-lg font-bold text-[11px] flex items-center gap-1 transition-all shadow-2xs cursor-pointer active:scale-95"
+                            >
+                              <CompassOutlined className="text-orange-500" />
+                              <span>Xem bản đồ</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Kiểu thanh toán */}
                         <div className="flex items-center gap-2 flex-wrap">
-                          <div className="flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-lg font-bold">
-                            <Navigation className="w-3 h-3 text-emerald-600" />
-                            <span>Cách bạn {(order as any).distanceToShop?.toFixed(1) || '1.2'} km</span>
-                          </div>
-
-                          <div className="flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-1 rounded-lg font-bold">
-                            <span>Quán tới khách: {order.distanceKm} km</span>
-                          </div>
-
                           <div
-                            className={`flex items-center gap-1 px-2 py-1 rounded-lg font-bold ${
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-xl font-bold text-xs ${
                               order.codAmount > 0
-                                ? 'bg-amber-50 text-amber-700 border border-amber-100'
-                                : 'bg-teal-50 text-teal-700 border border-teal-100'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-teal-50 text-teal-700 border border-teal-200'
                             }`}
                           >
-                            <DollarSign className="w-3 h-3" />
+                            <DollarSign className="w-3.5 h-3.5" />
                             <span>{formatPaymentLabel(order)}</span>
                           </div>
                         </div>
@@ -1174,6 +1225,63 @@ export const ShipperHubPage: React.FC = () => {
                 className="py-3 rounded-2xl font-black text-xs bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-lg shadow-amber-400/30 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <span>NHẬN ĐƠN NGAY 🛵</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+      {/* Real-World Map Route Preview Modal for Scanned Order */}
+      <Modal
+        open={Boolean(previewMapOrder)}
+        onCancel={() => setPreviewMapOrder(null)}
+        footer={null}
+        width={760}
+        centered
+        destroyOnClose
+        title={
+          <div className="flex items-center gap-2 text-slate-800">
+            <CompassOutlined className="text-orange-500 text-lg" />
+            <span className="font-extrabold text-base">
+              Lộ trình đơn hàng #{previewMapOrder?.orderCode}
+            </span>
+            <span className="text-xs text-slate-500 font-normal">
+              ({previewMapOrder?.restaurantName})
+            </span>
+          </div>
+        }
+      >
+        {previewMapOrder && (
+          <div className="pt-2">
+            <RealMapRouteView
+              restaurantName={previewMapOrder.restaurantName}
+              restaurantAddress={previewMapOrder.restaurantAddress}
+              restaurantLat={previewMapOrder.restaurantLat || 10.7769}
+              restaurantLng={previewMapOrder.restaurantLng || 106.7009}
+              customerName={previewMapOrder.receiverName}
+              customerAddress={previewMapOrder.receiverAddress}
+              customerLat={previewMapOrder.receiverLat || 10.7925}
+              customerLng={previewMapOrder.receiverLng || 106.7214}
+              driverLiveCoords={driverCoords}
+              orderCode={previewMapOrder.orderCode}
+              statusCode="CONFIRMED"
+              height={380}
+            />
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-600">
+                <span className="font-semibold text-slate-800">Điểm giao:</span> {previewMapOrder.receiverAddress}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = previewMapOrder;
+                  setPreviewMapOrder(null);
+                  handleAcceptOrder(target);
+                }}
+                disabled={isAcceptingId !== null}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                NHẬN ĐƠN NÀY
               </button>
             </div>
           </div>

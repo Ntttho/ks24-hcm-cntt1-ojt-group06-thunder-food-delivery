@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   AlertCircle,
   Bike,
@@ -15,7 +15,7 @@ import {
   Phone,
 } from '../icons';
 import { DriverOrder, driverApi } from '@/services/modules/driverApi';
-import { GoogleMapRouteView } from '@/components/map/GoogleMapRouteView';
+import { RealMapRouteView } from '@/components/map/RealMapRouteView';
 import {
   RouteMapFocus,
   buildGoogleMapsDirectionsUrl,
@@ -28,6 +28,7 @@ import { DriverCustomerChatModal } from './DriverCustomerChatModal';
 import { chatApi } from '@/services/modules/chatApi';
 import { orderLiveTrackingWs } from '@/services/modules/orderLiveTrackingWebSocket';
 import { soundManager } from '@/utils/soundNotification';
+import { calculateBearing, interpolateRouteWaypoints, type LatLngPoint } from '@/utils/geoUtils';
 
 interface ActiveDeliveryViewProps {
   order: DriverOrder;
@@ -124,43 +125,100 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
     };
   }, [order.id]);
 
-  // Realtime GPS broadcast to server & customer tracking
+  // Waypoints simulation index for Smart Simulation Fallback when GPS is unavailable on Desktop/Localhost
+  const simulationIndexRef = useRef<number>(0);
+  const isSimulatingRef = useRef<boolean>(false);
+
+  // Realtime GPS broadcast to server & customer tracking (Chặng 1: Điểm nhận món, Chặng 2: Điểm giao món)
   useEffect(() => {
     if (!order.id) return;
 
+    const isActivelyDelivering =
+      stageInfo.stage === 'PICKUP' ||
+      stageInfo.stage === 'DELIVERING' ||
+      order.statusCode === 'DRIVER_ACCEPTED' ||
+      order.statusCode === 'PICKING_UP' ||
+      order.statusCode === 'DELIVERING';
+
+    if (!isActivelyDelivering) return;
+
+    // Determine route start & end based on current stage
+    const restPoint: LatLngPoint = {
+      lat: order.restaurantLat && Math.abs(order.restaurantLat) > 0.001 ? order.restaurantLat : 10.7769,
+      lng: order.restaurantLng && Math.abs(order.restaurantLng) > 0.001 ? order.restaurantLng : 106.7009,
+    };
+    const custPoint: LatLngPoint = {
+      lat: order.receiverLat && Math.abs(order.receiverLat) > 0.001 ? order.receiverLat : 10.7925,
+      lng: order.receiverLng && Math.abs(order.receiverLng) > 0.001 ? order.receiverLng : 106.7214,
+    };
+    const shipperStartPoint: LatLngPoint = {
+      lat: restPoint.lat - 0.0065,
+      lng: restPoint.lng - 0.0055,
+    };
+
+    const isDeliveringStage = stageInfo.stage === 'DELIVERING';
+    const startPt = isDeliveringStage ? restPoint : shipperStartPoint;
+    const endPt = isDeliveringStage ? custPoint : restPoint;
+
+    const waypoints = interpolateRouteWaypoints(startPt, endPt, 30);
+
+    const broadcastCoords = (lat: number, lng: number, heading: number, speedKmh: number) => {
+      const coords = { lat, lng, heading, speedKmh };
+      setDriverLiveCoords(coords);
+      driverApi.updateLocation({
+        latitude: lat,
+        longitude: lng,
+        heading,
+        speedKmh,
+        orderId: order.id,
+      }).catch(() => {});
+    };
+
     const pushLocation = () => {
-      if ('geolocation' in navigator) {
+      let geoSupported = false;
+      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+        geoSupported = true;
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 24;
             const heading = pos.coords.heading || 0;
-            const coords = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              heading,
-              speedKmh: speed,
-            };
-            setDriverLiveCoords(coords);
-
-            if (stageInfo.stage === 'DELIVERING') {
-              driverApi.updateLocation({
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-                heading,
-                speedKmh: speed,
-                orderId: order.id,
-              }).catch(() => {});
-            }
+            isSimulatingRef.current = false;
+            broadcastCoords(pos.coords.latitude, pos.coords.longitude, heading, speed);
           },
-          () => {}
+          () => {
+            // Geolocation denied, failed or unavailable on desktop -> Smart Simulation Fallback
+            isSimulatingRef.current = true;
+            simulationIndexRef.current = (simulationIndexRef.current + 1) % waypoints.length;
+            const curr = waypoints[simulationIndexRef.current];
+            const prev = waypoints[Math.max(0, simulationIndexRef.current - 1)];
+            const bearing = calculateBearing(prev.lat, prev.lng, curr.lat, curr.lng);
+            broadcastCoords(curr.lat, curr.lng, bearing, 24);
+          },
+          { enableHighAccuracy: true, timeout: 3000, maximumAge: 1000 }
         );
+      }
+
+      if (!geoSupported) {
+        simulationIndexRef.current = (simulationIndexRef.current + 1) % waypoints.length;
+        const curr = waypoints[simulationIndexRef.current];
+        const prev = waypoints[Math.max(0, simulationIndexRef.current - 1)];
+        const bearing = calculateBearing(prev.lat, prev.lng, curr.lat, curr.lng);
+        broadcastCoords(curr.lat, curr.lng, bearing, 24);
       }
     };
 
     pushLocation();
     const timer = setInterval(pushLocation, 3500);
     return () => clearInterval(timer);
-  }, [order.id, stageInfo.stage]);
+  }, [
+    order.id,
+    stageInfo.stage,
+    order.statusCode,
+    order.restaurantLat,
+    order.restaurantLng,
+    order.receiverLat,
+    order.receiverLng,
+  ]);
 
   // Tự động đồng bộ tab bản đồ theo mốc hiện tại (Mốc 1: Quán ăn, Mốc 2: Khách hàng)
   const mapFocus: RouteMapFocus =
@@ -364,7 +422,7 @@ export const ActiveDeliveryView: React.FC<ActiveDeliveryViewProps> = ({
 
         {isMapExpanded && (
           <div className="rounded-2xl overflow-hidden shadow-md">
-            <GoogleMapRouteView
+            <RealMapRouteView
               restaurantName={order.restaurantName}
               restaurantAddress={order.restaurantAddress}
               restaurantLat={order.restaurantLat || 10.7769}

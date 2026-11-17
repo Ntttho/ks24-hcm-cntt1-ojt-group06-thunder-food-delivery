@@ -1,4 +1,3 @@
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 import {
   calculateHaversineDistance,
   calculateEstimatedDeliveryMinutes,
@@ -28,7 +27,6 @@ export interface Route3PointsResult {
   overviewPolylinePath: Coordinates[];
 }
 
-let isSdkInitialized = false;
 let googleMapsPromise: Promise<typeof google> | null = null;
 
 export const getGoogleMapsApiKey = (): string => {
@@ -41,7 +39,7 @@ export const isGoogleMapsConfigured = (): boolean => {
 };
 
 /**
- * Loads Google Maps JavaScript API via the modern official importLibrary API
+ * Loads Google Maps JavaScript API via Native Dynamic Script Loader (Zero external dependencies)
  */
 export const loadGoogleMapsApi = async (): Promise<typeof google> => {
   if (typeof window !== 'undefined' && window.google?.maps) {
@@ -57,22 +55,51 @@ export const loadGoogleMapsApi = async (): Promise<typeof google> => {
     throw new Error('Google Maps API key is not configured in VITE_GOOGLE_MAPS_API_KEY');
   }
 
-  if (!isSdkInitialized) {
-    setOptions({
-      key: apiKey,
-      v: 'weekly',
-    });
-    isSdkInitialized = true;
-  }
+  googleMapsPromise = new Promise<typeof google>((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('Window is undefined'));
+      return;
+    }
 
-  googleMapsPromise = (async () => {
-    await Promise.all([
-      importLibrary('maps'),
-      importLibrary('routes'),
-      importLibrary('geometry'),
-    ]);
-    return window.google;
-  })();
+    // Check if script tag is already in DOM
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+    if (existingScript) {
+      if (window.google?.maps) {
+        resolve(window.google);
+        return;
+      }
+      existingScript.addEventListener('load', () => {
+        if (window.google?.maps) resolve(window.google);
+        else reject(new Error('Google Maps SDK loaded but maps namespace missing'));
+      });
+      existingScript.addEventListener('error', (e) => {
+        googleMapsPromise = null;
+        reject(e);
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places,geometry&v=weekly&loading=async`;
+    script.async = true;
+    script.defer = true;
+    script.id = 'google-maps-sdk-script';
+
+    script.onload = () => {
+      if (window.google?.maps) {
+        resolve(window.google);
+      } else {
+        reject(new Error('Google Maps SDK loaded but window.google.maps is undefined'));
+      }
+    };
+
+    script.onerror = (err) => {
+      googleMapsPromise = null;
+      reject(err);
+    };
+
+    document.head.appendChild(script);
+  });
 
   return googleMapsPromise;
 };

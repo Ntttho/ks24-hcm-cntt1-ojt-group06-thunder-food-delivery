@@ -44,8 +44,8 @@ export const DriverApprovalTab: React.FC<DriverApprovalTabProps> = ({
   useEffect(() => {
     let mounted = true;
     const missingUserIds = driverApprovals
-      .map((d) => d.userId)
-      .filter((uid) => uid && !userInfoMap[uid] && (!d.fullName || !d.phoneNumber));
+      .filter((d) => d.userId && !userInfoMap[d.userId] && (!d.fullName || !d.phoneNumber))
+      .map((d) => d.userId);
 
     if (missingUserIds.length === 0) return;
 
