@@ -27,6 +27,7 @@ import {
   MenuOutlined,
   SwapOutlined,
   ArrowRightOutlined,
+  PictureOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/hooks/useAuth';
 import { APP_ROUTES } from '@/constants';
@@ -86,6 +87,12 @@ export const AdminNavbar: React.FC = () => {
       altPaths: ['/admin/analytics'],
       label: 'Tổng quan & Thống kê',
       icon: <DashboardOutlined className="text-base" />,
+    },
+    {
+      key: 'banners',
+      path: '/admin/banners',
+      label: 'Quản lý Banner',
+      icon: <PictureOutlined className="text-base" />,
     },
     {
       key: 'users',

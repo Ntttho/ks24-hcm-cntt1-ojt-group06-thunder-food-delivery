@@ -6,10 +6,10 @@ export const appConfig = {
   port: Number(import.meta.env.VITE_APP_PORT) || 3000,
   defaultTimeout: 15000,
   cloudinary: {
-    cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dbsu61unm',
-    apiKey: import.meta.env.VITE_CLOUDINARY_API_KEY || '248623814955712',
-    apiSecret: import.meta.env.VITE_CLOUDINARY_API_SECRET || 'CUic7H8Zol524YGoyoiKrdLFM60',
-    folder: import.meta.env.VITE_CLOUDINARY_FOLDER || 'foodthunder',
+    cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+    apiKey: import.meta.env.VITE_CLOUDINARY_API_KEY || '',
+    apiSecret: import.meta.env.VITE_CLOUDINARY_API_SECRET || '',
+    folder: import.meta.env.VITE_CLOUDINARY_FOLDER || 'thunder-food/banners',
   },
 };
 

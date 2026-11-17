@@ -12,5 +12,6 @@ export * from './adminApprovalApi';
 export * from './adminSettingsApi';
 export * from './systemSettingsApi';
 export * from './adminAnalyticsApi';
+export * from './bannerApi';
 export * from './driverWebSocket';
 export * from './orderLiveTrackingWebSocket';
