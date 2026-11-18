@@ -8,6 +8,7 @@ import com.foodthunder.order.dto.client.RemoteToppingDto;
 import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.Order;
+import com.foodthunder.order.entity.OrderItem;
 import com.foodthunder.order.entity.OrderStatus;
 import com.foodthunder.order.exception.BadRequestException;
 import com.foodthunder.order.exception.ConflictException;
@@ -602,5 +603,84 @@ class OrderServiceTest {
 
         assertThat(res.getStatusCode()).isEqualTo(OrderStatus.DRIVER_REJECTED);
         assertThat(res.getDriverId()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("Task DUC-03: Khách hàng có thể hủy đơn khi còn PENDING, ghi log CUSTOMER và hoàn kho")
+    void testCancelOrder_CustomerCancelsPendingOrder_Success() {
+        OrderItem item = OrderItem.builder()
+                .id(1L)
+                .foodId(101)
+                .foodName("Cơm Tấm Sườn")
+                .quantity(2)
+                .priceAtOrder(BigDecimal.valueOf(45000))
+                .build();
+
+        Order order = Order.builder()
+                .id(100L)
+                .orderCode("ORD-100")
+                .customerId(1)
+                .restaurantId(10)
+                .status(pendingStatus)
+                .items(List.of(item))
+                .build();
+
+        when(orderRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(order));
+        when(orderStatusRepository.findByCode(OrderStatus.CANCELLED)).thenReturn(Optional.of(cancelledStatus));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse res = orderService.cancelOrder(100L, "Đặt nhầm địa chỉ giao hàng", 1, "ROLE_CUSTOMER");
+
+        assertThat(res.getStatusCode()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(order.getCancelledByRole()).isEqualTo("CUSTOMER");
+        assertThat(order.getCancelReason()).isEqualTo("Đặt nhầm địa chỉ giao hàng");
+        assertThat(order.getCancelledByUserId()).isEqualTo(1);
+        assertThat(order.getStatusLogs()).hasSize(1);
+        assertThat(order.getStatusLogs().get(0).getNewStatus()).isEqualTo(OrderStatus.CANCELLED);
+
+        // Verify hoàn kho ngay lập tức
+        verify(restaurantClient, times(1)).restoreProductStock(eq(101), eq(2));
+    }
+
+    @Test
+    @DisplayName("Task DUC-03: Khách hàng KHÔNG thể hủy đơn khi đơn đã CONFIRMED (quán đã nấu)")
+    void testCancelOrder_CustomerCannotCancelConfirmedOrder_ThrowsBadRequestException() {
+        Order order = Order.builder()
+                .id(101L)
+                .orderCode("ORD-101")
+                .customerId(1)
+                .restaurantId(10)
+                .status(confirmedStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(101L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(101L, "Đổi ý", 1, "ROLE_CUSTOMER"))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("PENDING");
+
+        verify(orderRepository, never()).save(any());
+        verify(restaurantClient, never()).restoreProductStock(any(), any());
+    }
+
+    @Test
+    @DisplayName("Task DUC-03: Khách hàng không thể hủy đơn hàng của khách hàng khác")
+    void testCancelOrder_CustomerCannotCancelOtherCustomerOrder_ThrowsForbiddenException() {
+        Order order = Order.builder()
+                .id(102L)
+                .orderCode("ORD-102")
+                .customerId(99)
+                .restaurantId(10)
+                .status(pendingStatus)
+                .build();
+
+        when(orderRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(order));
+
+        assertThatThrownBy(() -> orderService.cancelOrder(102L, "Đổi ý", 1, "ROLE_CUSTOMER"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("người khác");
+
+        verify(orderRepository, never()).save(any());
+        verify(restaurantClient, never()).restoreProductStock(any(), any());
     }
 }

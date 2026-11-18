@@ -46,6 +46,12 @@ public class RestaurantClientFallbackFactory implements FallbackFactory<Restaura
                 log.error("Fallback triggered for getVoucherById with id: {}, cause: {}", id, cause.getMessage());
                 throw new ResourceNotFoundException("Không thể lấy thông tin voucher ID=" + id + " từ restaurant-service: " + cause.getMessage());
             }
+
+            @Override
+            public ResponseEntity<ApiResponse<Void>> restoreProductStock(Integer id, Integer quantity) {
+                log.warn("Fallback triggered for restoreProductStock with id: {}, quantity: {}, cause: {}", id, quantity, cause.getMessage());
+                return ResponseEntity.ok(ApiResponse.success("Fallback: Không thể kết nối tới restaurant-service để hoàn kho", null));
+            }
         };
     }
 }

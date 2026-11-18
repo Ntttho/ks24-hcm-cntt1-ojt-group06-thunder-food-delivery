@@ -282,6 +282,26 @@ public class ProductServiceImpl implements ProductService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional
+    public void restoreStock(Integer productId, Integer quantity) {
+        if (productId == null || quantity == null || quantity <= 0) {
+            return;
+        }
+        Product product = productRepository.findById(productId).orElse(null);
+        if (product != null) {
+            int current = product.getCurrentQuantity() != null ? product.getCurrentQuantity() : 0;
+            product.setCurrentQuantity(current + quantity);
+            if (Boolean.FALSE.equals(product.getIsAvailable()) && product.getCurrentQuantity() > 0) {
+                product.setIsAvailable(true);
+            }
+            productRepository.save(product);
+            log.info("Restored stock for product ID={}, quantity=+{}, newQuantity={}", productId, quantity, product.getCurrentQuantity());
+        } else {
+            log.warn("Cannot restore stock: Product not found with ID={}", productId);
+        }
+    }
+
     private ProductDto mapProductToDto(Product product) {
         Integer restaurantId = null;
         String restaurantName = null;

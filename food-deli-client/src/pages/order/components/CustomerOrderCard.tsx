@@ -7,12 +7,14 @@ import {
   CompassOutlined,
   StarFilled,
   CarOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import type { CustomerOrder } from '@/types';
 import { reviewApi } from '@/services/api/reviewApi';
 import { RestaurantReviewModal } from './RestaurantReviewModal';
 import { DriverReviewModal } from './DriverReviewModal';
+import { CancelOrderModal } from './CancelOrderModal';
 
 interface CustomerOrderCardProps {
   order: CustomerOrder;
@@ -28,8 +30,15 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
   const [isDriverReviewOpen, setIsDriverReviewOpen] = useState<boolean>(false);
   const [restaurantReviewed, setRestaurantReviewed] = useState<boolean>(false);
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
+  const [currentOrder, setCurrentOrder] = useState<CustomerOrder>(order);
 
-  const isCompleted = order.statusCode === 'DELIVERED' || order.statusCode === 'COMPLETED';
+  useEffect(() => {
+    setCurrentOrder(order);
+  }, [order]);
+
+  const canCancel = currentOrder.statusCode === 'PENDING' || currentOrder.statusCode === 'AWAITING_PAYMENT';
+  const isCompleted = currentOrder.statusCode === 'DELIVERED' || currentOrder.statusCode === 'COMPLETED';
   const orderTime = new Date(order.createdAt).getTime();
   const isWithin24Hours = Date.now() - orderTime <= 24 * 60 * 60 * 1000;
 
@@ -119,7 +128,7 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
           </div>
         </div>
         <div className="self-start sm:self-auto">
-          {getStatusBadge(order.statusCode)}
+          {getStatusBadge(currentOrder.statusCode)}
         </div>
       </div>
 
@@ -216,6 +225,17 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
             )
           )}
 
+          {canCancel && (
+            <Button
+              danger
+              icon={<CloseCircleOutlined />}
+              onClick={() => setIsCancelModalOpen(true)}
+              className="border-rose-300 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-xs"
+            >
+              Hủy đơn
+            </Button>
+          )}
+
           <Button
             type="primary"
             icon={<CompassOutlined />}
@@ -226,6 +246,24 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Modal hủy đơn hàng */}
+      {isCancelModalOpen && (
+        <CancelOrderModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          orderId={currentOrder.id}
+          orderCode={currentOrder.orderCode}
+          onSuccess={(reason) => {
+            setCurrentOrder({
+              ...currentOrder,
+              statusCode: 'CANCELLED',
+              statusLabel: 'Đã hủy',
+              cancelReason: reason,
+            });
+          }}
+        />
+      )}
 
       {/* Modal đánh giá Quán riêng */}
       {isRestaurantReviewOpen && (

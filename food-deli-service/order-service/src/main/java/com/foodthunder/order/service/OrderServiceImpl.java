@@ -679,24 +679,56 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Không thể hủy đơn hàng đã ở trạng thái: " + currentStatus);
         }
 
+        // RBAC validation: Khách hàng chỉ có thể hủy đơn khi đơn còn ở PENDING hoặc AWAITING_PAYMENT (chưa nấu)
+        boolean isCustomer = requestingUserRole == null
+                || requestingUserRole.toUpperCase().contains("CUSTOMER")
+                || (!requestingUserRole.toUpperCase().contains("ADMIN") && !requestingUserRole.toUpperCase().contains("MERCHANT"));
+
+        if (isCustomer) {
+            if (requestingUserId != null && order.getCustomerId() != null && !requestingUserId.equals(order.getCustomerId())) {
+                throw new ForbiddenException("Bạn không có quyền thao tác hủy trên đơn hàng của khách hàng khác");
+            }
+            if (!OrderStatus.PENDING.equalsIgnoreCase(currentStatus) && !OrderStatus.AWAITING_PAYMENT.equalsIgnoreCase(currentStatus)) {
+                throw new BadRequestException("Khách hàng chỉ có thể hủy đơn khi đơn còn ở trạng thái PENDING (chờ quán xác nhận). Đơn hàng đã được quán tiếp nhận/đang nấu không thể hủy!");
+            }
+        }
+
         OrderStatus cancelledStatus = getOrCreateStatus(OrderStatus.CANCELLED, "Đã huỷ", "Đơn hàng đã bị huỷ", 8);
         order.setStatus(cancelledStatus);
-        order.setCancelReason(reason != null ? reason : "Hủy đơn hàng");
+        String finalReason = (reason != null && !reason.isBlank()) ? reason.trim() : "Khách hàng hủy đơn khi chờ xác nhận";
+        order.setCancelReason(finalReason);
         order.setCancelledAt(LocalDateTime.now());
-        order.setCancelledByRole(requestingUserRole != null ? requestingUserRole : "CUSTOMER");
-        order.setCancelledByUserId(requestingUserId);
+        order.setCancelledByRole(isCustomer ? "CUSTOMER" : (requestingUserRole != null ? requestingUserRole : "CUSTOMER"));
+        order.setCancelledByUserId(requestingUserId != null ? requestingUserId : order.getCustomerId());
 
         OrderStatusLog logEntry = OrderStatusLog.builder()
                 .previousStatus(currentStatus)
                 .newStatus(OrderStatus.CANCELLED)
-                .changedBy(requestingUserId)
-                .reason(reason != null ? reason : "Hủy đơn hàng")
+                .changedBy(requestingUserId != null ? requestingUserId : order.getCustomerId())
+                .reason(finalReason)
                 .createdAt(LocalDateTime.now())
                 .build();
         order.addStatusLog(logEntry);
 
+        // Hoàn kho ngay lập tức cho các món ăn trong đơn
+        if (order.getItems() != null && !order.getItems().isEmpty()) {
+            for (OrderItem item : order.getItems()) {
+                if (item.getFoodId() != null && item.getQuantity() != null && item.getQuantity() > 0) {
+                    try {
+                        restaurantClient.restoreProductStock(item.getFoodId(), item.getQuantity());
+                        log.info("Hoàn kho thành công món ID={} số lượng={}", item.getFoodId(), item.getQuantity());
+                    } catch (Exception ex) {
+                        log.warn("Không thể hoàn kho món ID={}: {}", item.getFoodId(), ex.getMessage());
+                    }
+                }
+            }
+        }
+
         Order saved = orderRepository.save(order);
-        log.info("Order ID={} cancelled with reason: {}", orderId, reason);
+        log.info("Order ID={} cancelled with reason: {}, cancelledByRole: {}", orderId, finalReason, order.getCancelledByRole());
+
+        broadcastOrderToMerchant(saved);
+
         return mapToOrderResponse(saved);
     }
 

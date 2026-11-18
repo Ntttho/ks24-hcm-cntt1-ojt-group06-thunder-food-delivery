@@ -16,6 +16,8 @@ import {
   StarFilled,
   ShopOutlined,
   CarOutlined,
+  CloseCircleOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
@@ -27,6 +29,7 @@ import {
   OrderItemsBreakdown,
   RestaurantReviewModal,
   DriverReviewModal,
+  CancelOrderModal,
 } from './components';
 
 const { Title, Text } = Typography;
@@ -88,6 +91,7 @@ export const OrderDetailPage: React.FC = () => {
   const [isDriverReviewOpen, setIsDriverReviewOpen] = useState<boolean>(false);
   const [restaurantReviewed, setRestaurantReviewed] = useState<boolean>(false);
   const [driverReviewed, setDriverReviewed] = useState<boolean>(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchOrderDetail = async () => {
@@ -276,6 +280,7 @@ export const OrderDetailPage: React.FC = () => {
   const { current, statusText } = getStepCurrent(order.statusCode);
   const isError = order.statusCode === 'CANCELLED' || order.statusCode === 'TIMEOUT';
   const isCompleted = order.statusCode === 'DELIVERED' || order.statusCode === 'COMPLETED';
+  const canCancel = order.statusCode === 'PENDING' || order.statusCode === 'AWAITING_PAYMENT';
 
   return (
     <div className="w-full space-y-6">
@@ -314,6 +319,19 @@ export const OrderDetailPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Nút Hủy đơn hàng nổi bật khi PENDING (Task DUC-03) */}
+            {canCancel && (
+              <Button
+                danger
+                type="primary"
+                icon={<CloseCircleOutlined />}
+                onClick={() => setIsCancelModalOpen(true)}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-rose-600/20 active:scale-95"
+              >
+                Hủy đơn hàng này
+              </Button>
+            )}
+
             {isCompleted && (
               <>
                 {/* 1. Nút / Tag Đánh giá Quán */}
@@ -365,6 +383,36 @@ export const OrderDetailPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Banner chi tiết nếu đơn đã bị hủy */}
+        {order.statusCode === 'CANCELLED' && (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs sm:text-sm space-y-1.5 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 font-black text-rose-700">
+              <CloseCircleOutlined className="text-base" />
+              <span>ĐƠN HÀNG ĐÃ BỊ HỦY</span>
+            </div>
+            <p className="text-rose-700/90 font-medium">
+              <strong>Lý do hủy:</strong> {order.cancelReason || 'Khách hàng hủy đơn khi chờ xác nhận'}
+            </p>
+          </div>
+        )}
+
+        {/* Khung nhắc nhở khách có thể hủy khi còn PENDING */}
+        {canCancel && (
+          <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 font-medium">
+              <InfoCircleOutlined className="text-amber-600 text-base shrink-0" />
+              <span>Đơn hàng đang chờ quán xác nhận. Bạn có thể bấm <strong>Hủy đơn hàng</strong> nếu muốn thay đổi thông tin hoặc chọn lại món.</span>
+            </div>
+            <Button
+              danger
+              onClick={() => setIsCancelModalOpen(true)}
+              className="font-bold text-xs rounded-xl self-start sm:self-auto border-rose-300 text-rose-600 hover:bg-rose-50 hover:border-rose-400"
+            >
+              Hủy đơn ngay
+            </Button>
+          </div>
+        )}
 
         {/* 3. Live Tracking Progress Bar */}
         <OrderLiveTrackingStepper
@@ -426,6 +474,23 @@ export const OrderDetailPage: React.FC = () => {
           onClose={() => setIsDriverReviewOpen(false)}
           order={order}
           onSuccess={() => setDriverReviewed(true)}
+        />
+      )}
+
+      {isCancelModalOpen && order && (
+        <CancelOrderModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          orderId={order.id}
+          orderCode={order.orderCode}
+          onSuccess={(reason) => {
+            setOrder({
+              ...order,
+              statusCode: 'CANCELLED',
+              statusLabel: 'Đã hủy',
+              cancelReason: reason,
+            });
+          }}
         />
       )}
     </div>

@@ -35,4 +35,6 @@ public interface ProductService {
     List<ToppingDto> assignToppingsToProduct(Integer productId, List<Integer> toppingIds, Integer requesterUserId, String role);
 
     List<ToppingDto> getProductToppings(Integer productId);
+
+    void restoreStock(Integer productId, Integer quantity);
 }

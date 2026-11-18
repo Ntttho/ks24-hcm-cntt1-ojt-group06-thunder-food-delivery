@@ -130,4 +130,17 @@ public class ProductController {
         List<ToppingDto> toppings = productService.getProductToppings(id);
         return ResponseEntity.ok(ApiResponse.success("Lấy danh sách topping của món ăn thành công", toppings));
     }
+
+    /**
+     * Hoàn kho nguyên liệu món ăn ngay lập tức khi đơn hàng bị hủy
+     * POST /api/v1/products/{id}/restore-stock?quantity=X
+     */
+    @PostMapping("/{id}/restore-stock")
+    public ResponseEntity<ApiResponse<Void>> restoreStock(
+            @PathVariable Integer id,
+            @RequestParam(defaultValue = "1") Integer quantity
+    ) {
+        productService.restoreStock(id, quantity);
+        return ResponseEntity.ok(ApiResponse.success("Hoàn kho món ăn thành công", null));
+    }
 }

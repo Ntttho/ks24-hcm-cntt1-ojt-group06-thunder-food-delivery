@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @FeignClient(name = "restaurant-service", fallbackFactory = RestaurantClientFallbackFactory.class)
 public interface RestaurantClient {
 
@@ -26,4 +28,10 @@ public interface RestaurantClient {
 
     @GetMapping("/api/v1/vouchers/{id}")
     ResponseEntity<ApiResponse<RemoteVoucherValidationResponse>> getVoucherById(@PathVariable("id") Integer id);
+
+    @PostMapping("/api/v1/products/{id}/restore-stock")
+    ResponseEntity<ApiResponse<Void>> restoreProductStock(
+            @PathVariable("id") Integer id,
+            @RequestParam("quantity") Integer quantity
+    );
 }
