@@ -240,74 +240,70 @@ public class OrderServiceImpl implements OrderService {
         Integer appliedSystemVoucherId = null;
         String appliedSystemVoucherCode = null;
         Set<Integer> voucherIdsToRedeem = new LinkedHashSet<>();
+        List<OrderVoucher> pendingOrderVouchers = new ArrayList<>();
 
-        // 4.1 Validate & apply shop voucher + system voucher (both optional, max 1 each)
+        // 4.1 Validate & apply multiple vouchers: allow max 1 voucher per voucher_category per order
         boolean isNewUser = isNewUserForVouchers(customerId);
-        List<RemoteVoucherValidationResponse> validatedVouchers = new ArrayList<>();
+        List<RemoteVoucherValidationResponse> validatedVouchers = validateRequestedVouchers(
+                request, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser
+        );
 
-        String primaryCode = resolveVoucherCode(request.getVoucherId(), request.getVoucherCode());
-        RemoteVoucherValidationResponse primaryVoucher = null;
-        if (primaryCode != null && !primaryCode.isBlank()) {
-            primaryVoucher = validateSingleVoucher(
-                    primaryCode, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
-                    "Không thể áp dụng voucher: "
-            );
-            validatedVouchers.add(primaryVoucher);
-        }
-
-        String systemCode = resolveVoucherCode(request.getSystemVoucherId(), request.getSystemVoucherCode());
-        if (systemCode != null && !systemCode.isBlank()) {
-            boolean isSameAsPrimary = primaryVoucher != null
-                    && ((primaryVoucher.getCode() != null && primaryVoucher.getCode().equalsIgnoreCase(systemCode))
-                    || (request.getSystemVoucherId() != null && request.getSystemVoucherId().equals(primaryVoucher.getVoucherId())));
-            if (!isSameAsPrimary) {
-                RemoteVoucherValidationResponse systemVoucher = validateSingleVoucher(
-                        systemCode, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
-                        "Không thể áp dụng voucher toàn hệ thống: "
-                );
-                if (Boolean.FALSE.equals(systemVoucher.getIsSystemVoucher()) || systemVoucher.getRestaurantId() != null) {
-                    throw new BadRequestException("Mã '" + systemVoucher.getCode() + "' là voucher riêng của quán, không thể dùng ở mục Voucher toàn hệ thống");
-                }
-                if (primaryVoucher != null && Boolean.TRUE.equals(primaryVoucher.getIsSystemVoucher())) {
-                    throw new BadRequestException("Mỗi đơn hàng chỉ được áp dụng tối đa 1 voucher toàn hệ thống");
-                }
-                validatedVouchers.add(systemVoucher);
-                appliedSystemVoucherId = systemVoucher.getVoucherId();
-                appliedSystemVoucherCode = systemVoucher.getCode();
-            }
-        }
-
-        if (primaryVoucher != null) {
-            appliedVoucherId = primaryVoucher.getVoucherId();
-            appliedVoucherCode = primaryVoucher.getCode();
-            if (Boolean.TRUE.equals(primaryVoucher.getIsSystemVoucher()) && appliedSystemVoucherId == null) {
-                appliedSystemVoucherId = primaryVoucher.getVoucherId();
-                appliedSystemVoucherCode = primaryVoucher.getCode();
-            }
-        } else if (appliedSystemVoucherId != null) {
-            appliedVoucherId = appliedSystemVoucherId;
-            appliedVoucherCode = appliedSystemVoucherCode;
-        }
-
+        Map<String, RemoteVoucherValidationResponse> appliedByCategory = new LinkedHashMap<>();
         BigDecimal remainingFood = subtotal;
         BigDecimal remainingShipping = shippingFee;
         for (RemoteVoucherValidationResponse vData : validatedVouchers) {
+            String category = normalizeVoucherCategory(vData.getVoucherCategory());
+            RemoteVoucherValidationResponse existingInCategory = appliedByCategory.putIfAbsent(category, vData);
+            if (existingInCategory != null) {
+                throw new BadRequestException(
+                        "Mỗi đơn hàng chỉ được áp dụng tối đa 1 voucher cho cùng loại (" + category + "). "
+                        + "Mã '" + vData.getCode() + "' bị trùng loại với mã '" + existingInCategory.getCode() + "'"
+                );
+            }
+
             if (vData.getVoucherId() != null) {
                 voucherIdsToRedeem.add(vData.getVoucherId());
             }
-            if ("FREESHIP".equalsIgnoreCase(vData.getVoucherCategory())) {
+
+            BigDecimal appliedVoucherDiscount;
+            if ("FREESHIP".equals(category)) {
                 BigDecimal rawShip = vData.getShippingDiscountAmount() != null
                         ? vData.getShippingDiscountAmount()
                         : (vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO);
-                BigDecimal appliedShip = rawShip.max(BigDecimal.ZERO).min(remainingShipping);
-                remainingShipping = remainingShipping.subtract(appliedShip);
-                shippingDiscountAmount = shippingDiscountAmount.add(appliedShip);
+                appliedVoucherDiscount = rawShip.max(BigDecimal.ZERO).min(remainingShipping);
+                remainingShipping = remainingShipping.subtract(appliedVoucherDiscount);
+                shippingDiscountAmount = shippingDiscountAmount.add(appliedVoucherDiscount);
             } else {
                 BigDecimal rawFood = vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO;
-                BigDecimal appliedFood = rawFood.max(BigDecimal.ZERO).min(remainingFood);
-                remainingFood = remainingFood.subtract(appliedFood);
-                discountAmount = discountAmount.add(appliedFood);
+                appliedVoucherDiscount = rawFood.max(BigDecimal.ZERO).min(remainingFood);
+                remainingFood = remainingFood.subtract(appliedVoucherDiscount);
+                discountAmount = discountAmount.add(appliedVoucherDiscount);
             }
+
+            boolean isSystem = Boolean.TRUE.equals(vData.getIsSystemVoucher());
+            if (isSystem) {
+                if (appliedSystemVoucherId == null) {
+                    appliedSystemVoucherId = vData.getVoucherId();
+                    appliedSystemVoucherCode = vData.getCode();
+                }
+            } else if (appliedVoucherId == null) {
+                appliedVoucherId = vData.getVoucherId();
+                appliedVoucherCode = vData.getCode();
+            }
+
+            if (vData.getVoucherId() != null) {
+                pendingOrderVouchers.add(OrderVoucher.builder()
+                        .voucherId(vData.getVoucherId())
+                        .voucherCode(vData.getCode() != null ? vData.getCode() : "")
+                        .voucherCategory(category)
+                        .isSystemVoucher(isSystem)
+                        .discountAmount(appliedVoucherDiscount)
+                        .build());
+            }
+        }
+        if (appliedVoucherId == null && appliedSystemVoucherId != null) {
+            appliedVoucherId = appliedSystemVoucherId;
+            appliedVoucherCode = appliedSystemVoucherCode;
         }
         discountAmount = discountAmount.add(shippingDiscountAmount);
 
@@ -372,6 +368,10 @@ public class OrderServiceImpl implements OrderService {
 
         for (OrderItem oi : orderItems) {
             order.addItem(oi);
+        }
+
+        for (OrderVoucher ov : pendingOrderVouchers) {
+            order.addAppliedVoucher(ov);
         }
 
         OrderStatusLog initialLog = OrderStatusLog.builder()
@@ -742,6 +742,18 @@ public class OrderServiceImpl implements OrderService {
                         .build())
                 .collect(Collectors.toList());
 
+        List<OrderVoucherResponse> appliedVoucherResponses = order.getAppliedVouchers() != null
+                ? order.getAppliedVouchers().stream()
+                        .map(ov -> OrderVoucherResponse.builder()
+                                .voucherId(ov.getVoucherId())
+                                .voucherCode(ov.getVoucherCode())
+                                .voucherCategory(ov.getVoucherCategory())
+                                .isSystemVoucher(ov.getIsSystemVoucher())
+                                .discountAmount(ov.getDiscountAmount())
+                                .build())
+                        .collect(Collectors.toList())
+                : new ArrayList<>();
+
         return OrderResponse.builder()
                 .id(order.getId())
                 .orderCode(order.getOrderCode())
@@ -774,6 +786,7 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(order.getCreatedAt())
                 .items(itemResponses)
                 .statusLogs(logResponses)
+                .appliedVouchers(appliedVoucherResponses)
                 .build();
     }
 
@@ -873,6 +886,106 @@ public class OrderServiceImpl implements OrderService {
                 customerId,
                 List.of(OrderStatus.CANCELLED, OrderStatus.TIMEOUT)
         );
+    }
+
+    private List<RemoteVoucherValidationResponse> validateRequestedVouchers(
+            CreateOrderRequest request,
+            Integer targetRestaurantId,
+            BigDecimal subtotal,
+            BigDecimal shippingFee,
+            Integer customerId,
+            boolean isNewUser
+    ) {
+        Set<String> codesToValidate = new LinkedHashSet<>();
+        addNormalizedCode(codesToValidate, request.getVoucherCode());
+        addNormalizedCode(codesToValidate, request.getSystemVoucherCode());
+        if (request.getVoucherCodes() != null) {
+            for (String code : request.getVoucherCodes()) {
+                addNormalizedCode(codesToValidate, code);
+            }
+        }
+
+        List<RemoteVoucherValidationResponse> validated = new ArrayList<>();
+        Set<Integer> validatedIds = new HashSet<>();
+        Set<String> validatedCodes = new HashSet<>();
+
+        String explicitSystemCode = (request.getSystemVoucherCode() != null && !request.getSystemVoucherCode().isBlank())
+                ? request.getSystemVoucherCode().trim().toUpperCase(Locale.ROOT)
+                : null;
+
+        for (String code : codesToValidate) {
+            RemoteVoucherValidationResponse vData = validateSingleVoucher(
+                    code, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
+                    "Không thể áp dụng voucher: "
+            );
+            String resolvedCode = vData.getCode() != null ? vData.getCode().trim().toUpperCase(Locale.ROOT) : code;
+            if (explicitSystemCode != null
+                    && explicitSystemCode.equals(resolvedCode)
+                    && (request.getVoucherCode() == null || !explicitSystemCode.equalsIgnoreCase(request.getVoucherCode().trim()))
+                    && (request.getVoucherCodes() == null || request.getVoucherCodes().stream()
+                            .noneMatch(c -> c != null && explicitSystemCode.equalsIgnoreCase(c.trim())))
+                    && (Boolean.FALSE.equals(vData.getIsSystemVoucher()) || vData.getRestaurantId() != null)) {
+                throw new BadRequestException("Mã '" + vData.getCode() + "' là voucher riêng của quán, không thể dùng ở mục Voucher toàn hệ thống");
+            }
+            if (vData.getVoucherId() != null && !validatedIds.add(vData.getVoucherId())) {
+                continue;
+            }
+            if (validatedCodes.add(resolvedCode)) {
+                validated.add(vData);
+            }
+        }
+
+        List<Integer> requestedIds = new ArrayList<>();
+        if (request.getVoucherId() != null) {
+            requestedIds.add(request.getVoucherId());
+        }
+        if (request.getSystemVoucherId() != null) {
+            requestedIds.add(request.getSystemVoucherId());
+        }
+        if (request.getVoucherIds() != null) {
+            requestedIds.addAll(request.getVoucherIds());
+        }
+
+        for (Integer id : requestedIds) {
+            if (id == null || validatedIds.contains(id)) {
+                continue;
+            }
+            String resolvedFromId = resolveVoucherCode(id, null);
+            if (resolvedFromId == null || resolvedFromId.isBlank() || validatedCodes.contains(resolvedFromId)) {
+                continue;
+            }
+            RemoteVoucherValidationResponse vData = validateSingleVoucher(
+                    resolvedFromId, targetRestaurantId, subtotal, shippingFee, customerId, isNewUser,
+                    "Không thể áp dụng voucher: "
+            );
+            boolean isExplicitSystemOnlyId = id.equals(request.getSystemVoucherId())
+                    && !id.equals(request.getVoucherId())
+                    && (request.getVoucherIds() == null || !request.getVoucherIds().contains(id));
+            if (isExplicitSystemOnlyId && (Boolean.FALSE.equals(vData.getIsSystemVoucher()) || vData.getRestaurantId() != null)) {
+                throw new BadRequestException("Mã '" + vData.getCode() + "' là voucher riêng của quán, không thể dùng ở mục Voucher toàn hệ thống");
+            }
+            if (vData.getVoucherId() != null && !validatedIds.add(vData.getVoucherId())) {
+                continue;
+            }
+            if (validatedCodes.add(resolvedFromId)) {
+                validated.add(vData);
+            }
+        }
+
+        return validated;
+    }
+
+    private void addNormalizedCode(Set<String> target, String code) {
+        if (code != null && !code.isBlank()) {
+            target.add(code.trim().toUpperCase(Locale.ROOT));
+        }
+    }
+
+    private String normalizeVoucherCategory(String category) {
+        if (category == null || category.isBlank()) {
+            return "DISCOUNT_FOOD";
+        }
+        return category.trim().toUpperCase(Locale.ROOT);
     }
 
     private String resolveVoucherCode(Integer voucherId, String voucherCode) {
@@ -979,6 +1092,13 @@ public class OrderServiceImpl implements OrderService {
 
     private void releaseOrderVouchers(Order order) {
         Set<Integer> idsToRelease = new LinkedHashSet<>();
+        if (order.getAppliedVouchers() != null) {
+            for (OrderVoucher ov : order.getAppliedVouchers()) {
+                if (ov.getVoucherId() != null) {
+                    idsToRelease.add(ov.getVoucherId());
+                }
+            }
+        }
         if (order.getVoucherId() != null) {
             idsToRelease.add(order.getVoucherId());
         }

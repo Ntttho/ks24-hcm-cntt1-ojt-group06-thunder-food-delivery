@@ -130,6 +130,10 @@ public class Order {
     @Builder.Default
     private List<OrderStatusLog> statusLogs = new ArrayList<>();
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<OrderVoucher> appliedVouchers = new ArrayList<>();
+
     public void addItem(OrderItem item) {
         items.add(item);
         item.setOrder(this);
@@ -138,5 +142,10 @@ public class Order {
     public void addStatusLog(OrderStatusLog log) {
         statusLogs.add(log);
         log.setOrder(this);
+    }
+
+    public void addAppliedVoucher(OrderVoucher orderVoucher) {
+        appliedVouchers.add(orderVoucher);
+        orderVoucher.setOrder(this);
     }
 }

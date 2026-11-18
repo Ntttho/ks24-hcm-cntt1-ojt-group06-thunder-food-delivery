@@ -262,6 +262,21 @@ CREATE TABLE `orders` (
   CONSTRAINT `orders_ibfk_5` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE `order_vouchers` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `order_id` bigint NOT NULL,
+  `voucher_id` int NOT NULL,
+  `voucher_code` varchar(30) NOT NULL,
+  `voucher_category` varchar(50) NOT NULL,
+  `is_system_voucher` tinyint(1) NOT NULL DEFAULT '0',
+  `discount_amount` decimal(10,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_order_voucher_category` (`order_id`, `voucher_category`),
+  UNIQUE KEY `uniq_order_voucher_id` (`order_id`, `voucher_id`),
+  KEY `idx_order_vouchers_order_id` (`order_id`),
+  CONSTRAINT `fk_order_vouchers_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 -- [Logical FK]: food_id trỏ sang restaurant-service
 -- [Physical FK]: order_id nội bộ
 CREATE TABLE `order_items` (

@@ -56,4 +56,7 @@ public class OrderResponse {
 
     @Builder.Default
     private List<OrderStatusLogResponse> statusLogs = new ArrayList<>();
+
+    @Builder.Default
+    private List<OrderVoucherResponse> appliedVouchers = new ArrayList<>();
 }

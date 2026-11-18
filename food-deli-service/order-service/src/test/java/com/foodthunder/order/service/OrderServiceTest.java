@@ -9,6 +9,7 @@ import com.foodthunder.order.dto.client.RemoteValidateVoucherRequest;
 import com.foodthunder.order.dto.client.RemoteVoucherValidationResponse;
 import com.foodthunder.order.entity.Order;
 import com.foodthunder.order.entity.OrderStatus;
+import com.foodthunder.order.entity.OrderVoucher;
 import com.foodthunder.order.exception.BadRequestException;
 import com.foodthunder.order.exception.ConflictException;
 import com.foodthunder.order.exception.ForbiddenException;
@@ -780,5 +781,185 @@ class OrderServiceTest {
         assertThat(res.getStatusCode()).isEqualTo(OrderStatus.CANCELLED);
         verify(restaurantClient).releaseVoucher(4);
         verify(restaurantClient).releaseVoucher(1);
+    }
+
+    @Test
+    @DisplayName("Áp dụng nhiều voucher khác loại (DISCOUNT_FOOD quán + FREESHIP hệ thống + NEW_USER hệ thống)")
+    void testCreateOrder_WithMultipleDifferentCategoryVouchers_StacksAllDiscounts() {
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Nguyễn Huệ, Q1")
+                .distanceKm(2.0)
+                .paymentMethod("COD")
+                .voucherIds(List.of(4, 1, 8))
+                .voucherCodes(List.of("QUAN20K", "FREESHIP", "NEW15K"))
+                .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(2).build()))
+                .build();
+
+        RemoteProductDto productDto = RemoteProductDto.builder()
+                .id(101)
+                .name("Cơm Tấm")
+                .price(BigDecimal.valueOf(50000))
+                .restaurantId(10)
+                .isAvailable(true)
+                .build();
+
+        RemoteVoucherValidationResponse shopFoodRes = RemoteVoucherValidationResponse.builder()
+                .voucherId(4)
+                .restaurantId(10)
+                .isSystemVoucher(false)
+                .voucherCategory("DISCOUNT_FOOD")
+                .code("QUAN20K")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(20000))
+                .shippingDiscountAmount(BigDecimal.ZERO)
+                .isValid(true)
+                .message("OK")
+                .build();
+
+        RemoteVoucherValidationResponse sysFreeshipRes = RemoteVoucherValidationResponse.builder()
+                .voucherId(1)
+                .restaurantId(null)
+                .isSystemVoucher(true)
+                .voucherCategory("FREESHIP")
+                .code("FREESHIP")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(15000))
+                .shippingDiscountAmount(BigDecimal.valueOf(15000))
+                .isValid(true)
+                .message("OK")
+                .build();
+
+        RemoteVoucherValidationResponse sysNewUserRes = RemoteVoucherValidationResponse.builder()
+                .voucherId(8)
+                .restaurantId(null)
+                .isSystemVoucher(true)
+                .voucherCategory("NEW_USER")
+                .code("NEW15K")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(15000))
+                .shippingDiscountAmount(BigDecimal.ZERO)
+                .isValid(true)
+                .message("OK")
+                .build();
+
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+        when(orderStatusRepository.findByCode(OrderStatus.PENDING)).thenReturn(Optional.of(pendingStatus));
+        when(restaurantClient.validateVoucher(argThat(r -> r != null && "QUAN20K".equals(r.getCode()))))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(shopFoodRes)));
+        when(restaurantClient.validateVoucher(argThat(r -> r != null && "FREESHIP".equals(r.getCode()))))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(sysFreeshipRes)));
+        when(restaurantClient.validateVoucher(argThat(r -> r != null && "NEW15K".equals(r.getCode()))))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(sysNewUserRes)));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
+            Order o = i.getArgument(0);
+            o.setId(2027L);
+            return o;
+        });
+
+        OrderResponse response = orderService.createOrder(request, 7);
+
+        // Subtotal = 100,000; shipping = 25,000
+        // Discounts: QUAN20K (20,000) + FREESHIP (15,000) + NEW15K (15,000) = 50,000 -> total = 75,000
+        assertThat(response.getShippingDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(15000));
+        assertThat(response.getDiscountAmount()).isEqualByComparingTo(BigDecimal.valueOf(50000));
+        assertThat(response.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(75000));
+        assertThat(response.getAppliedVouchers()).hasSize(3);
+        assertThat(response.getAppliedVouchers())
+                .extracting(OrderVoucherResponse::getVoucherCode)
+                .containsExactly("QUAN20K", "FREESHIP", "NEW15K");
+        verify(restaurantClient).redeemVoucher(4);
+        verify(restaurantClient).redeemVoucher(1);
+        verify(restaurantClient).redeemVoucher(8);
+    }
+
+    @Test
+    @DisplayName("Từ chối đơn hàng nếu 2 voucher có cùng voucher_category (dù 1 quán 1 toàn sàn)")
+    void testCreateOrder_SameVoucherCategory_ThrowsBadRequest() {
+        CreateOrderRequest request = CreateOrderRequest.builder()
+                .restaurantId(10)
+                .receiverAddress("123 Nguyễn Huệ, Q1")
+                .distanceKm(2.0)
+                .paymentMethod("COD")
+                .voucherIds(List.of(4, 9))
+                .voucherCodes(List.of("QUAN20K", "SYSFOOD10K"))
+                .items(List.of(CreateOrderItemRequest.builder().foodId(101).quantity(2).build()))
+                .build();
+
+        RemoteProductDto productDto = RemoteProductDto.builder()
+                .id(101)
+                .name("Cơm Tấm")
+                .price(BigDecimal.valueOf(50000))
+                .restaurantId(10)
+                .isAvailable(true)
+                .build();
+
+        RemoteVoucherValidationResponse shopFoodRes = RemoteVoucherValidationResponse.builder()
+                .voucherId(4)
+                .restaurantId(10)
+                .isSystemVoucher(false)
+                .voucherCategory("DISCOUNT_FOOD")
+                .code("QUAN20K")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(20000))
+                .isValid(true)
+                .build();
+
+        RemoteVoucherValidationResponse sysFoodRes = RemoteVoucherValidationResponse.builder()
+                .voucherId(9)
+                .restaurantId(null)
+                .isSystemVoucher(true)
+                .voucherCategory("DISCOUNT_FOOD")
+                .code("SYSFOOD10K")
+                .discountType("FIXED")
+                .discountAmount(BigDecimal.valueOf(10000))
+                .isValid(true)
+                .build();
+
+        when(restaurantClient.getRestaurantDetail(10)).thenReturn(ResponseEntity.ok(ApiResponse.success(validRestaurantDto)));
+        when(restaurantClient.getProductDetail(101)).thenReturn(ResponseEntity.ok(ApiResponse.success(productDto)));
+        when(restaurantClient.validateVoucher(argThat(r -> r != null && "QUAN20K".equals(r.getCode()))))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(shopFoodRes)));
+        when(restaurantClient.validateVoucher(argThat(r -> r != null && "SYSFOOD10K".equals(r.getCode()))))
+                .thenReturn(ResponseEntity.ok(ApiResponse.success(sysFoodRes)));
+
+        assertThatThrownBy(() -> orderService.createOrder(request, 7))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("cùng loại")
+                .hasMessageContaining("DISCOUNT_FOOD");
+
+        verify(restaurantClient, never()).redeemVoucher(anyInt());
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    @DisplayName("Hủy đơn hàng hoàn trả toàn bộ voucher trong danh sách appliedVouchers")
+    void testCancelOrder_ReleasesAllAppliedVouchersFromList() {
+        Order order = Order.builder()
+                .id(556L)
+                .orderCode("ORD-556")
+                .customerId(1)
+                .restaurantId(10)
+                .status(pendingStatus)
+                .items(new java.util.ArrayList<>())
+                .statusLogs(new java.util.ArrayList<>())
+                .appliedVouchers(new java.util.ArrayList<>())
+                .build();
+        order.addAppliedVoucher(OrderVoucher.builder().voucherId(4).voucherCode("QUAN20K").voucherCategory("DISCOUNT_FOOD").isSystemVoucher(false).discountAmount(BigDecimal.valueOf(20000)).build());
+        order.addAppliedVoucher(OrderVoucher.builder().voucherId(1).voucherCode("FREESHIP").voucherCategory("FREESHIP").isSystemVoucher(true).discountAmount(BigDecimal.valueOf(15000)).build());
+        order.addAppliedVoucher(OrderVoucher.builder().voucherId(8).voucherCode("NEW15K").voucherCategory("NEW_USER").isSystemVoucher(true).discountAmount(BigDecimal.valueOf(15000)).build());
+
+        OrderStatus cancelled = OrderStatus.builder().id(8).code(OrderStatus.CANCELLED).label("Đã huỷ").build();
+        when(orderRepository.findByIdForUpdate(556L)).thenReturn(Optional.of(order));
+        when(orderStatusRepository.findByCode(OrderStatus.CANCELLED)).thenReturn(Optional.of(cancelled));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> i.getArgument(0));
+
+        OrderResponse res = orderService.cancelOrder(556L, "Đổi ý", 1, "ROLE_CUSTOMER");
+
+        assertThat(res.getStatusCode()).isEqualTo(OrderStatus.CANCELLED);
+        verify(restaurantClient).releaseVoucher(4);
+        verify(restaurantClient).releaseVoucher(1);
+        verify(restaurantClient).releaseVoucher(8);
     }
 }

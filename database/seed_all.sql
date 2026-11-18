@@ -29,6 +29,7 @@ DROP TABLE IF EXISTS `order_status_logs`;
 DROP TABLE IF EXISTS `payment_transactions`;
 DROP TABLE IF EXISTS `payments`;
 DROP TABLE IF EXISTS `order_item_toppings`;
+DROP TABLE IF EXISTS `order_vouchers`;
 DROP TABLE IF EXISTS `order_items`;
 DROP TABLE IF EXISTS `orders`;
 DROP TABLE IF EXISTS `order_statuses`;
@@ -307,6 +308,22 @@ CREATE TABLE `orders` (
   KEY `idx_orders_created_at` (`created_at`),
   KEY `idx_orders_cancelled_by_user_id` (`cancelled_by_user_id`),
   CONSTRAINT `fk_orders_status` FOREIGN KEY (`status_id`) REFERENCES `order_statuses` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Lưu chi tiết nhiều voucher khác danh mục (mỗi danh mục tối đa 1 voucher / đơn hàng)
+CREATE TABLE `order_vouchers` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `order_id` BIGINT NOT NULL,
+  `voucher_id` INT NOT NULL,
+  `voucher_code` VARCHAR(30) NOT NULL,
+  `voucher_category` VARCHAR(50) NOT NULL,
+  `is_system_voucher` TINYINT(1) NOT NULL DEFAULT '0',
+  `discount_amount` DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_order_voucher_category` (`order_id`, `voucher_category`),
+  UNIQUE KEY `uniq_order_voucher_id` (`order_id`, `voucher_id`),
+  KEY `idx_order_vouchers_order_id` (`order_id`),
+  CONSTRAINT `fk_order_vouchers_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ĐÃ TÁCH LOGIC: food_id là Logical FK; order_id là Physical FK nội bộ

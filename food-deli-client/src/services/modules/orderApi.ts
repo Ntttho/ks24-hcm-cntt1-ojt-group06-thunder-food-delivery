@@ -32,6 +32,8 @@ export interface CreateOrderPayload {
   voucherCode?: string;
   systemVoucherId?: number;
   systemVoucherCode?: string;
+  voucherIds?: number[];
+  voucherCodes?: string[];
   idempotencyKey?: string;
   items: CreateOrderItemPayload[];
   paymentMethod?: 'COD' | 'MOMO' | 'VNPAY' | 'WALLET';

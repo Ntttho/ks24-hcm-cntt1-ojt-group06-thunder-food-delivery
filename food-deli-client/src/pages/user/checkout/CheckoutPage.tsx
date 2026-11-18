@@ -14,7 +14,7 @@ import { useAppSelector } from '@/hooks/useAppSelector';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAuth } from '@/hooks/useAuth';
 import { clearPurchasedItems } from '@/store/slices/cartSlice';
-import { calculateVoucherDiscount } from '@/utils/voucherUtils';
+import { calculateVoucherDiscount, isSystemScopeVoucher } from '@/utils/voucherUtils';
 import { APP_ROUTES } from '@/constants';
 import { AddressSelectorModal } from '../../components/AddressSelectorModal';
 import type { DeliveryAddressItem } from '../types';
@@ -75,14 +75,19 @@ export const CheckoutPage: React.FC = () => {
   const [createdOrderCode, setCreatedOrderCode] = useState<string>('');
   const [createdOrderTotal, setCreatedOrderTotal] = useState<number | null>(null);
 
-  // Applied Vouchers State (Supports 1 Restaurant Voucher + 1 System Voucher)
-  const [appliedRestaurantVoucher, setAppliedRestaurantVoucher] = useState<VoucherItem | null>(null);
-  const [appliedSystemVoucher, setAppliedSystemVoucher] = useState<VoucherItem | null>(null);
+  // Applied Vouchers State (Supports multiple vouchers of distinct voucher_category values)
+  const [appliedVouchers, setAppliedVouchers] = useState<VoucherItem[]>([]);
   const [isNewUser, setIsNewUser] = useState<boolean>(true);
 
-  useEffect(() => {
-    setAppliedRestaurantVoucher(null);
-  }, [activeRestaurantId]);
+  const activeAppliedVouchers = useMemo(
+    () =>
+      appliedVouchers.filter(
+        (v) =>
+          isSystemScopeVoucher(v) ||
+          String(v.restaurantId) === String(activeRestaurantId)
+      ),
+    [appliedVouchers, activeRestaurantId]
+  );
 
   useEffect(() => {
     orderApi
@@ -247,17 +252,15 @@ export const CheckoutPage: React.FC = () => {
     return 0;
   }, [itemsSubtotal, orderCostConfig.vatIncluded, orderCostConfig.vatRate]);
 
-  // Combined Shop + System Voucher Calculation synced with order-service
+  // Multi-voucher breakdown (Max 1 per voucher_category, synced with order-service)
   const voucherBreakdown = useMemo(() => {
     let remainingFood = itemsSubtotal;
     let remainingShipping = shippingFee;
-    let shopDiscount = 0;
-    let systemDiscount = 0;
     let foodDiscount = 0;
     let shippingDiscount = 0;
+    const appliedWithDiscount: Array<{ voucher: VoucherItem; discount: number }> = [];
 
-    const applyVoucherSlot = (voucher: VoucherItem | null, isSystemSlot: boolean) => {
-      if (!voucher) return;
+    for (const voucher of activeAppliedVouchers) {
       const cat = (voucher.voucherCategory || 'DISCOUNT_FOOD').toUpperCase();
       const raw = calculateVoucherDiscount(voucher, itemsSubtotal, shippingFee, isNewUser);
       const applied =
@@ -270,24 +273,16 @@ export const CheckoutPage: React.FC = () => {
         remainingFood = Math.max(0, remainingFood - applied);
         foodDiscount += applied;
       }
-      if (isSystemSlot) {
-        systemDiscount += applied;
-      } else {
-        shopDiscount += applied;
-      }
-    };
-
-    applyVoucherSlot(appliedRestaurantVoucher, false);
-    applyVoucherSlot(appliedSystemVoucher, true);
+      appliedWithDiscount.push({ voucher, discount: applied });
+    }
 
     return {
-      shopDiscount,
-      systemDiscount,
+      appliedWithDiscount,
       foodDiscount,
       shippingDiscount,
       totalVoucherDiscount: foodDiscount + shippingDiscount,
     };
-  }, [appliedRestaurantVoucher, appliedSystemVoucher, itemsSubtotal, shippingFee, isNewUser]);
+  }, [activeAppliedVouchers, itemsSubtotal, shippingFee, isNewUser]);
 
   const paymentMethodDiscount = paymentMethod.extraDiscount;
   const totalDiscount = voucherBreakdown.totalVoucherDiscount + paymentMethodDiscount;
@@ -324,6 +319,9 @@ export const CheckoutPage: React.FC = () => {
         .filter(Boolean)
         .join(' • ');
 
+      const firstShopVoucher = activeAppliedVouchers.find((v) => !isSystemScopeVoucher(v));
+      const firstSystemVoucher = activeAppliedVouchers.find((v) => isSystemScopeVoucher(v));
+
       const createPayload: CreateOrderPayload = {
         restaurantId: Number(activeRestaurantId) || 1,
         customerName: selectedAddress?.recipientName || (user as any)?.fullName || 'Khách hàng',
@@ -333,10 +331,12 @@ export const CheckoutPage: React.FC = () => {
         receiverLng: 106.721,
         distanceKm: checkoutDistanceKm,
         deliverySpeed,
-        voucherId: appliedRestaurantVoucher?.id || undefined,
-        voucherCode: appliedRestaurantVoucher?.code || undefined,
-        systemVoucherId: appliedSystemVoucher?.id || undefined,
-        systemVoucherCode: appliedSystemVoucher?.code || undefined,
+        voucherId: firstShopVoucher?.id || firstSystemVoucher?.id || undefined,
+        voucherCode: firstShopVoucher?.code || firstSystemVoucher?.code || undefined,
+        systemVoucherId: firstSystemVoucher?.id || undefined,
+        systemVoucherCode: firstSystemVoucher?.code || undefined,
+        voucherIds: activeAppliedVouchers.length > 0 ? activeAppliedVouchers.map((v) => v.id) : undefined,
+        voucherCodes: activeAppliedVouchers.length > 0 ? activeAppliedVouchers.map((v) => v.code) : undefined,
         note: fullNote,
         items: selectedItems.map((it) => ({
           foodId: Number(it.productId),
@@ -372,7 +372,7 @@ export const CheckoutPage: React.FC = () => {
         try {
           const qrRes = await paymentApi.generateSepayQr({
             orderId,
-            amount: finalTotal,
+            amount: authoritativeTotal,
             orderInfo: `FDL${orderId < 100 ? String(orderId).padStart(3, '0') : orderId}`,
           });
           setSepayQrData(qrRes.data);
@@ -447,16 +447,14 @@ export const CheckoutPage: React.FC = () => {
               shopName={currentShopName}
             />
 
-            {/* 6. Vouchers & Promotions Box (Supports 1 Restaurant Voucher + 1 System Voucher) */}
+            {/* 6. Vouchers & Promotions Box (Supports multiple vouchers of distinct categories) */}
             <CheckoutVoucherCard
               totalDiscount={voucherBreakdown.totalVoucherDiscount}
-              shopDiscount={voucherBreakdown.shopDiscount}
-              systemDiscount={voucherBreakdown.systemDiscount}
-              appliedRestaurantVoucher={appliedRestaurantVoucher}
-              appliedSystemVoucher={appliedSystemVoucher}
+              appliedVouchers={voucherBreakdown.appliedWithDiscount}
               onOpenVoucherPicker={() => setIsVoucherModalOpen(true)}
-              onRemoveRestaurantVoucher={() => setAppliedRestaurantVoucher(null)}
-              onRemoveSystemVoucher={() => setAppliedSystemVoucher(null)}
+              onRemoveVoucher={(voucherId) =>
+                setAppliedVouchers((prev) => prev.filter((v) => v.id !== voucherId))
+              }
             />
 
             {/* 7. Payment Method Selector */}
@@ -520,20 +518,16 @@ export const CheckoutPage: React.FC = () => {
         totalAmount={finalTotal}
       />
 
-      {/* 12. Dynamic Dual Voucher Selector Modal (1 Restaurant + 1 System) */}
+      {/* 12. Multi-Category Voucher Selector Modal (Max 1 voucher per category) */}
       <VoucherSelectorModal
         isOpen={isVoucherModalOpen}
         onClose={() => setIsVoucherModalOpen(false)}
         restaurantId={Number(activeRestaurantId) || 1}
         subtotal={itemsSubtotal}
         shippingFee={shippingFee}
-        appliedRestaurantVoucher={appliedRestaurantVoucher}
-        appliedSystemVoucher={appliedSystemVoucher}
+        appliedVouchers={activeAppliedVouchers}
         isNewUser={isNewUser}
-        onApplyVouchers={({ restaurantVoucher, systemVoucher }) => {
-          setAppliedRestaurantVoucher(restaurantVoucher);
-          setAppliedSystemVoucher(systemVoucher);
-        }}
+        onApplyVouchers={(selected) => setAppliedVouchers(selected)}
       />
 
       {/* 13. SePay VietQR Modal with Dynamic QR & Live Polling (8 mins) */}

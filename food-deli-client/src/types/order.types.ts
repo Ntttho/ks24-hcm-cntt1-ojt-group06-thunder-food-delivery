@@ -41,6 +41,14 @@ export type OrderStatusCode =
   | 'CANCELLED'
   | 'TIMEOUT';
 
+export interface OrderVoucherItem {
+  voucherId: number;
+  voucherCode: string;
+  voucherCategory?: string;
+  isSystemVoucher?: boolean;
+  discountAmount?: number;
+}
+
 export interface CustomerOrder {
   id: number;
   orderCode: string;
@@ -78,4 +86,5 @@ export interface CustomerOrder {
   createdAt: string;
   items: OrderItem[];
   statusLogs?: OrderStatusLog[];
+  appliedVouchers?: OrderVoucherItem[];
 }
