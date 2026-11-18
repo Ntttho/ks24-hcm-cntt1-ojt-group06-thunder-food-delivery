@@ -151,15 +151,19 @@ public class ProductServiceImpl implements ProductService {
             toppings.addAll(toppingRepository.findAllById(request.getToppingIds()));
         }
 
+        Integer quantity = request.getCurrentQuantity() != null ? request.getCurrentQuantity()
+                : (request.getDefaultQuantity() != null ? request.getDefaultQuantity() : 50);
+        boolean available = request.getIsAvailable() != null ? request.getIsAvailable() : (quantity > 0);
+
         Product product = Product.builder()
                 .category(category)
                 .name(request.getName().trim())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
                 .price(request.getPrice())
                 .imageUrl(request.getImageUrl())
-                .isAvailable(request.getIsAvailable() != null ? request.getIsAvailable() : true)
-                .defaultQuantity(request.getDefaultQuantity() != null ? request.getDefaultQuantity() : 50)
-                .currentQuantity(request.getDefaultQuantity() != null ? request.getDefaultQuantity() : 50)
+                .isAvailable(available)
+                .defaultQuantity(quantity)
+                .currentQuantity(quantity)
                 .toppings(toppings)
                 .build();
 
@@ -187,11 +191,17 @@ public class ProductServiceImpl implements ProductService {
         if (request.getImageUrl() != null) {
             product.setImageUrl(request.getImageUrl());
         }
+        Integer quantity = request.getCurrentQuantity() != null ? request.getCurrentQuantity()
+                : request.getDefaultQuantity();
+        if (quantity != null) {
+            product.setCurrentQuantity(quantity);
+            product.setDefaultQuantity(quantity);
+            if (quantity > 0 && request.getIsAvailable() == null) {
+                product.setIsAvailable(true);
+            }
+        }
         if (request.getIsAvailable() != null) {
             product.setIsAvailable(request.getIsAvailable());
-        }
-        if (request.getDefaultQuantity() != null) {
-            product.setDefaultQuantity(request.getDefaultQuantity());
         }
 
         if (request.getToppingIds() != null) {
@@ -218,6 +228,11 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy món ăn với ID: " + id));
         product.setIsAvailable(isAvailable);
+        if (Boolean.TRUE.equals(isAvailable) && (product.getCurrentQuantity() == null || product.getCurrentQuantity() <= 0)) {
+            int restoredQty = (product.getDefaultQuantity() != null && product.getDefaultQuantity() > 0)
+                    ? product.getDefaultQuantity() : 50;
+            product.setCurrentQuantity(restoredQty);
+        }
         Product updated = productRepository.save(product);
         return mapProductToDto(updated);
     }

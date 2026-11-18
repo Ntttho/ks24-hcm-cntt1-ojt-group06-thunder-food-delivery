@@ -62,6 +62,7 @@ CREATE TABLE `roles` (
 CREATE TABLE `users` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `phone` VARCHAR(15) NOT NULL,
+  `email` VARCHAR(100) DEFAULT NULL,
   `password` VARCHAR(255) NOT NULL,
   `full_name` VARCHAR(100) DEFAULT NULL,
   `rating_avg` DECIMAL(3,2) DEFAULT '5.00',
@@ -293,6 +294,7 @@ CREATE TABLE `orders` (
   `shipping_discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `total_amount` DECIMAL(10,2) DEFAULT NULL,
+  `payment_method` VARCHAR(30) DEFAULT 'COD',
   `status_id` INT NOT NULL,               -- [Physical FK] trỏ sang order_statuses nội bộ
   `version` INT NOT NULL DEFAULT '0',     -- Optimistic Locking version
   `cancel_reason` TEXT,
@@ -525,13 +527,13 @@ INSERT INTO `roles` (`id`, `name`) VALUES
 (4, 'ADMIN');
 
 -- 2. Users (Password: 123456)
-INSERT INTO `users` (`id`, `phone`, `password`, `full_name`, `rating_avg`, `created_at`, `deleted_at`) VALUES
-(1, '0900000001', '$2a$10$tFzqYb.rxAZWJ4ggv1I2XOnr1zkXQDmXoI48V5TxspPkr93B33F6a', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
-(2, '0900000002', '$2a$10$5WGj8RuHVMH4FwpZkTSkGOssJKqG6oefZLlpzM8kkjgWclazmcttO', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
-(3, '0900000003', '$2a$10$CmbVVephSjEcxKDbxtsbG.2/nQ0q9.poRcUsCIPDxpf20nIheLWle', 'Le Van C', '4.70', '2026-06-10 08:08:00', NULL),
-(4, '0900000004', '$2a$10$DnzFJhBXWPHqNyHgpceR2.7LG4yNcJK4.dxswiFV5We.pee7RD8qG', 'Pham Thi D', '4.88', '2026-06-10 08:08:00', NULL),
-(5, '0900000000', '$2a$10$TP0RsDH.JXTLrDqcrg9fwe5XGxEgGRyYXxgCWztamYLIl1URYiNfO', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
-(6, '0944495653', '$2a$10$ExCfal4mIKRCNd8Q/4apLedkozCHtu5zfIqCZI2SxKUJyd9yTOxLi', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
+INSERT INTO `users` (`id`, `phone`, `email`, `password`, `full_name`, `rating_avg`, `created_at`, `deleted_at`) VALUES
+(1, '0900000001', 'customer@fooddeli.com', '$2a$10$tFzqYb.rxAZWJ4ggv1I2XOnr1zkXQDmXoI48V5TxspPkr93B33F6a', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
+(2, '0900000002', 'driver@fooddeli.com', '$2a$10$5WGj8RuHVMH4FwpZkTSkGOssJKqG6oefZLlpzM8kkjgWclazmcttO', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
+(3, '0900000003', 'merchant@fooddeli.com', '$2a$10$CmbVVephSjEcxKDbxtsbG.2/nQ0q9.poRcUsCIPDxpf20nIheLWle', 'Le Van C', '4.70', '2026-06-10 08:08:00', NULL),
+(4, '0900000004', 'customer2@fooddeli.com', '$2a$10$DnzFJhBXWPHqNyHgpceR2.7LG4yNcJK4.dxswiFV5We.pee7RD8qG', 'Pham Thi D', '4.88', '2026-06-10 08:08:00', NULL),
+(5, '0900000000', 'admin@fooddeli.com', '$2a$10$TP0RsDH.JXTLrDqcrg9fwe5XGxEgGRyYXxgCWztamYLIl1URYiNfO', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
+(6, '0944495653', 'tienloc@fooddeli.com', '$2a$10$ExCfal4mIKRCNd8Q/4apLedkozCHtu5zfIqCZI2SxKUJyd9yTOxLi', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
 
 -- 3. User Roles
 INSERT INTO `user_roles` (`user_id`, `role_id`) VALUES
@@ -572,11 +574,12 @@ INSERT INTO `voucher_categories` (`id`, `code`, `name`, `description`, `is_activ
 
 -- 8. Vouchers
 INSERT INTO `vouchers` (`id`, `restaurant_id`, `voucher_category`, `code`, `discount_type`, `discount_value`, `discount_amount`, `max_discount_amount`, `min_order_value`, `usage_limit`, `used_count`, `start_date`, `expiry_date`, `is_active`) VALUES
-(1, NULL, 'FREESHIP', 'FREESHIP', 'FIXED', 15000.00, 15000.00, NULL, 50000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(2, NULL, 'DISCOUNT_FOOD', 'FLASHFOOD20', 'FIXED', 20000.00, 20000.00, NULL, 80000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(3, NULL, 'NEW_USER', 'WELCOME50', 'FIXED', 50000.00, 50000.00, NULL, 150000.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
-(4, 1, 'DISCOUNT_FOOD', 'HANHDUNG10', 'PERCENTAGE', 10.00, 10.00, 30000.00, 50000.00, 100, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
-(5, 1, 'DISCOUNT_FOOD', 'HANHDUNG25K', 'FIXED', 25000.00, 25000.00, NULL, 100000.00, 50, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1);
+(1, NULL, 'FREESHIP', 'FREESHIP', 'FIXED', 15000.00, 15000.00, NULL, 0.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(2, NULL, 'DISCOUNT_FOOD', 'FLASHFOOD20', 'FIXED', 20000.00, 20000.00, NULL, 0.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(3, NULL, 'NEW_USER', 'WELCOME50', 'FIXED', 50000.00, 50000.00, NULL, 0.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1),
+(4, 1, 'DISCOUNT_FOOD', 'HANHDUNG10', 'PERCENTAGE', 10.00, 10.00, 30000.00, 0.00, 100, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
+(5, 1, 'DISCOUNT_FOOD', 'HANHDUNG25K', 'FIXED', 25000.00, 25000.00, NULL, 0.00, 50, 0, '2026-01-01 00:00:00', '2026-12-31 23:59:59', 1),
+(6, NULL, 'DISCOUNT_FOOD', 'SEPAYFOOD', 'FIXED', 10000.00, 10000.00, NULL, 0.00, NULL, 0, NULL, '2026-12-31 23:59:59', 1);
 
 -- 9. Restaurants
 INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `longitude`, `opening_time`, `closing_time`, `is_open`, `is_open_today`, `temporary_closed_reason`, `temporary_closed_until`, `image_url`, `rating_avg`, `approval_status`, `approved_by`, `approved_at`, `reject_reason`, `deleted_at`) VALUES
@@ -722,10 +725,10 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 (10, 'AWAITING_PAYMENT', 'Chờ thanh toán VietQR', 'Đơn hàng đang chờ thanh toán qua cổng VietQR Napas 247', 10);
 
 -- 16. Orders
-INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `customer_name`, `customer_phone`, `restaurant_id`, `restaurant_name`, `restaurant_address`, `restaurant_phone`, `driver_id`, `driver_name`, `driver_phone`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
-(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', 2, 'Tran Thi B', '0900000002', 1, '12 Nguyen Hue, Quan 1', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
-(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
-(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
+INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `customer_name`, `customer_phone`, `restaurant_id`, `restaurant_name`, `restaurant_address`, `restaurant_phone`, `driver_id`, `driver_name`, `driver_phone`, `voucher_id`, `voucher_code`, `system_voucher_id`, `system_voucher_code`, `receiver_address`, `note`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `shipping_discount_amount`, `discount_amount`, `total_amount`, `payment_method`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
+(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', 2, 'Tran Thi B', '0900000002', 1, 'FREESHIP', NULL, NULL, '12 Nguyen Hue, Quan 1', 'Giao tận cửa', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 0.00, 108600.00, 'COD', 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
+(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '1 Test Address', 'Ít đá', 10.78, 106.7, 2.0, 45000.00, 0.00, 7000.00, 0.00, 0.00, 52000.00, 'COD', 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
+(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '1 Test Address', NULL, 10.78, 106.7, 2.0, 45000.00, 0.00, 7000.00, 0.00, 0.00, 52000.00, 'SEPAY', 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
 
 -- 17. Order Items
 INSERT INTO `order_items` (`id`, `order_id`, `food_id`, `food_name`, `quantity`, `price_at_order`) VALUES
@@ -785,6 +788,7 @@ ALTER TABLE `roles`                      AUTO_INCREMENT = 10;
 ALTER TABLE `users`                      AUTO_INCREMENT = 10;
 ALTER TABLE `user_addresses`             AUTO_INCREMENT = 10;
 ALTER TABLE `system_settings`            AUTO_INCREMENT = 10;
+ALTER TABLE `voucher_categories`         AUTO_INCREMENT = 10;
 ALTER TABLE `vouchers`                   AUTO_INCREMENT = 10;
 ALTER TABLE `restaurants`                AUTO_INCREMENT = 20;
 ALTER TABLE `restaurant_change_requests` AUTO_INCREMENT = 10;

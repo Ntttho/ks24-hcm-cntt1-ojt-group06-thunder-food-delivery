@@ -22,5 +22,13 @@ public class RemoteOrderDto {
     private String receiverAddress;
     private BigDecimal totalAmount;
     private String status;
+    private String statusCode;
+
+    public String getStatus() {
+        if (status != null && !status.isBlank()) {
+            return status;
+        }
+        return statusCode;
+    }
 }
 

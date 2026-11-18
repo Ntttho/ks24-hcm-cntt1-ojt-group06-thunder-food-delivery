@@ -118,9 +118,9 @@ public class ReviewServiceImpl implements ReviewService {
                 ? order.getCustomerName() : "Customer Demo";
         String resolvedCustomerAvatar = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150";
         String resolvedRestaurantName = (order.getRestaurantName() != null && !order.getRestaurantName().isBlank())
-                ? order.getRestaurantName() : "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi";
+                ? order.getRestaurantName() : ("Quán ăn #" + restaurantId);
         String resolvedDriverName = (order.getDriverName() != null && !order.getDriverName().isBlank())
-                ? order.getDriverName() : ((order.getDriverId() != null && order.getDriverId() == 2) ? "Tran Thi B (Tài xế Thunder)" : "Tài xế Thunder #" + order.getDriverId());
+                ? order.getDriverName() : (order.getDriverId() != null ? ("Tài xế #" + order.getDriverId()) : "Tài xế đối tác");
 
         Review restaurantReviewEntity = Review.builder()
                 .orderId(request.getOrderId())
@@ -154,6 +154,12 @@ public class ReviewServiceImpl implements ReviewService {
                     .quickTagsJson(serializeStringList(driverReview.getQuickTags()))
                     .build();
             savedReviews.add(reviewRepository.save(driverReviewEntity));
+        }
+
+        reviewRepository.flush();
+        recalculateAndSyncRestaurantRating(restaurantId);
+        if (driverReview != null && driverReview.getRating() != null && order.getDriverId() != null) {
+            recalculateAndSyncDriverRating(order.getDriverId().longValue());
         }
 
         return savedReviews.stream().map(this::mapToDto).toList();
@@ -207,7 +213,11 @@ public class ReviewServiceImpl implements ReviewService {
                 .imagesJson(serializeImages(request.getImages()))
                 .build();
 
-        return mapToDto(reviewRepository.save(restaurantReviewEntity));
+        Review saved = reviewRepository.save(restaurantReviewEntity);
+        reviewRepository.flush();
+        recalculateAndSyncRestaurantRating(restaurantId);
+
+        return mapToDto(saved);
     }
 
     @Override
@@ -251,7 +261,7 @@ public class ReviewServiceImpl implements ReviewService {
         String resolvedCustomerName = (order.getCustomerName() != null && !order.getCustomerName().isBlank())
                 ? order.getCustomerName() : "Customer Demo";
         String resolvedDriverName = (order.getDriverName() != null && !order.getDriverName().isBlank())
-                ? order.getDriverName() : ((order.getDriverId() != null && order.getDriverId() == 2) ? "Tran Thi B (Tài xế Thunder)" : "Tài xế Thunder #" + order.getDriverId());
+                ? order.getDriverName() : (order.getDriverId() != null ? ("Tài xế #" + order.getDriverId()) : "Tài xế đối tác");
 
         Review driverReviewEntity = Review.builder()
                 .orderId(request.getOrderId())
@@ -266,7 +276,11 @@ public class ReviewServiceImpl implements ReviewService {
                 .quickTagsJson(serializeStringList(request.getQuickTags()))
                 .build();
 
-        return mapToDto(reviewRepository.save(driverReviewEntity));
+        Review saved = reviewRepository.save(driverReviewEntity);
+        reviewRepository.flush();
+        recalculateAndSyncDriverRating(order.getDriverId().longValue());
+
+        return mapToDto(saved);
     }
 
     @Override
@@ -528,7 +542,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (targetType == null) {
             throw new BadRequestException("targetType không được để trống");
         }
-        String targetName = "RESTAURANT".equalsIgnoreCase(targetType) ? "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi" : "Tran Thi B (Tài xế Thunder)";
+        String targetName = "RESTAURANT".equalsIgnoreCase(targetType) ? ("Quán ăn #" + req.getTargetId()) : ("Tài xế #" + req.getTargetId());
         Review review = Review.builder()
                 .orderId(req.getOrderId())
                 .customerId(req.getCustomerId())
@@ -544,7 +558,15 @@ public class ReviewServiceImpl implements ReviewService {
                 .quickTagsJson(serializeStringList(req.getQuickTags()))
                 .build();
 
-        return mapToDto(reviewRepository.save(review));
+        Review saved = reviewRepository.save(review);
+        reviewRepository.flush();
+        if ("RESTAURANT".equals(targetType)) {
+            recalculateAndSyncRestaurantRating(req.getTargetId());
+        } else if ("DRIVER".equals(targetType)) {
+            recalculateAndSyncDriverRating(req.getTargetId());
+        }
+
+        return mapToDto(saved);
     }
 
     @Override
@@ -557,17 +579,39 @@ public class ReviewServiceImpl implements ReviewService {
         reviewRepository.delete(review);
         reviewRepository.flush();
 
-        Double average = reviewRepository.calculateAverageRating(targetType, review.getTargetId());
-        BigDecimal ratingAvg = BigDecimal.valueOf(average != null ? average : 5.0)
-                .setScale(2, RoundingMode.HALF_UP);
-
         if ("RESTAURANT".equals(targetType)) {
-            restaurantClient.updateRating(Math.toIntExact(review.getTargetId()), ratingAvg, "ROLE_ADMIN");
+            recalculateAndSyncRestaurantRating(review.getTargetId());
         } else if ("DRIVER".equals(targetType)) {
-            userClient.updateRating(review.getTargetId(), ratingAvg, "ROLE_ADMIN");
+            recalculateAndSyncDriverRating(review.getTargetId());
         }
 
         log.info("Admin successfully deleted review #{}", id);
+    }
+
+    private void recalculateAndSyncRestaurantRating(Long restaurantId) {
+        if (restaurantId == null) return;
+        try {
+            Double average = reviewRepository.calculateAverageRating("RESTAURANT", restaurantId);
+            BigDecimal ratingAvg = BigDecimal.valueOf(average != null ? average : 5.0)
+                    .setScale(2, RoundingMode.HALF_UP);
+            restaurantClient.updateRating(Math.toIntExact(restaurantId), ratingAvg, "ROLE_ADMIN");
+            log.info("Successfully updated rating_avg for restaurant #{} to {}", restaurantId, ratingAvg);
+        } catch (Exception ex) {
+            log.error("Failed to sync rating_avg to restaurant-service for restaurant #{}: {}", restaurantId, ex.getMessage());
+        }
+    }
+
+    private void recalculateAndSyncDriverRating(Long driverId) {
+        if (driverId == null) return;
+        try {
+            Double average = reviewRepository.calculateAverageRating("DRIVER", driverId);
+            BigDecimal ratingAvg = BigDecimal.valueOf(average != null ? average : 5.0)
+                    .setScale(2, RoundingMode.HALF_UP);
+            userClient.updateRating(driverId, ratingAvg, "ROLE_ADMIN");
+            log.info("Successfully updated rating_avg for driver #{} to {}", driverId, ratingAvg);
+        } catch (Exception ex) {
+            log.error("Failed to sync rating_avg to auth-service for driver #{}: {}", driverId, ex.getMessage());
+        }
     }
 
     // Helper methods
@@ -654,11 +698,9 @@ public class ReviewServiceImpl implements ReviewService {
         }
         String targetName = r.getTargetName();
         if (targetName == null || targetName.isBlank()) {
-            if ("RESTAURANT".equalsIgnoreCase(r.getTargetType())) {
-                targetName = (r.getTargetId() != null && r.getTargetId() == 1) ? "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi" : ("Quán ăn #" + r.getTargetId());
-            } else {
-                targetName = (r.getTargetId() != null && r.getTargetId() == 2) ? "Tran Thi B (Tài xế Thunder)" : ("Tài xế #" + r.getTargetId());
-            }
+            targetName = "RESTAURANT".equalsIgnoreCase(r.getTargetType())
+                    ? ("Quán ăn #" + r.getTargetId())
+                    : ("Tài xế #" + r.getTargetId());
         }
 
         return ReviewResponseDto.builder()

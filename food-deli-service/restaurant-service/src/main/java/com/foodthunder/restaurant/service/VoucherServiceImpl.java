@@ -131,7 +131,8 @@ public class VoucherServiceImpl implements VoucherService {
         boolean isSystemVoucher = voucher.getRestaurantId() == null;
         LocalDateTime now = LocalDateTime.now();
 
-        if (voucher.getStartDate() != null && now.isBefore(voucher.getStartDate())) {
+        // Safe timezone buffer: allow vouchers if start date is within 24 hours of current time
+        if (voucher.getStartDate() != null && now.plusDays(1).isBefore(voucher.getStartDate())) {
             return invalidResponse(voucher, "Mã voucher chưa đến thời gian áp dụng (Bắt đầu từ: " + voucher.getStartDate() + ")");
         }
 
@@ -174,11 +175,17 @@ public class VoucherServiceImpl implements VoucherService {
         BigDecimal discountAmount;
         BigDecimal shippingDiscountAmount = BigDecimal.ZERO;
 
+        BigDecimal discountVal = (voucher.getDiscountValue() != null && voucher.getDiscountValue().compareTo(BigDecimal.ZERO) > 0)
+                ? voucher.getDiscountValue()
+                : (voucher.getDiscountAmount() != null ? voucher.getDiscountAmount() : BigDecimal.ZERO);
+        String discountType = (voucher.getDiscountType() != null && !voucher.getDiscountType().isBlank())
+                ? voucher.getDiscountType() : "FIXED";
+
         if ("FREESHIP".equalsIgnoreCase(category)) {
             BigDecimal shippingBase = request.getShippingFee();
-            if ("PERCENTAGE".equalsIgnoreCase(voucher.getDiscountType())) {
+            if ("PERCENTAGE".equalsIgnoreCase(discountType)) {
                 if (shippingBase != null) {
-                    BigDecimal calc = shippingBase.multiply(voucher.getDiscountValue())
+                    BigDecimal calc = shippingBase.multiply(discountVal)
                             .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
                     if (voucher.getMaxDiscountAmount() != null && calc.compareTo(voucher.getMaxDiscountAmount()) > 0) {
                         calc = voucher.getMaxDiscountAmount();
@@ -191,19 +198,19 @@ public class VoucherServiceImpl implements VoucherService {
                 }
             } else {
                 discountAmount = shippingBase != null
-                        ? voucher.getDiscountValue().min(shippingBase)
-                        : voucher.getDiscountValue();
+                        ? discountVal.min(shippingBase)
+                        : discountVal;
             }
             shippingDiscountAmount = discountAmount;
-        } else if ("PERCENTAGE".equalsIgnoreCase(voucher.getDiscountType())) {
-            BigDecimal calc = orderAmount.multiply(voucher.getDiscountValue())
+        } else if ("PERCENTAGE".equalsIgnoreCase(discountType)) {
+            BigDecimal calc = orderAmount.multiply(discountVal)
                     .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             if (voucher.getMaxDiscountAmount() != null && calc.compareTo(voucher.getMaxDiscountAmount()) > 0) {
                 calc = voucher.getMaxDiscountAmount();
             }
-            discountAmount = calc.min(orderAmount);
+            discountAmount = calc;
         } else {
-            discountAmount = voucher.getDiscountValue().min(orderAmount);
+            discountAmount = discountVal;
         }
 
         return VoucherValidationResponse.builder()
@@ -212,8 +219,8 @@ public class VoucherServiceImpl implements VoucherService {
                 .isSystemVoucher(isSystemVoucher)
                 .voucherCategory(category)
                 .code(voucher.getCode())
-                .discountType(voucher.getDiscountType())
-                .discountValue(voucher.getDiscountValue())
+                .discountType(discountType)
+                .discountValue(discountVal)
                 .discountAmount(discountAmount)
                 .shippingDiscountAmount(shippingDiscountAmount)
                 .minOrderValue(minOrder)
