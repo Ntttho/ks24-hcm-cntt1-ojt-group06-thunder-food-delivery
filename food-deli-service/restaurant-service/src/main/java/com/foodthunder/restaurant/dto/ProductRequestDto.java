@@ -37,5 +37,7 @@ public class ProductRequestDto {
     @Builder.Default
     private Integer defaultQuantity = 50;
 
+    private Integer currentQuantity;
+
     private List<Integer> toppingIds;
 }

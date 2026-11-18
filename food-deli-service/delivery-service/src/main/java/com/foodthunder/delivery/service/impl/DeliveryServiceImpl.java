@@ -3,7 +3,9 @@ package com.foodthunder.delivery.service.impl;
 import com.foodthunder.common.dto.response.ApiResponse;
 import com.foodthunder.delivery.client.NotificationClient;
 import com.foodthunder.delivery.client.OrderClient;
+import com.foodthunder.delivery.client.UserClient;
 import com.foodthunder.delivery.dto.client.RemoteUpdateOrderStatusRequest;
+import com.foodthunder.delivery.dto.client.RemoteUserDto;
 import com.foodthunder.delivery.dto.request.DriverCancelOrderRequest;
 import com.foodthunder.delivery.dto.request.DriverLocationRequest;
 import com.foodthunder.delivery.dto.request.UpdateDeliveryStepRequest;
@@ -44,6 +46,7 @@ public class DeliveryServiceImpl implements DeliveryService {
     private final DriverPenaltyRepository driverPenaltyRepository;
     private final OrderClient orderClient;
     private final NotificationClient notificationClient;
+    private final UserClient userClient;
 
     @Override
     @Transactional
@@ -121,9 +124,41 @@ public class DeliveryServiceImpl implements DeliveryService {
         try {
             DriverDetail dDetail = driverDetailRepository.findById(driverId).orElse(null);
             String driverName = (dDetail != null && dDetail.getFullName() != null && !dDetail.getFullName().isBlank())
-                    ? dDetail.getFullName().trim() : ("Tài xế #" + driverId);
+                    ? dDetail.getFullName().trim() : null;
             String driverPhone = (dDetail != null && dDetail.getPhoneNumber() != null && !dDetail.getPhoneNumber().isBlank())
-                    ? dDetail.getPhoneNumber().trim() : "0900000000";
+                    ? dDetail.getPhoneNumber().trim() : null;
+
+            if ((driverName == null || driverPhone == null) && driverId != null) {
+                try {
+                    ResponseEntity<ApiResponse<RemoteUserDto>> uRes = userClient.getUserById(Long.valueOf(driverId));
+                    if (uRes != null && uRes.getBody() != null && uRes.getBody().data() != null) {
+                        RemoteUserDto uData = uRes.getBody().data();
+                        if (driverName == null && uData.getFullName() != null && !uData.getFullName().isBlank()) {
+                            driverName = uData.getFullName().trim();
+                            if (dDetail != null) dDetail.setFullName(driverName);
+                        }
+                        if (driverPhone == null && uData.getPhone() != null && !uData.getPhone().isBlank()) {
+                            driverPhone = uData.getPhone().trim();
+                            if (dDetail != null) dDetail.setPhoneNumber(driverPhone);
+                        }
+                        if (dDetail != null && (dDetail.getEmail() == null || dDetail.getEmail().isBlank()) && uData.getEmail() != null) {
+                            dDetail.setEmail(uData.getEmail().trim());
+                        }
+                        if (dDetail != null) {
+                            driverDetailRepository.save(dDetail);
+                        }
+                    }
+                } catch (Exception ex) {
+                    log.warn("Could not fetch user profile from auth-service for driverId {}: {}", driverId, ex.getMessage());
+                }
+            }
+
+            if (driverName == null || driverName.isBlank()) {
+                driverName = "Tài xế #" + driverId;
+            }
+            if (driverPhone == null || driverPhone.isBlank()) {
+                driverPhone = "090000000" + driverId;
+            }
 
             RemoteUpdateOrderStatusRequest statusReq = RemoteUpdateOrderStatusRequest.builder()
                     .statusCode("DRIVER_ACCEPTED")
@@ -507,6 +542,19 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         boolean isSuspended = activePenalty != null || acceptanceRate < 80.0 || cancellationRate > 10.0;
 
+        double ratingAvg = 5.0;
+        try {
+            ResponseEntity<ApiResponse<RemoteUserDto>> userResp = userClient.getUserById(driverId.longValue());
+            if (userResp != null && userResp.getBody() != null && userResp.getBody().data() != null) {
+                RemoteUserDto userDto = userResp.getBody().data();
+                if (userDto.getRatingAvg() != null) {
+                    ratingAvg = userDto.getRatingAvg().doubleValue();
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to fetch driver rating for driverId={}: {}", driverId, ex.getMessage());
+        }
+
         return DriverMetricsResponse.builder()
                 .driverId(driverId)
                 .totalOrders(totalAll)
@@ -516,7 +564,7 @@ public class DeliveryServiceImpl implements DeliveryService {
                 .acceptanceRate(acceptanceRate)
                 .cancellationRate(cancellationRate)
                 .totalEarnings(earnings)
-                .ratingAvg(5.0)
+                .ratingAvg(ratingAvg)
                 .rollingWindowOffers(rollingOffersCount)
                 .rollingWindowAccepted(rollingAcceptedCount)
                 .rollingWindowCancelled(rollingChargeableCancelledCount)
@@ -687,6 +735,11 @@ public class DeliveryServiceImpl implements DeliveryService {
         if (request.getEmail() != null && !request.getEmail().isBlank()) {
             detail.setEmail(request.getEmail().trim());
         }
+        if (detail.getFullName() == null || detail.getFullName().isBlank()
+                || detail.getPhoneNumber() == null || detail.getPhoneNumber().isBlank()
+                || detail.getEmail() == null || detail.getEmail().isBlank()) {
+            enrichProfileFromAuth(detail, userId);
+        }
         if (request.getLicensePlate() != null && !request.getLicensePlate().isBlank()) {
             detail.setLicensePlate(request.getLicensePlate().trim());
         }
@@ -703,16 +756,59 @@ public class DeliveryServiceImpl implements DeliveryService {
         return mapToDriverApprovalDto(saved);
     }
 
+    private void enrichProfileFromAuth(DriverDetail detail, Integer userId) {
+        if (userId == null) return;
+        try {
+            ResponseEntity<ApiResponse<RemoteUserDto>> uRes = userClient.getUserById(Long.valueOf(userId));
+            if (uRes != null && uRes.getBody() != null && uRes.getBody().data() != null) {
+                RemoteUserDto uData = uRes.getBody().data();
+                if ((detail.getFullName() == null || detail.getFullName().isBlank()) && uData.getFullName() != null && !uData.getFullName().isBlank()) {
+                    detail.setFullName(uData.getFullName().trim());
+                }
+                if ((detail.getPhoneNumber() == null || detail.getPhoneNumber().isBlank()) && uData.getPhone() != null && !uData.getPhone().isBlank()) {
+                    detail.setPhoneNumber(uData.getPhone().trim());
+                }
+                if ((detail.getEmail() == null || detail.getEmail().isBlank()) && uData.getEmail() != null && !uData.getEmail().isBlank()) {
+                    detail.setEmail(uData.getEmail().trim());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("Could not enrich driver profile from auth-service for userId {}: {}", userId, ex.getMessage());
+        }
+    }
+
     private DriverApprovalDto mapToDriverApprovalDto(DriverDetail detail) {
         String fullName = detail.getFullName();
+        String phoneNumber = detail.getPhoneNumber();
+        String email = detail.getEmail();
+
+        if ((fullName == null || fullName.isBlank() || phoneNumber == null || phoneNumber.isBlank() || email == null || email.isBlank())
+                && detail.getUserId() != null) {
+            try {
+                ResponseEntity<ApiResponse<RemoteUserDto>> uRes = userClient.getUserById(Long.valueOf(detail.getUserId()));
+                if (uRes != null && uRes.getBody() != null && uRes.getBody().data() != null) {
+                    RemoteUserDto uData = uRes.getBody().data();
+                    if ((fullName == null || fullName.isBlank()) && uData.getFullName() != null && !uData.getFullName().isBlank()) {
+                        fullName = uData.getFullName().trim();
+                    }
+                    if ((phoneNumber == null || phoneNumber.isBlank()) && uData.getPhone() != null && !uData.getPhone().isBlank()) {
+                        phoneNumber = uData.getPhone().trim();
+                    }
+                    if ((email == null || email.isBlank()) && uData.getEmail() != null && !uData.getEmail().isBlank()) {
+                        email = uData.getEmail().trim();
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Could not enrich mapToDriverApprovalDto for userId {}: {}", detail.getUserId(), ex.getMessage());
+            }
+        }
+
         if (fullName == null || fullName.isBlank()) {
             fullName = "Tài xế #" + detail.getUserId();
         }
-        String phoneNumber = detail.getPhoneNumber();
         if (phoneNumber == null || phoneNumber.isBlank()) {
             phoneNumber = "090000000" + detail.getUserId();
         }
-        String email = detail.getEmail();
         if (email == null || email.isBlank()) {
             email = "driver." + detail.getUserId() + "@foodthunder.com";
         }

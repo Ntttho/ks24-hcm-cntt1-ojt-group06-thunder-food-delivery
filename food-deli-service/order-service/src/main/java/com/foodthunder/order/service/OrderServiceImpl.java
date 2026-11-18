@@ -158,9 +158,10 @@ public class OrderServiceImpl implements OrderService {
                 throw new BadRequestException("Món ăn '" + product.getName() + "' hiện đang tạm ngưng phục vụ");
             }
 
-            // Check stock quantity
-            if (product.getCurrentQuantity() != null && product.getCurrentQuantity() < itemRequest.getQuantity()) {
-                throw new BadRequestException("Món ăn '" + product.getName() + "' chỉ còn " + product.getCurrentQuantity()
+            // Check stock quantity (Số lượng còn lại của món ăn)
+            Integer availableStock = product.getCurrentQuantity() != null ? product.getCurrentQuantity() : product.getDefaultQuantity();
+            if (availableStock != null && availableStock < itemRequest.getQuantity()) {
+                throw new BadRequestException("Món ăn '" + product.getName() + "' chỉ còn " + availableStock
                         + " phần, không đủ số lượng đặt (" + itemRequest.getQuantity() + ")");
             }
 
@@ -291,8 +292,9 @@ public class OrderServiceImpl implements OrderService {
             appliedVoucherCode = appliedSystemVoucherCode;
         }
 
-        BigDecimal remainingFood = subtotal;
         BigDecimal remainingShipping = shippingFee;
+        BigDecimal foodDiscountAmount = BigDecimal.ZERO;
+
         for (RemoteVoucherValidationResponse vData : validatedVouchers) {
             if (vData.getVoucherId() != null) {
                 voucherIdsToRedeem.add(vData.getVoucherId());
@@ -306,14 +308,16 @@ public class OrderServiceImpl implements OrderService {
                 shippingDiscountAmount = shippingDiscountAmount.add(appliedShip);
             } else {
                 BigDecimal rawFood = vData.getDiscountAmount() != null ? vData.getDiscountAmount() : BigDecimal.ZERO;
-                BigDecimal appliedFood = rawFood.max(BigDecimal.ZERO).min(remainingFood);
-                remainingFood = remainingFood.subtract(appliedFood);
-                discountAmount = discountAmount.add(appliedFood);
+                foodDiscountAmount = foodDiscountAmount.add(rawFood.max(BigDecimal.ZERO));
             }
         }
-        discountAmount = discountAmount.add(shippingDiscountAmount);
 
-        BigDecimal totalAmount = subtotal.add(shippingFee).add(taxAmount).subtract(discountAmount);
+        BigDecimal grossTotal = subtotal.add(shippingFee).add(taxAmount);
+        BigDecimal totalRequestedDiscount = foodDiscountAmount.add(shippingDiscountAmount);
+        BigDecimal effectiveDiscount = totalRequestedDiscount.min(grossTotal);
+        discountAmount = effectiveDiscount;
+
+        BigDecimal totalAmount = grossTotal.subtract(effectiveDiscount);
         if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
             totalAmount = BigDecimal.ZERO;
         }
@@ -464,7 +468,9 @@ public class OrderServiceImpl implements OrderService {
                         .restaurantId(order.getRestaurantId())
                         .restaurantName(order.getRestaurantName() != null ? order.getRestaurantName() : "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi")
                         .customerName(order.getCustomerName() != null ? order.getCustomerName() : "Khách hàng")
-                        .driverName(order.getDriverName() != null ? order.getDriverName() : (order.getDriverId() != null ? ((order.getDriverId() == 2) ? "Tran Thi B" : "Tài xế đối tác") : null))
+                        .driverName(order.getDriverName() != null && !order.getDriverName().isBlank()
+                                ? order.getDriverName()
+                                : (order.getDriverId() != null ? ("Tài xế #" + order.getDriverId()) : null))
                         .items(order.getItems().stream()
                                 .map(item -> ReviewOrderContextResponse.Item.builder()
                                         .foodId(item.getFoodId())
@@ -626,12 +632,12 @@ public class OrderServiceImpl implements OrderService {
         } else if (OrderStatus.DRIVER_ACCEPTED.equals(targetStatus) && requestingUserId != null) {
             order.setDriverId(requestingUserId);
             if (request.getDriverName() != null && !request.getDriverName().isBlank()) {
-                order.setDriverName(request.getDriverName());
+                order.setDriverName(request.getDriverName().trim());
             } else if (order.getDriverName() == null || order.getDriverName().isBlank()) {
-                order.setDriverName((requestingUserId == 2) ? "Tran Thi B" : (requestingUserId == 4) ? "Pham Thi D" : ("Tài xế Thunder #" + requestingUserId));
+                order.setDriverName("Tài xế #" + requestingUserId);
             }
             if (request.getDriverPhone() != null && !request.getDriverPhone().isBlank()) {
-                order.setDriverPhone(request.getDriverPhone());
+                order.setDriverPhone(request.getDriverPhone().trim());
             } else if (order.getDriverPhone() == null || order.getDriverPhone().isBlank()) {
                 order.setDriverPhone("090000000" + requestingUserId);
             }
@@ -729,9 +735,7 @@ public class OrderServiceImpl implements OrderService {
     private OrderResponse mapToOrderResponse(Order order) {
         String resolvedRestaurantName = order.getRestaurantName();
         if (resolvedRestaurantName == null || resolvedRestaurantName.isBlank()) {
-            resolvedRestaurantName = (order.getRestaurantId() != null && order.getRestaurantId() == 1)
-                    ? "Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi"
-                    : "Quán ăn đối tác";
+            resolvedRestaurantName = "Quán ăn đối tác";
         }
         String resolvedRestaurantAddress = order.getRestaurantAddress();
         if (resolvedRestaurantAddress == null || resolvedRestaurantAddress.isBlank()) {

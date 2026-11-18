@@ -62,6 +62,7 @@ CREATE TABLE `roles` (
 CREATE TABLE `users` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `phone` VARCHAR(15) NOT NULL,
+  `email` VARCHAR(100) DEFAULT NULL,
   `password` VARCHAR(255) NOT NULL,
   `full_name` VARCHAR(100) DEFAULT NULL,
   `rating_avg` DECIMAL(3,2) DEFAULT '5.00',
@@ -285,6 +286,7 @@ CREATE TABLE `orders` (
   `shipping_discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `discount_amount` DECIMAL(10,2) DEFAULT '0.00',
   `total_amount` DECIMAL(10,2) DEFAULT NULL,
+  `payment_method` VARCHAR(30) DEFAULT 'COD',
   `status_id` INT NOT NULL,               -- [Physical FK] trỏ sang order_statuses nội bộ
   `version` INT NOT NULL DEFAULT '0',     -- Optimistic Locking version
   `cancel_reason` TEXT,
@@ -757,6 +759,7 @@ ALTER TABLE `roles`                      AUTO_INCREMENT = 10;
 ALTER TABLE `users`                      AUTO_INCREMENT = 10;
 ALTER TABLE `user_addresses`             AUTO_INCREMENT = 10;
 ALTER TABLE `system_settings`            AUTO_INCREMENT = 10;
+ALTER TABLE `voucher_categories`         AUTO_INCREMENT = 10;
 ALTER TABLE `vouchers`                   AUTO_INCREMENT = 10;
 ALTER TABLE `restaurants`                AUTO_INCREMENT = 20;
 ALTER TABLE `restaurant_change_requests` AUTO_INCREMENT = 10;
