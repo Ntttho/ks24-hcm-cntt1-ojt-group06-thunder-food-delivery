@@ -273,7 +273,12 @@ CREATE TABLE `orders` (
   `customer_name` VARCHAR(100) DEFAULT NULL, -- Snapshot tên khách lúc đặt đơn
   `customer_phone` VARCHAR(20) DEFAULT NULL,  -- Snapshot SĐT khách lúc đặt đơn
   `restaurant_id` INT NOT NULL,           -- [Logical FK] trỏ sang restaurant-service: restaurants.id
+  `restaurant_name` VARCHAR(150) DEFAULT NULL, -- Snapshot tên quán lúc đặt đơn
+  `restaurant_address` TEXT DEFAULT NULL,      -- Snapshot địa chỉ quán lúc đặt đơn
+  `restaurant_phone` VARCHAR(20) DEFAULT NULL, -- Snapshot SĐT quán lúc đặt đơn
   `driver_id` INT DEFAULT NULL,           -- [Logical FK] trỏ sang delivery-service: driver_details.user_id
+  `driver_name` VARCHAR(100) DEFAULT NULL, -- Snapshot tên tài xế lúc nhận đơn
+  `driver_phone` VARCHAR(20) DEFAULT NULL,  -- Snapshot SĐT tài xế lúc nhận đơn
   `voucher_id` INT DEFAULT NULL,          -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher quán / chính)
   `voucher_code` VARCHAR(30) DEFAULT NULL,-- Snapshot mã voucher chính
   `system_voucher_id` INT DEFAULT NULL,   -- [Logical FK] trỏ sang restaurant-service: vouchers.id (Voucher toàn sàn)
@@ -376,6 +381,9 @@ CREATE TABLE `order_status_logs` (
 -- ĐÃ TÁCH LOGIC: user_id là Logical Plain ID trỏ sang auth-service
 CREATE TABLE `driver_details` (
   `user_id` INT NOT NULL,                 -- [Logical FK] trỏ sang auth-service: users.id
+  `full_name` VARCHAR(100) DEFAULT NULL,
+  `phone_number` VARCHAR(20) DEFAULT NULL,
+  `email` VARCHAR(100) DEFAULT NULL,
   `license_plate` VARCHAR(20) DEFAULT NULL,
   `id_card_number` VARCHAR(20) DEFAULT NULL,
   `vehicle_type` VARCHAR(50) DEFAULT NULL,
@@ -482,8 +490,11 @@ CREATE TABLE `reviews` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
   `order_id` BIGINT NOT NULL,             -- [Logical FK] trỏ sang order-service: orders.id
   `customer_id` BIGINT NOT NULL,          -- [Logical FK] trỏ sang auth-service: users.id
+  `customer_name` VARCHAR(100) DEFAULT NULL,
+  `customer_avatar` VARCHAR(255) DEFAULT NULL,
   `target_type` ENUM('RESTAURANT','DRIVER') NOT NULL,
   `target_id` BIGINT NOT NULL,            -- [Logical FK] trỏ sang restaurants.id hoặc users.id
+  `target_name` VARCHAR(150) DEFAULT NULL,
   `food_item_id` BIGINT DEFAULT NULL,     -- [Logical FK] trỏ sang restaurant-service: food_items.id
   `rating` TINYINT NOT NULL,
   `comment` TEXT,
@@ -556,9 +567,9 @@ INSERT INTO `user_addresses` (`id`, `user_id`, `address`, `latitude`, `longitude
 (3, 2, '264 Bà Hạt, Phường 9, Quận 10, TP.HCM', 10.765, 106.671, 1, 'Nhà riêng', '2026-06-10 09:00:00');
 
 -- 5. Driver Details
-INSERT INTO `driver_details` (`user_id`, `license_plate`, `id_card_number`, `vehicle_type`, `approval_status`, `reject_reason`, `is_online`) VALUES
-(2, '59A1-12345', '079123456789', 'Motorbike', 'APPROVED', NULL, 1),
-(4, '51B2-67890', '079987654321', 'Motorbike', 'APPROVED', NULL, 0);
+INSERT INTO `driver_details` (`user_id`, `full_name`, `phone_number`, `email`, `license_plate`, `id_card_number`, `vehicle_type`, `approval_status`, `reject_reason`, `is_online`) VALUES
+(2, 'Tran Thi B', '0900000002', 'driver.b@foodthunder.com', '59A1-12345', '079123456789', 'Motorbike', 'APPROVED', NULL, 1),
+(4, 'Pham Thi D', '0900000004', 'driver.d@foodthunder.com', '51B2-67890', '079987654321', 'Motorbike', 'APPROVED', NULL, 0);
 
 -- 6. Merchant Details
 INSERT INTO `merchant_details` (`user_id`, `business_license`, `tax_code`) VALUES
@@ -728,10 +739,10 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 (10, 'AWAITING_PAYMENT', 'Chờ thanh toán VietQR', 'Đơn hàng đang chờ thanh toán qua cổng VietQR Napas 247', 10);
 
 -- 16. Orders
-INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `restaurant_id`, `driver_id`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
-(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 1, 2, 1, '12 Nguyen Hue, Quan 1', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
-(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
-(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
+INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `customer_name`, `customer_phone`, `restaurant_id`, `restaurant_name`, `restaurant_address`, `restaurant_phone`, `driver_id`, `driver_name`, `driver_phone`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
+(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', 2, 'Tran Thi B', '0900000002', 1, '12 Nguyen Hue, Quan 1', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
+(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
+(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 'Customer Demo', '0900000001', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', '123 Nguyễn Trãi, Phường 2, Quận 5, TP.HCM', '02838383838', NULL, NULL, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
 
 -- 17. Order Items
 INSERT INTO `order_items` (`id`, `order_id`, `food_id`, `food_name`, `quantity`, `price_at_order`) VALUES
@@ -772,9 +783,9 @@ INSERT INTO `driver_penalties` (`id`, `driver_id`, `type`, `status`, `reason`, `
 (1, 4, 'LATE_PICKUP', 'RESOLVED', 'Trễ lấy hàng 15 phút do kẹt xe', '2026-06-01 10:00:00', '2026-06-01 12:00:00', '2026-06-01 10:00:00', '2026-06-01 12:00:00');
 
 -- 25. Reviews
-INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `target_type`, `target_id`, `food_item_id`, `rating`, `comment`, `images_json`, `created_at`) VALUES
-(1, 1, 1, 'RESTAURANT', 1, 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600"]', '2026-06-10 08:08:00'),
-(2, 1, 1, 'DRIVER', 2, NULL, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', NULL, '2026-06-10 08:08:00');
+INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `customer_name`, `customer_avatar`, `target_type`, `target_id`, `target_name`, `food_item_id`, `rating`, `comment`, `images_json`, `created_at`) VALUES
+(1, 1, 1, 'Customer Demo', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'RESTAURANT', 1, 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi', 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600"]', '2026-06-10 08:08:00'),
+(2, 1, 1, 'Customer Demo', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'DRIVER', 2, 'Tran Thi B (Tài xế Thunder)', NULL, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', NULL, '2026-06-10 08:08:00');
 
 -- 26. Chat Messages
 INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES

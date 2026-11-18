@@ -18,5 +18,11 @@ public class DeductStockBatchRequest {
     @NotEmpty(message = "Danh sách món ăn không được để trống")
     @Valid
     private List<DeductStockItemRequest> items;
+
+    private List<Integer> toppingIds;
+
+    public DeductStockBatchRequest(List<DeductStockItemRequest> items) {
+        this.items = items;
+    }
 }
 

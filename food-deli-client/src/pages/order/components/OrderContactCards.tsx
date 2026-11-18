@@ -9,6 +9,7 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Button, Tag } from 'antd';
+import { maskPhoneNumber } from '@/utils/privacyMask';
 
 interface OrderContactCardsProps {
   driverName?: string;
@@ -63,10 +64,10 @@ export const OrderContactCards: React.FC<OrderContactCardsProps> = ({
                   </Tag>
                 </div>
                 <div className="font-bold text-gray-900 text-sm">
-                  {driverName || 'Nguyễn Tuấn Tài (Tài xế Thunder)'}
+                  {driverName || 'Tài xế đối tác Thunder'}
                 </div>
                 <div className="text-xs text-gray-500">
-                  {driverPhone ? `SĐT: ${driverPhone}` : 'Xe máy • 59-P1 888.99'}
+                  {driverPhone ? `SĐT: ${maskPhoneNumber(driverPhone)}` : 'Xe máy • Đối tác Thunder'}
                 </div>
               </div>
             </div>
@@ -140,7 +141,7 @@ export const OrderContactCards: React.FC<OrderContactCardsProps> = ({
               Quán ăn
             </div>
             <div className="font-bold text-gray-900 text-sm truncate max-w-[200px]">
-              {restaurantName}
+              {restaurantName || 'Quán ăn đối tác'}
             </div>
             <div className="text-xs text-gray-500">Khoảng cách: ~{distanceKm} km</div>
           </div>

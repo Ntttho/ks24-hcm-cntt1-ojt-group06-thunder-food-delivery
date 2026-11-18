@@ -212,6 +212,7 @@ export const MerchantMenuPage: React.FC = () => {
       categoryId: categories[0]?.id || 1,
       price: 45000,
       description: '',
+      currentQuantity: 50,
       defaultQuantity: 50,
       isAvailable: true,
       imageUrl: '',
@@ -222,12 +223,16 @@ export const MerchantMenuPage: React.FC = () => {
   // Open Edit Modal
   const handleOpenEditModal = (product: ProductItem) => {
     setEditingProduct(product);
+    const qty = product.currentQuantity !== undefined && product.currentQuantity !== null
+      ? product.currentQuantity
+      : (product.defaultQuantity || 50);
     form.setFieldsValue({
       name: product.name,
       description: product.description || '',
       categoryId: product.categoryId,
       price: product.price,
-      defaultQuantity: product.defaultQuantity || 50,
+      currentQuantity: qty,
+      defaultQuantity: qty,
       isAvailable: product.isAvailable,
       imageUrl: product.imageUrl,
     });
@@ -252,14 +257,20 @@ export const MerchantMenuPage: React.FC = () => {
       const values = await form.validateFields();
       setSubmitting(true);
 
+      const qty = values.currentQuantity !== undefined && values.currentQuantity !== null
+        ? values.currentQuantity
+        : (values.defaultQuantity || 50);
+      const isAvail = values.isAvailable !== undefined ? values.isAvailable : (qty > 0);
+
       const payload: ProductPayload = {
         name: values.name.trim(),
         description: values.description?.trim() || undefined,
         categoryId: values.categoryId,
         price: values.price,
         imageUrl: values.imageUrl?.trim() || undefined,
-        isAvailable: values.isAvailable ?? true,
-        defaultQuantity: values.defaultQuantity || 50,
+        isAvailable: isAvail,
+        currentQuantity: qty,
+        defaultQuantity: qty,
       };
 
       if (editingProduct) {
@@ -272,6 +283,8 @@ export const MerchantMenuPage: React.FC = () => {
               ? {
                   ...item,
                   ...payload,
+                  currentQuantity: qty,
+                  defaultQuantity: qty,
                   categoryName:
                     categories.find((c) => c.id === payload.categoryId)?.name ||
                     item.categoryName,
@@ -293,9 +306,9 @@ export const MerchantMenuPage: React.FC = () => {
           name: payload.name,
           description: payload.description,
           price: payload.price,
-          isAvailable: payload.isAvailable ?? true,
-          defaultQuantity: payload.defaultQuantity,
-          currentQuantity: payload.defaultQuantity,
+          isAvailable: isAvail,
+          defaultQuantity: qty,
+          currentQuantity: qty,
           imageUrl:
             payload.imageUrl ||
             'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=60',
@@ -408,15 +421,20 @@ export const MerchantMenuPage: React.FC = () => {
       },
     },
     {
-      title: 'Kho hàng ngày',
-      dataIndex: 'defaultQuantity',
-      key: 'defaultQuantity',
-      width: 120,
-      render: (qty: number, record) => (
-        <span className="text-xs text-slate-600 font-medium">
-          {record.currentQuantity ?? qty ?? 50} / {qty ?? 50} phần
-        </span>
-      ),
+      title: 'Số lượng còn lại',
+      dataIndex: 'currentQuantity',
+      key: 'currentQuantity',
+      width: 130,
+      render: (_, record) => {
+        const remaining = record.currentQuantity !== undefined && record.currentQuantity !== null
+          ? record.currentQuantity
+          : (record.defaultQuantity ?? 0);
+        return (
+          <span className={`text-xs font-semibold ${remaining > 0 ? 'text-slate-700' : 'text-rose-500'}`}>
+            {remaining} phần
+          </span>
+        );
+      },
     },
     {
       title: 'Trạng thái bán',

@@ -150,9 +150,9 @@ public class DeliveryController {
 
     /**
      * SP3-ADM-02: Lấy danh sách hồ sơ tài xế chờ duyệt (driver_details)
-     * GET /api/v1/deliveries/drivers/approvals?status=PENDING
+     * GET /api/v1/drivers/approvals hoặc /api/v1/deliveries/drivers/approvals?status=PENDING
      */
-    @GetMapping({"/drivers/approvals", "/driver/approvals"})
+    @GetMapping({"/drivers/approvals", "/driver/approvals", "/approvals"})
     public ResponseEntity<ApiResponse<List<DriverApprovalDto>>> getDriverApprovals(
             @RequestParam(required = false) String status
     ) {
@@ -162,9 +162,9 @@ public class DeliveryController {
 
     /**
      * SP3-ADM-02: Lấy chi tiết hồ sơ tài xế
-     * GET /api/v1/deliveries/drivers/{userId}/approval
+     * GET /api/v1/drivers/{userId}/approval hoặc /api/v1/deliveries/drivers/{userId}/approval
      */
-    @GetMapping({"/drivers/{userId}/approval", "/driver/{userId}/approval"})
+    @GetMapping({"/drivers/{userId}/approval", "/driver/{userId}/approval", "/{userId}/approval"})
     public ResponseEntity<ApiResponse<DriverApprovalDto>> getDriverApprovalDetail(@PathVariable Integer userId) {
         DriverApprovalDto detail = deliveryService.getDriverApprovalDetail(userId);
         return ResponseEntity.ok(ApiResponse.success("Lấy thông tin tài xế thành công", detail));
@@ -172,9 +172,9 @@ public class DeliveryController {
 
     /**
      * SP3-ADM-02: Phê duyệt hồ sơ tài xế (APPROVED)
-     * PUT /api/v1/deliveries/drivers/{userId}/approve
+     * PUT /api/v1/drivers/{userId}/approve hoặc /api/v1/deliveries/drivers/{userId}/approve
      */
-    @PutMapping({"/drivers/{userId}/approve", "/driver/{userId}/approve"})
+    @PutMapping({"/drivers/{userId}/approve", "/driver/{userId}/approve", "/{userId}/approve"})
     public ResponseEntity<ApiResponse<DriverApprovalDto>> approveDriver(@PathVariable Integer userId) {
         DriverApprovalDto approved = deliveryService.approveDriver(userId);
         return ResponseEntity.ok(ApiResponse.success("Phê duyệt hồ sơ tài xế thành công", approved));
@@ -182,9 +182,9 @@ public class DeliveryController {
 
     /**
      * SP3-ADM-02: Từ chối hồ sơ tài xế (REJECTED) kèm lý do
-     * PUT /api/v1/deliveries/drivers/{userId}/reject
+     * PUT /api/v1/drivers/{userId}/reject hoặc /api/v1/deliveries/drivers/{userId}/reject
      */
-    @PutMapping({"/drivers/{userId}/reject", "/driver/{userId}/reject"})
+    @PutMapping({"/drivers/{userId}/reject", "/driver/{userId}/reject", "/{userId}/reject"})
     public ResponseEntity<ApiResponse<DriverApprovalDto>> rejectDriver(
             @PathVariable Integer userId,
             @RequestBody(required = false) com.foodthunder.delivery.dto.request.RejectDriverRequest request
@@ -198,9 +198,9 @@ public class DeliveryController {
 
     /**
      * Tài xế đăng ký / cập nhật hồ sơ phương tiện & CCCD
-     * POST /api/v1/deliveries/drivers/register
+     * POST/PUT /api/v1/drivers/register hoặc /api/v1/deliveries/drivers/register
      */
-    @PostMapping({"/drivers/register", "/driver/register"})
+    @RequestMapping(value = {"/drivers/register", "/driver/register", "/register"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<ApiResponse<DriverApprovalDto>> registerDriver(
             @RequestHeader(value = "X-User-Id", required = false) Integer headerUserId,
             @RequestParam(required = false) Integer userId,

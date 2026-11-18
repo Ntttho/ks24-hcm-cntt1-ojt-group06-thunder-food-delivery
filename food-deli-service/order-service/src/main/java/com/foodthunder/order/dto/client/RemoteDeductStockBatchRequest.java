@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -13,5 +14,11 @@ import java.util.List;
 @AllArgsConstructor
 public class RemoteDeductStockBatchRequest {
     private List<RemoteDeductStockItemRequest> items;
+    private List<Integer> toppingIds;
+
+    public RemoteDeductStockBatchRequest(List<RemoteDeductStockItemRequest> items) {
+        this.items = items;
+        this.toppingIds = new ArrayList<>();
+    }
 }
 

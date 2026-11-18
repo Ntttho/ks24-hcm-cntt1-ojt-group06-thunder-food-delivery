@@ -117,11 +117,11 @@ const loadReviewDetails = async (
 
       return {
         ...review,
-        customerName: customer?.fullName || `Khách hàng #${review.customerId}`,
-        customerAvatar: customer?.avatarUrl,
+        customerName: customer?.fullName || review.customerName || 'Khách hàng thân thiết',
+        customerAvatar: customer?.avatarUrl || review.customerAvatar,
         targetName:
-          (targetUser?.fullName || restaurant?.name) ||
-          `${targetType === 'DRIVER' ? 'Tài xế' : 'Nhà hàng'} #${review.targetId}`,
+          (targetUser?.fullName || restaurant?.name || review.targetName) ||
+          (targetType === 'DRIVER' ? 'Tài xế giao hàng' : 'Nhà hàng đối tác'),
         targetImage: restaurant?.imageUrl,
         foodName: getProduct(restaurant, review.foodItemId)?.name,
         licensePlate: targetUser?.licensePlate,
@@ -331,8 +331,8 @@ const AdminReviewManagementPage: React.FC<AdminReviewManagementPageProps> = ({ t
                       </Text>
                       <Text className="text-xs text-slate-500">
                         {isRestaurantReview
-                          ? `Nhà hàng #${review.targetId}`
-                          : `Tài xế #${review.targetId} · Biển số: ${review.licensePlate || 'chưa cập nhật'}`}
+                          ? 'Đối tác quán ăn Thunder'
+                          : (review.licensePlate ? `Tài xế · Biển số: ${review.licensePlate}` : 'Tài xế đối tác Thunder')}
                       </Text>
                       {review.foodItemId != null && (
                         <div className="mt-1 text-sm text-orange-700">
@@ -420,7 +420,7 @@ const AdminReviewManagementPage: React.FC<AdminReviewManagementPageProps> = ({ t
                     <span className="inline-flex items-center gap-2">
                       <Avatar size={24} src={review.customerAvatar} icon={<UserOutlined />} />
                       <span className="font-medium text-slate-700">{review.customerName}</span>
-                      <span>#{review.customerId}</span>
+                      <Tag color="blue" className="text-[10px] m-0 rounded-md">Khách hàng</Tag>
                     </span>
                     <span>
                       {review.createdAt

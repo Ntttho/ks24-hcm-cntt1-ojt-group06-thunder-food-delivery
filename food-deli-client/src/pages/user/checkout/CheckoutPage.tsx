@@ -40,13 +40,24 @@ export const CheckoutPage: React.FC = () => {
   const { user } = useAuth();
   const cart = useAppSelector((state) => state.cart);
 
-  // If cart empty, redirect
+  // Order & Modal States
+  const [orderState, setOrderState] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [isSepayModalOpen, setIsSepayModalOpen] = useState(false);
+  const [createdOrderId, setCreatedOrderId] = useState<number>(0);
+  const [createdOrderCode, setCreatedOrderCode] = useState<string>('');
+  const [createdOrderTotal, setCreatedOrderTotal] = useState<number | null>(null);
+  const [sepayQrData, setSepayQrData] = useState<SepayGenerateResponse | null>(null);
+
+  // If cart empty, redirect (Chỉ chuyển hướng khi không ở trong tiến trình đặt đơn hoặc thanh toán)
   useEffect(() => {
+    if (orderState === 'loading' || isSepayModalOpen || createdOrderId > 0 || orderState === 'success') {
+      return;
+    }
     if (!cart.items || cart.items.length === 0) {
       message.info('Giỏ hàng của bạn đang trống');
       navigate(APP_ROUTES.CART);
     }
-  }, [cart.items, navigate]);
+  }, [cart.items, navigate, orderState, isSepayModalOpen, createdOrderId]);
 
   // Selected items from Cart (Shopee style - only items marked selected)
   const selectedItems = useMemo(() => {
@@ -69,11 +80,6 @@ export const CheckoutPage: React.FC = () => {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
-  const [isSepayModalOpen, setIsSepayModalOpen] = useState(false);
-  const [sepayQrData, setSepayQrData] = useState<SepayGenerateResponse | null>(null);
-  const [createdOrderId, setCreatedOrderId] = useState<number>(0);
-  const [createdOrderCode, setCreatedOrderCode] = useState<string>('');
-  const [createdOrderTotal, setCreatedOrderTotal] = useState<number | null>(null);
 
   // Applied Vouchers State (Supports multiple vouchers of distinct voucher_category values)
   const [appliedVouchers, setAppliedVouchers] = useState<VoucherItem[]>([]);
@@ -180,8 +186,7 @@ export const CheckoutPage: React.FC = () => {
     extraDiscount: 0,
   });
 
-  // Submission State
-  const [orderState, setOrderState] = useState<'idle' | 'loading' | 'success'>('idle');
+  // Order Cost Configuration
   const [orderCostConfig, setOrderCostConfig] = useState<OrderCostConfig>(DEFAULT_ORDER_COST_CONFIG);
 
   useEffect(() => {
@@ -276,13 +281,17 @@ export const CheckoutPage: React.FC = () => {
       appliedWithDiscount.push({ voucher, discount: applied });
     }
 
+    const grossTotal = itemsSubtotal + shippingFee + serviceFee + vatAmount;
+    const rawTotalDiscount = foodDiscount + shippingDiscount;
+    const totalVoucherDiscount = Math.min(rawTotalDiscount, grossTotal);
+
     return {
       appliedWithDiscount,
       foodDiscount,
       shippingDiscount,
-      totalVoucherDiscount: foodDiscount + shippingDiscount,
+      totalVoucherDiscount,
     };
-  }, [activeAppliedVouchers, itemsSubtotal, shippingFee, isNewUser]);
+  }, [activeAppliedVouchers, itemsSubtotal, shippingFee, serviceFee, vatAmount, isNewUser]);
 
   const paymentMethodDiscount = paymentMethod.extraDiscount;
   const totalDiscount = voucherBreakdown.totalVoucherDiscount + paymentMethodDiscount;
@@ -343,7 +352,7 @@ export const CheckoutPage: React.FC = () => {
           quantity: it.quantity,
           toppings: (it.toppings || []).map((tp) => ({ toppingId: tp.id, quantity: 1 })),
         })),
-        paymentMethod: paymentMethod.id === 'vietqr' ? 'WALLET' : 'COD',
+        paymentMethod: (paymentMethod.id === 'vietqr' || paymentMethod.id === 'sepay') ? 'WALLET' : 'COD',
       };
 
       const res = await orderApi.create(createPayload);
@@ -367,7 +376,9 @@ export const CheckoutPage: React.FC = () => {
       const purchasedIds = selectedItems.map((it) => it.id);
       dispatch(clearPurchasedItems(purchasedIds));
 
-      if (paymentMethod.id === 'vietqr' && authoritativeTotal >= 1000) {
+      const isOnlinePayment = paymentMethod.id === 'vietqr' || paymentMethod.id === 'sepay';
+
+      if (isOnlinePayment && authoritativeTotal >= 1000) {
         // SePay VietQR Flow synced with authoritative server order total
         try {
           const qrRes = await paymentApi.generateSepayQr({
@@ -375,7 +386,9 @@ export const CheckoutPage: React.FC = () => {
             amount: authoritativeTotal,
             orderInfo: `FDL${orderId < 100 ? String(orderId).padStart(3, '0') : orderId}`,
           });
-          setSepayQrData(qrRes.data);
+          if (qrRes?.data) {
+            setSepayQrData(qrRes.data);
+          }
         } catch (qrErr) {
           console.warn('SePay QR generation notice:', qrErr);
         }
@@ -516,6 +529,7 @@ export const CheckoutPage: React.FC = () => {
           setPaymentMethod({ id, name, extraDiscount: extraDiscount || 0 });
         }}
         totalAmount={finalTotal}
+        discountAmount={totalDiscount}
       />
 
       {/* 12. Multi-Category Voucher Selector Modal (Max 1 voucher per category) */}

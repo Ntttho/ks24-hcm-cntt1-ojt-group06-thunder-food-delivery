@@ -169,6 +169,7 @@ export interface ProductPayload {
   imageUrl?: string;
   isAvailable?: boolean;
   defaultQuantity?: number;
+  currentQuantity?: number;
   toppingIds?: number[];
 }
 

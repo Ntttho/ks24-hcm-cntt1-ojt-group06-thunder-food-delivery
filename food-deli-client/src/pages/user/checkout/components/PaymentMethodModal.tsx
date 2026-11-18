@@ -14,12 +14,11 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
   onClose,
   selectedMethodId: initialMethodId = 'vietqr',
   onSelectMethod,
-  totalAmount = 154000,
-  discountAmount = 40000,
+  totalAmount = 0,
+  discountAmount = 0,
 }) => {
   const [activeMethod, setActiveMethod] = useState<string>(initialMethodId);
   const [needChange, setNeedChange] = useState<boolean>(false);
-  const [appliedPromo, setAppliedPromo] = useState<boolean>(true);
 
   if (!isOpen) return null;
 
@@ -40,10 +39,7 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
     }
   };
 
-  const getExtraDiscount = (id: string) => {
-    if (appliedPromo && (id === 'vietqr' || id === 'momo')) {
-      return 10000;
-    }
+  const getExtraDiscount = (_id: string) => {
     return 0;
   };
 
@@ -116,32 +112,6 @@ export const PaymentMethodModal: React.FC<PaymentMethodModalProps> = ({
             <div className="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center text-primary">
               <span className="material-symbols-outlined text-[28px]">receipt_long</span>
             </div>
-          </section>
-
-          {/* Special Offer Highlight Banner */}
-          <section className="bg-secondary-container/10 rounded-xl p-space-md flex items-center gap-space-md shadow-sm">
-            <div className="w-10 h-10 rounded-full bg-secondary-container/20 flex items-center justify-center flex-shrink-0 text-secondary">
-              <span className="material-symbols-outlined text-[22px]">local_offer</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-label-lg text-label-lg text-on-surface font-semibold truncate">
-                Ưu đãi giảm thêm 10.000đ
-              </p>
-              <p className="font-body-sm text-body-sm text-on-surface-variant line-clamp-1">
-                Áp dụng ngay khi chọn VietQR hoặc MoMo
-              </p>
-            </div>
-            <button
-              type="button"
-              className={`font-label-md text-label-md px-3 py-1.5 rounded-full shadow-sm cursor-pointer transition-all ${
-                appliedPromo
-                  ? 'bg-secondary text-white font-bold'
-                  : 'bg-surface-container-lowest text-secondary'
-              }`}
-              onClick={() => setAppliedPromo(!appliedPromo)}
-            >
-              {appliedPromo ? 'Đã áp dụng' : 'Áp dụng'}
-            </button>
           </section>
 
           {/* Nhóm 1: Chuyển khoản VietQR & Ngân hàng */}

@@ -39,8 +39,23 @@ public class Order {
     @Column(name = "restaurant_id", nullable = false)
     private Integer restaurantId;
 
+    @Column(name = "restaurant_name", length = 150)
+    private String restaurantName;
+
+    @Column(name = "restaurant_address", columnDefinition = "TEXT")
+    private String restaurantAddress;
+
+    @Column(name = "restaurant_phone", length = 20)
+    private String restaurantPhone;
+
     @Column(name = "driver_id")
     private Integer driverId;
+
+    @Column(name = "driver_name", length = 100)
+    private String driverName;
+
+    @Column(name = "driver_phone", length = 20)
+    private String driverPhone;
 
     @Column(name = "voucher_id")
     private Integer voucherId;

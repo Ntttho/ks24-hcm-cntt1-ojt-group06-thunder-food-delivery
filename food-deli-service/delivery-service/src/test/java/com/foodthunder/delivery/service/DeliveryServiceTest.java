@@ -283,6 +283,8 @@ class DeliveryServiceTest {
     @Test
     @DisplayName("getPendingOffers: Lấy danh sách các đơn đang gửi mời nhận cuốc")
     void testGetPendingOffers() {
+        when(driverDetailRepository.findById(101))
+                .thenReturn(Optional.of(onlineDriver));
         when(driverOfferRepository.findByDriverIdAndStatus(101, "OFFERED"))
                 .thenReturn(List.of(pendingOfferDriver1));
 
@@ -427,7 +429,8 @@ class DeliveryServiceTest {
                 .endsAt(LocalDateTime.now().plusMinutes(10))
                 .build();
 
-        when(driverDetailRepository.findById(101)).thenReturn(Optional.of(onlineDriver));
+        when(driverDetailRepository.findById(101))
+                .thenReturn(Optional.of(onlineDriver));
         when(driverPenaltyRepository.findActivePenalties(eq(101), any(LocalDateTime.class)))
                 .thenReturn(List.of(activePenalty));
 
@@ -449,6 +452,8 @@ class DeliveryServiceTest {
                 .endsAt(LocalDateTime.now().plusHours(23))
                 .build();
 
+        when(driverDetailRepository.findById(101))
+                .thenReturn(Optional.of(onlineDriver));
         when(driverPenaltyRepository.findActivePenalties(eq(101), any(LocalDateTime.class)))
                 .thenReturn(List.of(activePenalty));
 

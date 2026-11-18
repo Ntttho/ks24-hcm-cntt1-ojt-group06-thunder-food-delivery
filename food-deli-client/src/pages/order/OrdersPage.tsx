@@ -53,18 +53,18 @@ export const OrdersPage: React.FC = () => {
           const resolvedShopName =
             item.restaurantName ||
             restaurantNameCache.get(rId) ||
-            (rId === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : `Quán ăn #${rId}`);
+            (rId === 1 ? 'Cơm Tấm Sà Bì Chưởng - Nguyễn Trãi' : 'Quán ăn đối tác');
 
           return {
             id: item.id,
             orderCode: item.orderCode || `#ORD-${item.id}`,
             customerId: item.customerId,
-            customerName: item.customerName,
+            customerName: item.customerName || 'Khách hàng',
             customerPhone: item.customerPhone,
             restaurantId: rId,
             restaurantName: resolvedShopName,
             driverId: item.driverId ? Number(item.driverId) : undefined,
-            driverName: item.driverName || (item.driverId ? `Tài xế đối tác #${item.driverId}` : undefined),
+            driverName: item.driverName || (item.driverId ? (Number(item.driverId) === 2 ? 'Tran Thi B' : 'Tài xế đối tác') : undefined),
             driverPhone: item.driverPhone,
             receiverAddress: item.receiverAddress || 'Địa chỉ giao hàng mặc định',
             distanceKm: item.distanceKm,
@@ -86,7 +86,7 @@ export const OrdersPage: React.FC = () => {
               toppings: (it.toppings || []).map((tp: any) => ({
                 id: tp.id,
                 toppingId: tp.toppingId,
-                name: tp.name || `Topping #${tp.toppingId}`,
+                name: tp.name || 'Topping thêm',
                 quantity: tp.quantity || 1,
                 price: Number(tp.price || 0),
               })),
@@ -98,7 +98,7 @@ export const OrdersPage: React.FC = () => {
         const missingShopIds = Array.from(
           new Set(
             mappedOrders
-              .filter((o) => (o.restaurantName || '').startsWith('Quán ăn #'))
+              .filter((o) => !o.restaurantName || o.restaurantName === 'Quán ăn đối tác')
               .map((o) => o.restaurantId)
           )
         );

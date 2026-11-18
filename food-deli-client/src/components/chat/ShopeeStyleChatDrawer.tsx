@@ -291,7 +291,7 @@ export const ShopeeStyleChatDrawer: React.FC = () => {
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800 truncate">
                         <ShopOutlined className="text-orange-500" />
-                        <span className="truncate">{ord.restaurantName || `Quán #${ord.restaurantId}`}</span>
+                        <span className="truncate">{ord.restaurantName || 'Quán ăn đối tác'}</span>
                       </div>
                       <Tag
                         color={

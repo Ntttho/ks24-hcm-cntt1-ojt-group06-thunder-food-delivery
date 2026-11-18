@@ -15,6 +15,9 @@ import java.util.List;
 public class ReviewOrderContextResponse {
     private Long orderId;
     private Integer restaurantId;
+    private String restaurantName;
+    private String customerName;
+    private String driverName;
 
     @Builder.Default
     private List<Item> items = new ArrayList<>();

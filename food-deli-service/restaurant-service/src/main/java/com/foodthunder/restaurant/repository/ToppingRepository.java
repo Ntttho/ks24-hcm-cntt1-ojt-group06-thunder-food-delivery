@@ -13,6 +13,10 @@ import java.util.List;
 @Repository
 public interface ToppingRepository extends JpaRepository<Topping, Integer> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM Topping t WHERE t.id IN :toppingIds")
+    List<Topping> findAllByIdsForUpdate(@Param("toppingIds") List<Integer> toppingIds);
+
     List<Topping> findByRestaurantId(Integer restaurantId);
 
     List<Topping> findByRestaurantIdAndIsAvailableTrue(Integer restaurantId);

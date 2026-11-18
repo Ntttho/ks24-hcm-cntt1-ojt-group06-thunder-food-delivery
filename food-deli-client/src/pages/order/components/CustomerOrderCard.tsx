@@ -100,7 +100,7 @@ export const CustomerOrderCard: React.FC<CustomerOrderCardProps> = ({
           </div>
           <div>
             <h3 className="font-extrabold text-gray-900 text-base mb-0.5">
-              {order.restaurantName || `Quán ăn #${order.restaurantId}`}
+              {order.restaurantName || 'Quán ăn đối tác'}
             </h3>
             <div className="text-xs text-gray-400 flex items-center gap-2">
               <span className="font-semibold text-gray-700">{order.orderCode}</span>
