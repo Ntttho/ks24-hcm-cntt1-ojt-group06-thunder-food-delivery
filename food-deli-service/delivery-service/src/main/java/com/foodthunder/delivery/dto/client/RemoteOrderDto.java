@@ -25,6 +25,7 @@ public class RemoteOrderDto {
     private String driverName;
     private String driverPhone;
     private String receiverAddress;
+    private BigDecimal shippingFee;
     private BigDecimal totalAmount;
     private String paymentMethod;
     private String statusCode;

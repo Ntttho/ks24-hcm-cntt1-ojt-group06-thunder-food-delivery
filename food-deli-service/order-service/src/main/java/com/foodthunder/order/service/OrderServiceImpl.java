@@ -80,7 +80,7 @@ public class OrderServiceImpl implements OrderService {
             OrderStatus.AWAITING_PAYMENT, Set.of(OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
             OrderStatus.PENDING, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
             OrderStatus.CONFIRMED, Set.of(OrderStatus.DRIVER_ACCEPTED, OrderStatus.CANCELLED, OrderStatus.TIMEOUT),
-            OrderStatus.DRIVER_ACCEPTED, Set.of(OrderStatus.PICKING_UP, OrderStatus.DRIVER_REJECTED, OrderStatus.CANCELLED),
+            OrderStatus.DRIVER_ACCEPTED, Set.of(OrderStatus.PICKING_UP, OrderStatus.DRIVER_REJECTED, OrderStatus.CONFIRMED, OrderStatus.CANCELLED),
             OrderStatus.DRIVER_REJECTED, Set.of(OrderStatus.CONFIRMED, OrderStatus.CANCELLED),
             OrderStatus.PICKING_UP, Set.of(OrderStatus.DELIVERING),
             OrderStatus.DELIVERING, Set.of(OrderStatus.COMPLETED, OrderStatus.CANCELLED),
@@ -618,6 +618,21 @@ public class OrderServiceImpl implements OrderService {
                 if (!OrderStatus.CONFIRMED.equals(targetStatus) && !OrderStatus.CANCELLED.equals(targetStatus)) {
                     throw new BadRequestException("Quán ăn chỉ có quyền xác nhận đơn (CONFIRMED) hoặc từ chối hủy đơn (CANCELLED)");
                 }
+                if (requestingUserId != null && order.getRestaurantId() != null) {
+                    try {
+                        ResponseEntity<ApiResponse<RemoteRestaurantDto>> res = restaurantClient.getRestaurantDetail(order.getRestaurantId());
+                        if (res != null && res.getBody() != null && res.getBody().getData() != null) {
+                            RemoteRestaurantDto rest = res.getBody().getData();
+                            if (rest.getOwnerId() != null && !rest.getOwnerId().equals(requestingUserId)) {
+                                throw new ForbiddenException("Bạn không phải chủ sở hữu của quán ăn này, không có quyền thao tác trên đơn hàng!");
+                            }
+                        }
+                    } catch (ForbiddenException fe) {
+                        throw fe;
+                    } catch (Exception ex) {
+                        log.warn("Could not verify restaurant ownership for restaurantId={}, error: {}", order.getRestaurantId(), ex.getMessage());
+                    }
+                }
             }
         }
 
@@ -640,6 +655,17 @@ public class OrderServiceImpl implements OrderService {
                 order.setDriverPhone(request.getDriverPhone().trim());
             } else if (order.getDriverPhone() == null || order.getDriverPhone().isBlank()) {
                 order.setDriverPhone("090000000" + requestingUserId);
+            }
+        } else if (OrderStatus.DRIVER_REJECTED.equals(targetStatus)) {
+            // Khi tài xế trả đơn: xóa gán tài xế và chuyển trạng thái về CONFIRMED để tài xế khác có thể nhận trên Radar
+            log.info("Driver {} returned/rejected order {}. Resetting driver assignment and transitioning back to CONFIRMED.",
+                    requestingUserId, orderId);
+            order.setDriverId(null);
+            order.setDriverName(null);
+            order.setDriverPhone(null);
+            targetStatus = OrderStatus.CONFIRMED;
+            if (request.getReason() == null || request.getReason().isBlank()) {
+                request.setReason("Tài xế đã trả đơn - Trả đơn về hàng đợi điều phối cho tài xế khác tiếp nhận");
             }
         }
 
@@ -903,6 +929,21 @@ public class OrderServiceImpl implements OrderService {
             if (OrderStatus.DELIVERING.equalsIgnoreCase(currentStatus)
                     || OrderStatus.PICKING_UP.equalsIgnoreCase(currentStatus)) {
                 throw new BadRequestException("Không thể hủy đơn hàng! Đơn đã có tài xế tiếp nhận hoặc đang giao hàng.");
+            }
+            if (requestingUserId != null && order.getRestaurantId() != null) {
+                try {
+                    ResponseEntity<ApiResponse<RemoteRestaurantDto>> res = restaurantClient.getRestaurantDetail(order.getRestaurantId());
+                    if (res != null && res.getBody() != null && res.getBody().getData() != null) {
+                        RemoteRestaurantDto rest = res.getBody().getData();
+                        if (rest.getOwnerId() != null && !rest.getOwnerId().equals(requestingUserId)) {
+                            throw new ForbiddenException("Bạn không phải chủ sở hữu của quán ăn này, không có quyền hủy đơn hàng!");
+                        }
+                    }
+                } catch (ForbiddenException fe) {
+                    throw fe;
+                } catch (Exception ex) {
+                    log.warn("Could not verify restaurant ownership in cancelOrder for restaurantId={}, error: {}", order.getRestaurantId(), ex.getMessage());
+                }
             }
         }
 

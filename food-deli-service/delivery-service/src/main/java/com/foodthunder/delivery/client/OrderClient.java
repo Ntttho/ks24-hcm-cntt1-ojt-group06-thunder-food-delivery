@@ -24,5 +24,13 @@ public interface OrderClient {
 
     @GetMapping("/api/v1/orders/{id}")
     ResponseEntity<ApiResponse<RemoteOrderDto>> getOrderById(@PathVariable("id") Long id);
+
+    @GetMapping("/api/v1/orders")
+    ResponseEntity<ApiResponse<com.foodthunder.delivery.dto.client.RemotePageResponse<RemoteOrderDto>>> getOrders(
+            @org.springframework.web.bind.annotation.RequestParam(value = "driverId", required = false) Integer driverId,
+            @org.springframework.web.bind.annotation.RequestParam(value = "status", required = false) String status,
+            @org.springframework.web.bind.annotation.RequestParam(value = "page", defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(value = "size", defaultValue = "100") int size
+    );
 }
 
