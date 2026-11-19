@@ -740,30 +740,48 @@ export const driverApi = {
     return mapOrderToDriverOrder(active, shopMap);
   },
 
-  // 2. Tài xế nhận đơn ngay (CONFIRMED -> DRIVER_ACCEPTED qua order-service Pessimistic Lock)
+  // 2. Tài xế nhận đơn ngay (Ưu tiên qua delivery-service để ghi nhận driver_offers & AR/CR metrics, fallback order-service)
   acceptOrder: async (orderId: number | string): Promise<DriverOrder> => {
     const user = storage.getUser();
     const driverId = resolveDriverId();
     const driverName = user?.fullName || 'Tài xế giao hàng';
     const driverPhone = user?.phone || user?.phoneNumber || '';
-    const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
-      statusCode: 'DRIVER_ACCEPTED',
-      reason: `Tài xế ${driverName} đã nhận đơn giao hàng`,
-      driverName,
-      driverPhone,
-    });
 
-    const accepted = res?.data;
-    if (!accepted || !accepted.id) {
-      throw new Error(res?.message || 'Không nhận được thông tin đơn hàng từ máy chủ.');
+    try {
+      // 1. Thử gọi qua delivery-service để lưu Offer và tính hiệu suất
+      await apiClient.post(API_ENDPOINTS.DELIVERY.ACCEPT(orderId));
+    } catch (deliveryError: any) {
+      console.warn('delivery-service accept failed, falling back directly to order-service:', deliveryError?.message);
+      // Fallback gọi trực tiếp order-service
+      const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
+        statusCode: 'DRIVER_ACCEPTED',
+        reason: `Tài xế ${driverName} đã nhận đơn giao hàng`,
+        driverName,
+        driverPhone,
+      });
+
+      const accepted = res?.data;
+      if (!accepted || !accepted.id) {
+        throw new Error(res?.message || 'Không nhận được thông tin đơn hàng từ máy chủ.');
+      }
+
+      if (
+        accepted.driverId !== undefined &&
+        accepted.driverId !== null &&
+        Number(accepted.driverId) !== Number(driverId)
+      ) {
+        throw new Error('Đơn hàng này đã được một tài xế khác nhận trước. Vui lòng chọn đơn khác!');
+      }
+
+      const shopMap = await fetchRestaurantDirectoryMap([accepted.restaurantId], true);
+      return mapOrderToDriverOrder(accepted, shopMap);
     }
 
-    if (
-      accepted.driverId !== undefined &&
-      accepted.driverId !== null &&
-      Number(accepted.driverId) !== Number(driverId)
-    ) {
-      throw new Error('Đơn hàng này đã được một tài xế khác nhận trước. Vui lòng chọn đơn khác!');
+    // Sau khi delivery-service nhận thành công, lấy chi tiết đơn từ order-service
+    const orderRes = await apiClient.get<BackendOrderDto>(API_ENDPOINTS.ORDERS.DETAIL(orderId));
+    const accepted = orderRes?.data;
+    if (!accepted || !accepted.id) {
+      throw new Error(orderRes?.message || 'Không nhận được thông tin đơn hàng từ máy chủ.');
     }
 
     const shopMap = await fetchRestaurantDirectoryMap([accepted.restaurantId], true);
@@ -771,6 +789,7 @@ export const driverApi = {
   },
 
   // 3. Chỉnh sửa trạng thái cuốc xe (PICKING_UP -> DELIVERING -> COMPLETED hoặc DRIVER_REJECTED)
+  // Ưu tiên chuẩn hóa qua delivery-service, có fallback an toàn sang order-service
   updateStatus: async (
     orderId: number | string,
     statusCode: string,
@@ -785,15 +804,38 @@ export const driverApi = {
       COMPLETED: `Tài xế ${driverName} đã giao hàng thành công`,
       DRIVER_REJECTED: `Tài xế ${driverName} trả đơn`,
     };
+    const finalReason = reason?.trim() || defaultReasonMap[normalizedStatus] || `Cập nhật trạng thái ${normalizedStatus}`;
 
-    const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
-      statusCode: normalizedStatus,
-      reason: reason?.trim() || defaultReasonMap[normalizedStatus] || `Cập nhật trạng thái ${normalizedStatus}`,
-    });
+    try {
+      if (normalizedStatus === 'DRIVER_REJECTED') {
+        // Tài xế hủy nhận đơn sau khi đã tiếp nhận (Trả đơn)
+        await apiClient.post(API_ENDPOINTS.DELIVERY.CANCEL(orderId), { reason: finalReason });
+      } else {
+        // Cập nhật tiến trình giao hàng (PICKING_UP, DELIVERING, COMPLETED)
+        await apiClient.post(API_ENDPOINTS.DELIVERY.UPDATE_STEP(orderId), { step: normalizedStatus });
+      }
+    } catch (deliveryError: any) {
+      console.warn('delivery-service updateStep failed, falling back directly to order-service:', deliveryError?.message);
+      // Fallback gọi trực tiếp order-service
+      const res = await apiClient.put<BackendOrderDto>(API_ENDPOINTS.ORDERS.STATUS(orderId), {
+        statusCode: normalizedStatus,
+        reason: finalReason,
+      });
 
-    const updated = res?.data;
+      const updated = res?.data;
+      if (!updated || !updated.id) {
+        throw new Error(res?.message || 'Không thể cập nhật trạng thái đơn hàng.');
+      }
+
+      const shopMap = await fetchRestaurantDirectoryMap([updated.restaurantId], true);
+      return mapOrderToDriverOrder(updated, shopMap);
+    }
+
+    // Sau khi delivery-service xử lý thành công, lấy thông tin cập nhật mới nhất từ order-service
+    const orderRes = await apiClient.get<BackendOrderDto>(API_ENDPOINTS.ORDERS.DETAIL(orderId));
+    const updated = orderRes?.data;
     if (!updated || !updated.id) {
-      throw new Error(res?.message || 'Không thể cập nhật trạng thái đơn hàng.');
+      throw new Error(orderRes?.message || 'Không thể tải thông tin đơn hàng sau khi cập nhật.');
     }
 
     const shopMap = await fetchRestaurantDirectoryMap([updated.restaurantId], true);

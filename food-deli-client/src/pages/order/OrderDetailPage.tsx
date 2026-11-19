@@ -10,6 +10,9 @@ import {
   Badge,
   notification,
   message,
+  Modal,
+  Radio,
+  Input,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -22,6 +25,7 @@ import {
   ShopOutlined,
   CarOutlined,
   MessageOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { orderApi } from '@/services/modules/orderApi';
 import { reviewApi } from '@/services/api/reviewApi';
@@ -115,6 +119,66 @@ export const OrderDetailPage: React.FC = () => {
     heading?: number;
     speedKmh?: number;
   } | null>(null);
+
+  // Đếm ngược 60s cho phép khách hủy đơn khi quán chưa chế biến
+  const [cancelSecondsLeft, setCancelSecondsLeft] = useState<number>(0);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
+  const [cancelReason, setCancelReason] = useState<string>('Đổi ý, không muốn đặt nữa');
+  const [otherCancelReason, setOtherCancelReason] = useState<string>('');
+  const [cancelling, setCancelling] = useState<boolean>(false);
+
+  // Timer 60s tính từ order.createdAt
+  useEffect(() => {
+    if (!order || !order.createdAt) return;
+    const canCancel = order.statusCode === 'PENDING' || order.statusCode === 'AWAITING_PAYMENT';
+    if (!canCancel) {
+      setCancelSecondsLeft(0);
+      return;
+    }
+
+    const calculateRemaining = () => {
+      const orderTime = new Date(order.createdAt).getTime();
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - orderTime) / 1000);
+      return Math.max(0, 60 - elapsedSeconds);
+    };
+
+    setCancelSecondsLeft(calculateRemaining());
+
+    const interval = setInterval(() => {
+      const remaining = calculateRemaining();
+      setCancelSecondsLeft(remaining);
+      if (remaining <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [order?.createdAt, order?.statusCode]);
+
+  const handleConfirmCancelOrder = async () => {
+    if (!order) return;
+    const finalReason = cancelReason === 'Lý do khác' && otherCancelReason.trim()
+      ? otherCancelReason.trim()
+      : cancelReason;
+    try {
+      setCancelling(true);
+      const res = await orderApi.cancelOrder(order.id, finalReason);
+      if (res) {
+        message.success('Đã hủy đơn hàng thành công!');
+        setOrder((prev) => prev ? {
+          ...prev,
+          statusCode: 'CANCELLED',
+          statusLabel: 'Đã hủy',
+        } : null);
+        setIsCancelModalOpen(false);
+      }
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || 'Không thể hủy đơn hàng vào lúc này');
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   // 1. Initial Order Fetch
   useEffect(() => {
@@ -387,7 +451,7 @@ export const OrderDetailPage: React.FC = () => {
   return (
     <div className="w-full space-y-6">
       {/* 1. Top Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Button
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate(APP_ROUTES.ORDERS)}
@@ -396,7 +460,31 @@ export const OrderDetailPage: React.FC = () => {
           Quay lại danh sách đơn hàng
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Nút Hủy đơn hàng 60s dành cho Khách hàng khi Quán chưa xác nhận */}
+          {(order.statusCode === 'PENDING' || order.statusCode === 'AWAITING_PAYMENT') && (
+            cancelSecondsLeft > 0 ? (
+              <Button
+                danger
+                icon={<CloseCircleOutlined />}
+                onClick={() => setIsCancelModalOpen(true)}
+                className="rounded-xl font-bold border-rose-500 text-rose-600 hover:bg-rose-50 shadow-xs"
+              >
+                Hủy đơn hàng ({cancelSecondsLeft}s)
+              </Button>
+            ) : (
+              <Tooltip title="Đã hết thời hạn 60 giây hủy đơn. Quán ăn đang chế biến món ăn của bạn.">
+                <Button
+                  disabled
+                  icon={<CloseCircleOutlined />}
+                  className="rounded-xl font-medium text-gray-400 border-gray-200"
+                >
+                  Hết hạn hủy đơn
+                </Button>
+              </Tooltip>
+            )
+          )}
+
           {/* Nút Chat nhanh với Tài xế */}
           <Button
             icon={<MessageOutlined className="text-orange-500" />}
@@ -607,6 +695,68 @@ export const OrderDetailPage: React.FC = () => {
           onSuccess={() => setDriverReviewed(true)}
         />
       )}
+
+      {/* Modal xác nhận hủy đơn trong 60s cho khách hàng */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2 text-rose-600 font-bold text-lg">
+            <CloseCircleOutlined />
+            <span>Xác nhận hủy đơn hàng</span>
+          </div>
+        }
+        open={isCancelModalOpen}
+        onCancel={() => !cancelling && setIsCancelModalOpen(false)}
+        footer={[
+          <Button key="back" onClick={() => setIsCancelModalOpen(false)} disabled={cancelling} className="rounded-xl">
+            Giữ lại đơn
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            danger
+            loading={cancelling}
+            onClick={handleConfirmCancelOrder}
+            className="rounded-xl font-bold bg-rose-600 hover:bg-rose-700"
+          >
+            Xác nhận hủy đơn {cancelSecondsLeft > 0 ? `(${cancelSecondsLeft}s)` : ''}
+          </Button>,
+        ]}
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-gray-600">
+            Bạn có thể hủy đơn hàng miễn phí trong vòng <strong>60 giây</strong> kể từ khi đặt nếu quán chưa bắt đầu chế biến. 
+            Vui lòng chọn lý do hủy đơn:
+          </p>
+
+          <Radio.Group
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            className="flex flex-col gap-2.5 w-full"
+          >
+            <Radio value="Đổi ý, không muốn đặt nữa">Đổi ý, không muốn đặt nữa</Radio>
+            <Radio value="Đặt nhầm món / sai số lượng">Đặt nhầm món / sai số lượng</Radio>
+            <Radio value="Nhầm địa chỉ nhận hàng">Nhầm địa chỉ nhận hàng</Radio>
+            <Radio value="Thời gian chờ đợi quá lâu">Thời gian chờ đợi quá lâu</Radio>
+            <Radio value="Lý do khác">Lý do khác</Radio>
+          </Radio.Group>
+
+          {cancelReason === 'Lý do khác' && (
+            <Input.TextArea
+              rows={3}
+              placeholder="Nhập lý do cụ thể..."
+              value={otherCancelReason}
+              onChange={(e) => setOtherCancelReason(e.target.value)}
+              maxLength={200}
+              showCount
+              className="rounded-xl"
+            />
+          )}
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            ⏳ Sau 60 giây, quán ăn sẽ chuẩn bị món và bạn sẽ không thể tự hủy đơn hàng qua ứng dụng được nữa.
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

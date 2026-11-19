@@ -90,4 +90,10 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             @Param("statusCode") String statusCode,
             @Param("threshold") java.time.LocalDateTime threshold
     );
+
+    @Query("SELECT o FROM Order o WHERE UPPER(o.status.code) = UPPER(:statusCode) AND o.driverId IS NULL AND o.createdAt <= :threshold AND o.deletedAt IS NULL")
+    List<Order> findUnassignedOrdersByStatusCodeAndCreatedAtBefore(
+            @Param("statusCode") String statusCode,
+            @Param("threshold") java.time.LocalDateTime threshold
+    );
 }

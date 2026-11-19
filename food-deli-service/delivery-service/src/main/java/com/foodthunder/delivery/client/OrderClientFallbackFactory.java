@@ -36,6 +36,20 @@ public class OrderClientFallbackFactory implements FallbackFactory<OrderClient> 
                         .receiverAddress("Địa chỉ người nhận")
                         .build()));
             }
+
+            @Override
+            public ResponseEntity<ApiResponse<com.foodthunder.delivery.dto.client.RemotePageResponse<RemoteOrderDto>>> getOrders(
+                    Integer driverId, String status, int page, int size) {
+                log.error("Fallback triggered for getOrders driverId={}, status={}, cause: {}", driverId, status, cause.getMessage());
+                return ResponseEntity.ok(ApiResponse.success(com.foodthunder.delivery.dto.client.RemotePageResponse.<RemoteOrderDto>builder()
+                        .content(java.util.Collections.emptyList())
+                        .pageNumber(page)
+                        .pageSize(size)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .last(true)
+                        .build()));
+            }
         };
     }
 }

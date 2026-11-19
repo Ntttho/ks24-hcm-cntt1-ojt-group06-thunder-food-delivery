@@ -538,7 +538,28 @@ public class DeliveryServiceImpl implements DeliveryService {
         long completedAll = allOffers.stream().filter(o -> "COMPLETED".equalsIgnoreCase(o.getStatus())).count();
         long cancelledAll = allOffers.stream().filter(o -> "REJECTED".equalsIgnoreCase(o.getStatus()) || "DRIVER_CANCELLED".equalsIgnoreCase(o.getStatus())).count();
         double completionRate = totalAll > 0 ? (double) Math.round((double) completedAll / totalAll * 10000.0) / 100.0 : 100.0;
-        double earnings = completedAll * 20000.0;
+
+        // Tính thu nhập thực tế dựa trên tổng cước phí vận chuyển (shippingFee) của các đơn hoàn thành
+        double earnings = 0.0;
+        try {
+            ResponseEntity<ApiResponse<com.foodthunder.delivery.dto.client.RemotePageResponse<com.foodthunder.delivery.dto.client.RemoteOrderDto>>> ordersResp =
+                    orderClient.getOrders(driverId, "COMPLETED", 0, 100);
+            if (ordersResp != null && ordersResp.getBody() != null && ordersResp.getBody().data() != null
+                    && ordersResp.getBody().data().getContent() != null && !ordersResp.getBody().data().getContent().isEmpty()) {
+                for (com.foodthunder.delivery.dto.client.RemoteOrderDto ord : ordersResp.getBody().data().getContent()) {
+                    if (ord.getShippingFee() != null && ord.getShippingFee().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                        earnings += ord.getShippingFee().doubleValue();
+                    } else {
+                        earnings += 20000.0;
+                    }
+                }
+            } else {
+                earnings = completedAll * 20000.0;
+            }
+        } catch (Exception ex) {
+            log.warn("Could not fetch completed orders shippingFee for driverId={}, fallback to standard fee: {}", driverId, ex.getMessage());
+            earnings = completedAll * 20000.0;
+        }
 
         boolean isSuspended = activePenalty != null || acceptanceRate < 80.0 || cancellationRate > 10.0;
 

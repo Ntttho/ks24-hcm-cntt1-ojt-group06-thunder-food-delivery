@@ -80,12 +80,15 @@ export const API_ENDPOINTS = {
   },
   // Delivery & Shipper Service
   DELIVERY: {
-    AVAILABLE_ORDERS: '/delivery/available',
-    ACCEPT: (orderId: number | string) => `/delivery/orders/${orderId}/accept`,
-    UPDATE_STATUS: (orderId: number | string) => `/delivery/orders/${orderId}/status`,
-    EARNINGS: '/delivery/earnings',
-    LOCATION: '/delivery/location',
-    ORDER_LOCATION: (orderId: number | string) => `/delivery/orders/${orderId}/location`,
+    AVAILABLE_ORDERS: '/deliveries/available',
+    ACCEPT: (orderId: number | string) => `/deliveries/orders/${orderId}/accept`,
+    UPDATE_STATUS: (orderId: number | string) => `/deliveries/orders/${orderId}/status`,
+    UPDATE_STEP: (orderId: number | string) => `/deliveries/orders/${orderId}/step`,
+    CANCEL: (orderId: number | string) => `/deliveries/orders/${orderId}/cancel`,
+    METRICS: '/deliveries/metrics',
+    EARNINGS: '/deliveries/earnings',
+    LOCATION: '/deliveries/location',
+    ORDER_LOCATION: (orderId: number | string) => `/deliveries/orders/${orderId}/location`,
   },
   // Review Service
   REVIEWS: {
