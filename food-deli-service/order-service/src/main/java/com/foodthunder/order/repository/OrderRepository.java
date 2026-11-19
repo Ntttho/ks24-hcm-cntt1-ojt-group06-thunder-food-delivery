@@ -96,4 +96,15 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
             @Param("statusCode") String statusCode,
             @Param("threshold") java.time.LocalDateTime threshold
     );
+
+    /**
+     * Quét các đơn hàng ở trạng thái chỉ định (e.g. CONFIRMED) chưa có tài xế nhận,
+     * tính thời gian quá hạn dựa trên thời điểm gần nhất đơn chuyển vào trạng thái đó (trong order_status_logs).
+     */
+    @Query("SELECT o FROM Order o WHERE UPPER(o.status.code) = UPPER(:statusCode) AND o.driverId IS NULL AND o.deletedAt IS NULL " +
+           "AND COALESCE((SELECT MAX(log.createdAt) FROM OrderStatusLog log WHERE log.order = o AND UPPER(log.newStatus) = UPPER(:statusCode)), o.createdAt) <= :threshold")
+    List<Order> findUnassignedOrdersByStatusCodeAndStatusEntryTimeBefore(
+            @Param("statusCode") String statusCode,
+            @Param("threshold") java.time.LocalDateTime threshold
+    );
 }

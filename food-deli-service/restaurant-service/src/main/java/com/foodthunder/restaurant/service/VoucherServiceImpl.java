@@ -357,7 +357,8 @@ public class VoucherServiceImpl implements VoucherService {
             throw new BadRequestException("Mã voucher '" + voucher.getCode() + "' hiện đã ngừng áp dụng");
         }
         LocalDateTime now = LocalDateTime.now();
-        if (voucher.getStartDate() != null && now.isBefore(voucher.getStartDate())) {
+        // Safe timezone buffer: allow vouchers if start date is within 24 hours of current time (consistent with validateVoucher)
+        if (voucher.getStartDate() != null && now.plusDays(1).isBefore(voucher.getStartDate())) {
             throw new BadRequestException("Mã voucher '" + voucher.getCode() + "' chưa đến thời gian áp dụng");
         }
         if (voucher.getExpiryDate() != null && now.isAfter(voucher.getExpiryDate())) {

@@ -11,7 +11,7 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
   deliverySpeed,
   onSelectDeliverySpeed,
   distance = '1.8 km',
-  priorityFee: _priorityFee = 5000,
+  priorityFee = 5000,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-3">
@@ -59,9 +59,15 @@ export const CheckoutDeliverySpeed: React.FC<CheckoutDeliverySpeedProps> = ({
               </span>
             </div>
           </div>
-          <span className="text-xs text-emerald-600 font-bold">
-            Miễn phụ thu
-          </span>
+          {priorityFee > 0 ? (
+            <span className="text-xs text-orange-600 font-bold">
+              +{priorityFee.toLocaleString('vi-VN')}đ
+            </span>
+          ) : (
+            <span className="text-xs text-emerald-600 font-bold">
+              Miễn phụ thu
+            </span>
+          )}
         </label>
 
         {/* Option 2: Standard */}

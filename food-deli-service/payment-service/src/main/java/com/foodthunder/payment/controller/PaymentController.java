@@ -108,4 +108,16 @@ public class PaymentController {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Khởi tạo thanh toán COD thành công", dto));
     }
+
+    /**
+     * Hủy / đối soát hoàn tiền thanh toán khi đơn hàng bị hủy
+     */
+    @PutMapping("/orders/{orderId}/cancel")
+    public ResponseEntity<ApiResponse<PaymentResponseDto>> cancelPayment(
+            @PathVariable("orderId") Long orderId,
+            @RequestParam(value = "reason", required = false) String reason) {
+        log.info("API PUT /api/v1/payments/orders/{}/cancel with reason: {}", orderId, reason);
+        PaymentResponseDto dto = paymentService.cancelPayment(orderId, reason);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái thanh toán khi hủy đơn thành công", dto));
+    }
 }

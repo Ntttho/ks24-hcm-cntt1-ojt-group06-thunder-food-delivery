@@ -28,6 +28,8 @@ export interface DeliveryAddressItem {
   recipientName: string;
   phone: string;
   isDefault?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface PaymentMethodItem {

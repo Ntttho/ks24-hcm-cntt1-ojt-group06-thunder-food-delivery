@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { message } from 'antd';
 import { orderApi, type CreateOrderPayload } from '@/services/modules/orderApi';
 import { addressApi } from '@/services/modules/addressApi';
 import { paymentApi, type SepayGenerateResponse } from '@/services/modules/paymentApi';
-import { type VoucherItem } from '@/services/modules/restaurantApi';
+import { restaurantApi, type VoucherItem, type Shop } from '@/services/modules/restaurantApi';
+import { calculateHaversineDistance } from '@/utils/geoUtils';
 import {
   adminSettingsApi,
   DEFAULT_ORDER_COST_CONFIG,
@@ -76,6 +77,22 @@ export const CheckoutPage: React.FC = () => {
     return cart.shopName || 'Thunder Food Delivery';
   }, [selectedItems, cart.shopName]);
 
+  // Restaurant Entity info (Lat, Lng, Address)
+  const [activeShop, setActiveShop] = useState<Shop | null>(null);
+
+  useEffect(() => {
+    if (activeRestaurantId) {
+      restaurantApi
+        .getById(activeRestaurantId)
+        .then((res) => {
+          if (res?.data) {
+            setActiveShop(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeRestaurantId]);
+
   // Modals
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -86,8 +103,12 @@ export const CheckoutPage: React.FC = () => {
   const [appliedSystemVoucher, setAppliedSystemVoucher] = useState<VoucherItem | null>(null);
   const [isNewUser, setIsNewUser] = useState<boolean>(true);
 
+  const prevRestaurantIdRef = useRef<number | null>(null);
   useEffect(() => {
-    setAppliedRestaurantVoucher(null);
+    if (prevRestaurantIdRef.current !== null && prevRestaurantIdRef.current !== activeRestaurantId) {
+      setAppliedRestaurantVoucher(null);
+    }
+    prevRestaurantIdRef.current = activeRestaurantId;
   }, [activeRestaurantId]);
 
   useEffect(() => {
@@ -126,6 +147,8 @@ export const CheckoutPage: React.FC = () => {
     recipientName: user?.fullName || 'Khách hàng',
     phone: user?.phone || '0909 000 888',
     isDefault: true,
+    latitude: 10.795,
+    longitude: 106.721,
   });
 
   // Fetch real user addresses on mount
@@ -144,6 +167,8 @@ export const CheckoutPage: React.FC = () => {
             recipientName: user?.fullName || 'Khách hàng',
             phone: user?.phone || '0909 000 888',
             isDefault: Boolean(def.isDefault),
+            latitude: def.latitude ?? 10.795,
+            longitude: def.longitude ?? 106.721,
           });
         }
       } catch {
@@ -228,7 +253,17 @@ export const CheckoutPage: React.FC = () => {
     }, 0);
   }, [selectedItems]);
 
-  const checkoutDistanceKm = 1.8;
+  // Dynamic Real-world Distance Calculation (Haversine from Shop to Delivery Address)
+  const checkoutDistanceKm = useMemo(() => {
+    const shopLat = activeShop?.latitude ?? 10.7769;
+    const shopLng = activeShop?.longitude ?? 106.7009;
+    const userLat = selectedAddress?.latitude ?? 10.795;
+    const userLng = selectedAddress?.longitude ?? 106.721;
+
+    const dist = calculateHaversineDistance(shopLat, shopLng, userLat, userLng);
+    return dist > 0 ? dist : 1.8;
+  }, [activeShop, selectedAddress]);
+
   const baseShippingFee = useMemo(() => {
     if (selectedItems.length === 0) return 0;
     const extraKm =
@@ -340,8 +375,8 @@ export const CheckoutPage: React.FC = () => {
         customerName: selectedAddress?.recipientName || (user as any)?.fullName || 'Khách hàng',
         customerPhone: selectedAddress?.phone || (user as any)?.phone || '0900000001',
         receiverAddress: selectedAddress?.fullAddress || '720A Điện Biên Phủ, Phường 22, Bình Thạnh, TP.HCM',
-        receiverLat: 10.795,
-        receiverLng: 106.721,
+        receiverLat: selectedAddress?.latitude ?? 10.795,
+        receiverLng: selectedAddress?.longitude ?? 106.721,
         distanceKm: checkoutDistanceKm,
         deliverySpeed,
         voucherId: appliedRestaurantVoucher?.id || undefined,
@@ -495,6 +530,8 @@ export const CheckoutPage: React.FC = () => {
               finalTotal={finalTotal}
               itemCount={selectedItems.length}
               paymentMethodDiscount={paymentMethodDiscount}
+              deliverySpeed={deliverySpeed}
+              priorityFee={Number(orderCostConfig.priorityFee || 0)}
             />
 
             {/* Friendly Reassurance */}

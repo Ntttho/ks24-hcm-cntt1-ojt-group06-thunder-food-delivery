@@ -394,6 +394,58 @@ public class PaymentServiceImpl implements PaymentService {
         return checkPaymentStatus(orderId);
     }
 
+    @Override
+    @Transactional
+    public PaymentResponseDto cancelPayment(Long orderId, String reason) {
+        log.info("Processing cancelPayment for orderId={}, reason={}", orderId, reason);
+        Optional<Payment> paymentOpt = paymentRepository.findByOrderId(orderId);
+        if (paymentOpt.isEmpty()) {
+            log.warn("Không tìm thấy bản ghi thanh toán cho orderId={}", orderId);
+            return null;
+        }
+
+        Payment payment = paymentOpt.get();
+        int nextAttempt = payment.getTransactions().size() + 1;
+        String cleanReason = (reason != null && !reason.isBlank()) ? reason : "Đơn hàng bị hủy";
+
+        if (payment.getStatus() == PaymentStatus.PENDING || payment.getStatus() == PaymentStatus.PROCESSING) {
+            payment.setStatus(PaymentStatus.FAILED);
+            PaymentTransaction tx = PaymentTransaction.builder()
+                    .attemptNumber(nextAttempt)
+                    .status(TransactionStatus.FAILED)
+                    .transactionRef("CANCELLED_" + orderId)
+                    .gatewayResponse("{\"action\":\"CANCELLED\",\"reason\":\"" + cleanReason.replace("\"", "'") + "\"}")
+                    .build();
+            payment.addTransaction(tx);
+            log.info("Cập nhật thanh toán sang FAILED do đơn hàng #{} bị hủy trước khi thanh toán", orderId);
+        } else if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            PaymentTransaction tx = PaymentTransaction.builder()
+                    .attemptNumber(nextAttempt)
+                    .status(TransactionStatus.FAILED)
+                    .transactionRef("REFUND_REQUIRED_" + orderId)
+                    .gatewayResponse("{\"action\":\"REFUND_REQUIRED\",\"reason\":\"" + cleanReason.replace("\"", "'") + "\"}")
+                    .build();
+            payment.addTransaction(tx);
+            log.warn("Đơn hàng #{} đã thanh toán SUCCESS nhưng bị hủy. Đã ghi nhận giao dịch REFUND_REQUIRED đối soát hoàn tiền", orderId);
+        }
+
+        Payment saved = paymentRepository.save(payment);
+        return mapToPaymentResponseDto(saved);
+    }
+
+    private PaymentResponseDto mapToPaymentResponseDto(Payment payment) {
+        return PaymentResponseDto.builder()
+                .id(payment.getId())
+                .orderId(payment.getOrderId())
+                .idempotencyKey(payment.getIdempotencyKey())
+                .paymentMethod(payment.getPaymentMethod())
+                .status(payment.getStatus())
+                .amount(payment.getAmount())
+                .createdAt(payment.getCreatedAt() != null ? payment.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant() : Instant.now())
+                .updatedAt(payment.getUpdatedAt() != null ? payment.getUpdatedAt().atZone(ZoneId.systemDefault()).toInstant() : Instant.now())
+                .build();
+    }
+
     private void validateSepayWebhookSecurity(String authHeader) {
         String configuredToken = sepayConfig.getWebhookToken();
         String apiKey = sepayConfig.getApiKey();

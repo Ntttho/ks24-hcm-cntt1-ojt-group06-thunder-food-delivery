@@ -18,6 +18,8 @@ const INITIAL_SAVED_ADDRESSES: DeliveryAddressItem[] = [
     recipientName: 'Nguyễn Văn An',
     phone: '0909 *** 888',
     isDefault: true,
+    latitude: 10.7950,
+    longitude: 106.7214,
   },
   {
     id: 'addr-2',
@@ -27,6 +29,8 @@ const INITIAL_SAVED_ADDRESSES: DeliveryAddressItem[] = [
     recipientName: 'Văn An',
     phone: '0909 *** 888',
     isDefault: false,
+    latitude: 10.7716,
+    longitude: 106.7044,
   },
   {
     id: 'addr-3',
@@ -36,6 +40,8 @@ const INITIAL_SAVED_ADDRESSES: DeliveryAddressItem[] = [
     recipientName: 'Thanh Hằng',
     phone: '0933 *** 777',
     isDefault: false,
+    latitude: 10.7428,
+    longitude: 106.7011,
   },
   {
     id: 'addr-4',
@@ -45,6 +51,8 @@ const INITIAL_SAVED_ADDRESSES: DeliveryAddressItem[] = [
     recipientName: 'Nguyễn Văn Bình (Bố)',
     phone: '0912 *** 345',
     isDefault: false,
+    latitude: 10.8035,
+    longitude: 106.6912,
   },
 ];
 

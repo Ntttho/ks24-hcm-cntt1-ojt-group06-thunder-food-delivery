@@ -68,6 +68,14 @@ public class DeliveryServiceImpl implements DeliveryService {
         // 1.1 Kiểm tra chế tài phạt / Tự động tạm khóa nhận cuốc (AR < 80% hoặc CR > 10%)
         checkDriverSuspension(driverId);
 
+        // 1.2 Ràng buộc 1 đơn active / tài xế tại một thời điểm (Tránh nhận nhiều đơn cùng lúc)
+        boolean hasActiveDelivery = driverOfferRepository.existsByDriverIdAndStatusIn(
+                driverId, List.of("ACCEPTED", "PICKING_UP", "DELIVERING")
+        );
+        if (hasActiveDelivery) {
+            throw new BadRequestException("Bạn đang có một đơn hàng đang trong tiến trình giao. Vui lòng hoàn tất đơn hiện tại trước khi nhận đơn mới!");
+        }
+
         // 2. KHÓA BI QUAN (PESSIMISTIC LOCKING - SELECT ... FOR UPDATE)
         // Lấy tất cả offers của orderId này kèm khóa ghi độc quyền X-Lock trên CSDL.
         // Bất kỳ thread nào khác cùng truy vấn đơn này sẽ bị BLOCKED tại đây cho đến khi transaction hoàn tất.
@@ -220,6 +228,16 @@ public class DeliveryServiceImpl implements DeliveryService {
 
         checkDriverSuspension(driverId);
 
+        // Khóa chuyển sang ngoại tuyến khi tài xế đang trong cuốc giao hàng
+        if (Boolean.TRUE.equals(driver.getIsOnline())) {
+            boolean hasActiveDelivery = driverOfferRepository.existsByDriverIdAndStatusIn(
+                    driverId, List.of("ACCEPTED", "PICKING_UP", "DELIVERING")
+            );
+            if (hasActiveDelivery) {
+                throw new BadRequestException("Bạn đang có đơn hàng đang trong tiến trình giao. Không thể chuyển sang trạng thái ngoại tuyến lúc này!");
+            }
+        }
+
         driver.setIsOnline(!Boolean.TRUE.equals(driver.getIsOnline()));
         driverDetailRepository.save(driver);
 
@@ -351,6 +369,9 @@ public class DeliveryServiceImpl implements DeliveryService {
             log.info("Driver #{} completed order #{}, offer status updated to COMPLETED", driverId, orderId);
         } else if ("DELIVERING".equalsIgnoreCase(targetStep)) {
             offer.setStatus("DELIVERING");
+            driverOfferRepository.save(offer);
+        } else if ("PICKING_UP".equalsIgnoreCase(targetStep)) {
+            offer.setStatus("PICKING_UP");
             driverOfferRepository.save(offer);
         }
 

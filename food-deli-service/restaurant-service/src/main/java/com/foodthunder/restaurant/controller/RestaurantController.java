@@ -123,7 +123,7 @@ public class RestaurantController {
             @RequestParam(required = false) Integer ownerId,
             @Valid @RequestBody CreateRestaurantRequest request
     ) {
-        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : ownerId;
         RestaurantDto updated = restaurantService.updateRestaurantDetails(id, request, effectiveOwnerId);
         return ResponseEntity.ok(ApiResponse.success("Lưu thông tin nhà hàng vào bảng restaurant_change_requests thành công", updated));
     }
@@ -135,7 +135,7 @@ public class RestaurantController {
             @RequestParam(required = false) Integer ownerId,
             @Valid @RequestBody CreateRestaurantRequest request
     ) {
-        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : (ownerId != null ? ownerId : 3);
+        Integer effectiveOwnerId = (headerOwnerId != null) ? headerOwnerId : ownerId;
         RestaurantDto updated = restaurantService.updateRestaurantDetails(id, request, effectiveOwnerId);
         return ResponseEntity.ok(ApiResponse.success("Lưu thông tin nhà hàng vào bảng restaurant_change_requests thành công", updated));
     }

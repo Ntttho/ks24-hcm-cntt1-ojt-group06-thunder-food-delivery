@@ -59,6 +59,9 @@ public class OrderServiceImpl implements OrderService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AuthClient authClient;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.foodthunder.order.client.PaymentClient paymentClient;
+
     public OrderServiceImpl(
             OrderRepository orderRepository,
             OrderStatusRepository orderStatusRepository,
@@ -708,34 +711,49 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private BigDecimal calculateShippingFee(Double distanceKm, String deliverySpeed, RemoteOrderCostConfigDto cfg) {
-        if (cfg == null) {
-            if (systemSettingsService != null) {
+        double baseKm = 2.0;
+        BigDecimal baseFee = BigDecimal.valueOf(15000);
+        BigDecimal extraPerKm = BigDecimal.valueOf(5000);
+        BigDecimal priorityFee = BigDecimal.valueOf(5000);
+
+        if (cfg != null) {
+            if (cfg.getBaseKm() != null && cfg.getBaseKm() > 0) {
+                baseKm = cfg.getBaseKm();
+            }
+            if (cfg.getBaseFee() != null) {
+                baseFee = cfg.getBaseFee();
+            }
+            if (cfg.getExtraPerKm() != null) {
+                extraPerKm = cfg.getExtraPerKm();
+            }
+            if (cfg.getPriorityFee() != null) {
+                priorityFee = cfg.getPriorityFee();
+            }
+        } else if (systemSettingsService != null) {
+            try {
                 var settings = systemSettingsService.getShippingSettings();
-                return settings.getDefaultShippingFee().add(
-                        settings.getShippingFeePerKilometer().multiply(BigDecimal.valueOf(distanceKm))
-                );
+                if (settings != null) {
+                    if (settings.getDefaultShippingFee() != null) {
+                        baseFee = settings.getDefaultShippingFee();
+                    }
+                    if (settings.getShippingFeePerKilometer() != null) {
+                        extraPerKm = settings.getShippingFeePerKilometer();
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Could not read shipping settings from systemSettingsService: {}", ex.getMessage());
             }
-            BigDecimal baseFee = BigDecimal.valueOf(15000);
-            if (distanceKm <= 2.0) {
-                return baseFee;
-            }
-            double extraKm = Math.ceil(distanceKm - 2.0);
-            return baseFee.add(BigDecimal.valueOf(extraKm * 5000));
         }
 
-        double baseKm = (cfg.getBaseKm() != null && cfg.getBaseKm() > 0) ? cfg.getBaseKm() : 2.0;
-        BigDecimal baseFee = cfg.getBaseFee() != null ? cfg.getBaseFee() : BigDecimal.valueOf(15000);
-        BigDecimal extraPerKm = cfg.getExtraPerKm() != null ? cfg.getExtraPerKm() : BigDecimal.valueOf(5000);
-
         BigDecimal total = baseFee;
-        if (distanceKm > baseKm) {
+        if (distanceKm != null && distanceKm > baseKm) {
             double extraKm = Math.ceil(distanceKm - baseKm);
             total = total.add(extraPerKm.multiply(BigDecimal.valueOf(extraKm)));
         }
         if ("priority".equalsIgnoreCase(deliverySpeed)
-                && cfg.getPriorityFee() != null
-                && cfg.getPriorityFee().compareTo(BigDecimal.ZERO) > 0) {
-            total = total.add(cfg.getPriorityFee());
+                && priorityFee != null
+                && priorityFee.compareTo(BigDecimal.ZERO) > 0) {
+            total = total.add(priorityFee);
         }
         return total;
     }
@@ -965,6 +983,7 @@ public class OrderServiceImpl implements OrderService {
 
         restoreProductStock(order);
         releaseOrderVouchers(order);
+        cancelPaymentSafely(order.getId(), reason);
 
         Order saved = orderRepository.save(order);
         log.info("Order ID={} cancelled with reason: {}", orderId, reason);
@@ -1118,6 +1137,17 @@ public class OrderServiceImpl implements OrderService {
                 restaurantClient.releaseVoucher(id);
             } catch (Exception ex) {
                 log.warn("Failed to release voucher ID={} on order cancellation {}: {}", id, order.getId(), ex.getMessage());
+            }
+        }
+    }
+
+    private void cancelPaymentSafely(Long orderId, String reason) {
+        if (paymentClient != null) {
+            try {
+                paymentClient.cancelPayment(orderId, reason);
+                log.info("Propagated cancelPayment to payment-service for orderId={}", orderId);
+            } catch (Exception ex) {
+                log.warn("Could not propagate cancelPayment to payment-service for orderId={}: {}", orderId, ex.getMessage());
             }
         }
     }

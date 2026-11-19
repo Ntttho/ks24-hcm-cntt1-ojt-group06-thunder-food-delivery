@@ -263,7 +263,7 @@ export const AdminAnalyticsPage: React.FC = () => {
         />
       )}
 
-      {!errorMessage && summary?.partialData && summary.warnings && summary.warnings.length > 0 && (
+      {/* {!errorMessage && summary?.partialData && summary.warnings && summary.warnings.length > 0 && (
         <Alert
           type="warning"
           showIcon
@@ -271,7 +271,7 @@ export const AdminAnalyticsPage: React.FC = () => {
           description={summary.warnings.join(' | ')}
           className="rounded-xl"
         />
-      )}
+      )} */}
 
       {/* 2. 5 Core System KPI Statistic Cards */}
       {loading && !summary ? (

@@ -47,4 +47,9 @@ public interface PaymentService {
      * Giả lập thanh toán thành công (dành cho môi trường Sandbox / Demo)
      */
     PaymentResponseDto simulatePaymentSuccess(Long orderId);
+
+    /**
+     * Đồng bộ hủy thanh toán / đối soát hoàn tiền khi đơn hàng bị hủy
+     */
+    PaymentResponseDto cancelPayment(Long orderId, String reason);
 }

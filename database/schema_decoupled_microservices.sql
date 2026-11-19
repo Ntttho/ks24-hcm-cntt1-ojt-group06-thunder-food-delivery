@@ -358,6 +358,9 @@ CREATE TABLE `order_status_logs` (
 -- ĐÃ TÁCH LOGIC: user_id là Logical Plain ID trỏ sang auth-service
 CREATE TABLE `driver_details` (
   `user_id` INT NOT NULL,                 -- [Logical FK] trỏ sang auth-service: users.id
+  `full_name` VARCHAR(100) DEFAULT NULL,
+  `phone_number` VARCHAR(20) DEFAULT NULL,
+  `email` VARCHAR(100) DEFAULT NULL,
   `license_plate` VARCHAR(20) DEFAULT NULL,
   `id_card_number` VARCHAR(20) DEFAULT NULL,
   `vehicle_type` VARCHAR(50) DEFAULT NULL,
@@ -511,11 +514,11 @@ INSERT INTO `roles` (`id`, `name`) VALUES
 
 -- 2. Users (Password: 123456)
 INSERT INTO `users` (`id`, `phone`, `password`, `full_name`, `rating_avg`, `created_at`, `deleted_at`) VALUES
-(1, '0900000001', '$2a$10$tFzqYb.rxAZWJ4ggv1I2XOnr1zkXQDmXoI48V5TxspPkr93B33F6a', 'Customer Demo', '4.80', '2026-06-10 08:08:00', NULL),
-(2, '0900000002', '$2a$10$5WGj8RuHVMH4FwpZkTSkGOssJKqG6oefZLlpzM8kkjgWclazmcttO', 'Tran Thi B', '4.95', '2026-06-10 08:08:00', NULL),
-(3, '0900000003', '$2a$10$CmbVVephSjEcxKDbxtsbG.2/nQ0q9.poRcUsCIPDxpf20nIheLWle', 'Le Van C', '4.70', '2026-06-10 08:08:00', NULL),
-(4, '0900000004', '$2a$10$DnzFJhBXWPHqNyHgpceR2.7LG4yNcJK4.dxswiFV5We.pee7RD8qG', 'Pham Thi D', '4.88', '2026-06-10 08:08:00', NULL),
-(5, '0900000000', '$2a$10$TP0RsDH.JXTLrDqcrg9fwe5XGxEgGRyYXxgCWztamYLIl1URYiNfO', 'Admin User', '5.00', '2026-06-10 08:08:00', NULL),
+(1, '0900000001', '$2a$10$tFzqYb.rxAZWJ4ggv1I2XOnr1zkXQDmXoI48V5TxspPkr93B33F6a', 'Nguyễn Văn An', '4.80', '2026-06-10 08:08:00', NULL),
+(2, '0900000002', '$2a$10$5WGj8RuHVMH4FwpZkTSkGOssJKqG6oefZLlpzM8kkjgWclazmcttO', 'Trần Thị Bích', '4.95', '2026-06-10 08:08:00', NULL),
+(3, '0900000003', '$2a$10$CmbVVephSjEcxKDbxtsbG.2/nQ0q9.poRcUsCIPDxpf20nIheLWle', 'Lê Văn Cường', '4.70', '2026-06-10 08:08:00', NULL),
+(4, '0900000004', '$2a$10$DnzFJhBXWPHqNyHgpceR2.7LG4yNcJK4.dxswiFV5We.pee7RD8qG', 'Phạm Thị Dung', '4.88', '2026-06-10 08:08:00', NULL),
+(5, '0900000000', '$2a$10$TP0RsDH.JXTLrDqcrg9fwe5XGxEgGRyYXxgCWztamYLIl1URYiNfO', 'Quản Trị Viên Hệ Thống', '5.00', '2026-06-10 08:08:00', NULL),
 (6, '0944495653', '$2a$10$ExCfal4mIKRCNd8Q/4apLedkozCHtu5zfIqCZI2SxKUJyd9yTOxLi', 'Huỳnh La Tiến Lộc', '5.00', '2026-06-10 01:32:08', NULL);
 
 -- 3. User Roles
@@ -535,9 +538,9 @@ INSERT INTO `user_addresses` (`id`, `user_id`, `address`, `latitude`, `longitude
 (3, 2, '264 Bà Hạt, Phường 9, Quận 10, TP.HCM', 10.765, 106.671, 1, 'Nhà riêng', '2026-06-10 09:00:00');
 
 -- 5. Driver Details
-INSERT INTO `driver_details` (`user_id`, `license_plate`, `id_card_number`, `vehicle_type`, `approval_status`, `reject_reason`, `is_online`) VALUES
-(2, '59A1-12345', '079123456789', 'Motorbike', 'APPROVED', NULL, 1),
-(4, '51B2-67890', '079987654321', 'Motorbike', 'APPROVED', NULL, 0);
+INSERT INTO `driver_details` (`user_id`, `full_name`, `phone_number`, `email`, `license_plate`, `id_card_number`, `vehicle_type`, `approval_status`, `reject_reason`, `is_online`) VALUES
+(2, 'Trần Thị Bích', '0900000002', 'driver.b@foodthunder.com', '59A1-12345', '079123456789', 'Xe máy số', 'APPROVED', NULL, 1),
+(4, 'Phạm Thị Dung', '0900000004', 'driver.d@foodthunder.com', '51B2-67890', '079987654321', 'Xe máy tay ga', 'APPROVED', NULL, 0);
 
 -- 6. Merchant Details
 INSERT INTO `merchant_details` (`user_id`, `business_license`, `tax_code`) VALUES
@@ -559,46 +562,46 @@ INSERT INTO `vouchers` (`id`, `restaurant_id`, `code`, `discount_type`, `discoun
 
 -- 9. Restaurants
 INSERT INTO `restaurants` (`id`, `owner_id`, `name`, `address`, `latitude`, `longitude`, `opening_time`, `closing_time`, `is_open`, `is_open_today`, `temporary_closed_reason`, `temporary_closed_until`, `image_url`, `rating_avg`, `approval_status`, `approved_by`, `approved_at`, `reject_reason`, `deleted_at`) VALUES
-(1, 3, 'Hanh Dung - Am Thuc Chay Man', '111-113 Au Co, P.14, Q.11', 10.771, 106.649, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', '4.80', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
-(2, 3, 'Quan Chay Thanh Ai', '264 Ba Hat, P.9, Q.10', 10.765, 106.671, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/99/2f/11/getlstd-property-photo.jpg?w=1000&h=-1&s=1', '4.70', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
-(3, 6, 'Cơm Tấm TL', '300A Phu chanh Phu Hung', 10.229067, 106.40525, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://tse3.mm.bing.net/th/id/OIP.YO6ZnE23qqs6g_8FvlITewHaFS?rs=1&pid=ImgDetMain&o=7&rm=3', '5.00', 'APPROVED', 1, '2026-06-10 02:07:20', NULL, NULL),
-(4, 3, 'Audit Restaurant Demo', '123 Test St', 10.77, 106.69, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4', '5.00', 'APPROVED', 5, '2026-06-10 02:43:43', NULL, '2026-06-10 02:43:43'),
-(5, 3, 'Audit Restaurant Demo 2', '123 Test St', 10.77, 106.69, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1552566626-52f8b828add9', '5.00', 'APPROVED', 5, '2026-06-10 02:44:54', NULL, '2026-06-10 02:44:54'),
-(6, 3, 'Bep Nha Sai Gon', '25 Nguyen Trai, P. Ben Thanh, Q.1, TP.HCM', 10.7698, 106.6939, '06:30:00', '21:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', '4.85', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
-(7, 3, 'Bun Bo Co Hue', '88 Ly Thuong Kiet, P.7, Q.10, TP.HCM', 10.7721, 106.6578, '06:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec', '4.75', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
-(8, 6, 'Tra Sua May Xanh', '145 Cach Mang Thang 8, P.5, Q.3, TP.HCM', 10.7824, 106.6841, '09:00:00', '23:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1558857563-b371033873b8', '4.60', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
-(9, 6, 'Pizza Pho Mai 4P Mini', '17 Phan Xich Long, P.2, Q. Phu Nhuan, TP.HCM', 10.7993, 106.6865, '10:00:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1513104890138-7c749659a591', '4.90', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
-(10, 3, 'Ga Ran Gion Rum', '62 Le Van Sy, P.11, Q.3, TP.HCM', 10.7874, 106.6742, '09:30:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1562967916-eb82221dfb92', '4.65', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL);
+(1, 3, 'Hạnh Dung - Ẩm Thực Chay Mặn', '111-113 Âu Cơ, Phường 14, Quận 11, TP.HCM', 10.771, 106.649, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', '4.80', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
+(2, 3, 'Quán Chay Thanh Ái', '264 Bà Hạt, Phường 9, Quận 10, TP.HCM', 10.765, 106.671, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/19/99/2f/11/getlstd-property-photo.jpg?w=1000&h=-1&s=1', '4.70', 'APPROVED', 5, '2026-06-10 08:08:00', NULL, NULL),
+(3, 6, 'Cơm Tấm Tiến Lộc', '300A Phú Chánh, Xã Phú Hưng, TP. Bến Tre', 10.229067, 106.40525, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://tse3.mm.bing.net/th/id/OIP.YO6ZnE23qqs6g_8FvlITewHaFS?rs=1&pid=ImgDetMain&o=7&rm=3', '5.00', 'APPROVED', 1, '2026-06-10 02:07:20', NULL, NULL),
+(4, 3, 'Cơm Niêu Sài Gòn Xưa', '123 Nguyễn Thị Minh Khai, Phường 6, Quận 3, TP.HCM', 10.77, 106.69, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4', '5.00', 'APPROVED', 5, '2026-06-10 02:43:43', NULL, '2026-06-10 02:43:43'),
+(5, 3, 'Phở Thìn Lò Đúc', '45 Đinh Tiên Hoàng, Phường Đa Kao, Quận 1, TP.HCM', 10.77, 106.69, '07:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1552566626-52f8b828add9', '5.00', 'APPROVED', 5, '2026-06-10 02:44:54', NULL, '2026-06-10 02:44:54'),
+(6, 3, 'Bếp Nhà Sài Gòn', '25 Nguyễn Trãi, Phường Bến Thành, Quận 1, TP.HCM', 10.7698, 106.6939, '06:30:00', '21:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', '4.85', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
+(7, 3, 'Bún Bò Cố Đô Huế', '88 Lý Thường Kiệt, Phường 7, Quận 10, TP.HCM', 10.7721, 106.6578, '06:00:00', '22:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1569058242253-92a9c755a0ec', '4.75', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
+(8, 6, 'Trà Sữa Mây Xanh', '145 Cách Mạng Tháng 8, Phường 5, Quận 3, TP.HCM', 10.7824, 106.6841, '09:00:00', '23:00:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1558857563-b371033873b8', '4.60', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
+(9, 6, 'Pizza Phô Mai 4P Mini', '17 Phan Xích Long, Phường 2, Quận Phú Nhuận, TP.HCM', 10.7993, 106.6865, '10:00:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1513104890138-7c749659a591', '4.90', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL),
+(10, 3, 'Gà Rán Giòn Rụm', '62 Lê Văn Sỹ, Phường 11, Quận 3, TP.HCM', 10.7874, 106.6742, '09:30:00', '22:30:00', 1, 1, NULL, NULL, 'https://images.unsplash.com/photo-1562967916-eb82221dfb92', '4.65', 'APPROVED', 5, '2026-06-11 08:00:00', NULL, NULL);
 
 -- 10. Restaurant Change Requests
 INSERT INTO `restaurant_change_requests` (`id`, `restaurant_id`, `requested_by`, `payload`, `status`, `reviewed_by`, `reviewed_at`, `reject_reason`, `created_at`) VALUES
-(1, 1, 1, '{"name":"Hanh Dung - Am Thuc Chay Man","address":"111-113 Au Co, P.14, Q.11","ownerId":5,"imageUrl":null,"latitude":10.771,"longitude":106.649,"ratingAvg":4.8}', 'PENDING', NULL, NULL, NULL, '2026-06-10 01:53:52'),
-(2, 3, 1, '{"name":"Cơm Tấm TL","address":"300A Phu chanh Phu Hung","ownerId":6,"imageUrl":"https://tse3.mm.bing.net/th/id/OIP.YO6ZnE23qqs6g_8FvlITewHaFS?rs=1&pid=ImgDetMain&o=7&rm=3","latitude":10.229067,"longitude":106.40525,"ratingAvg":5}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:00:21'),
-(3, 2, 1, '{"name":"Quan Chay Thanh Ai","address":"264 Ba Hat, P.9, Q.10","ownerId":3,"imageUrl":null,"latitude":10.765,"longitude":106.671,"ratingAvg":4.7}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:04:21');
+(1, 1, 1, '{"name":"Hạnh Dung - Ẩm Thực Chay Mặn","address":"111-113 Âu Cơ, Phường 14, Quận 11, TP.HCM","ownerId":5,"imageUrl":null,"latitude":10.771,"longitude":106.649,"ratingAvg":4.8}', 'PENDING', NULL, NULL, NULL, '2026-06-10 01:53:52'),
+(2, 3, 1, '{"name":"Cơm Tấm Tiến Lộc","address":"300A Phú Chánh, Xã Phú Hưng, TP. Bến Tre","ownerId":6,"imageUrl":"https://tse3.mm.bing.net/th/id/OIP.YO6ZnE23qqs6g_8FvlITewHaFS?rs=1&pid=ImgDetMain&o=7&rm=3","latitude":10.229067,"longitude":106.40525,"ratingAvg":5}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:00:21'),
+(3, 2, 1, '{"name":"Quán Chay Thanh Ái","address":"264 Bà Hạt, Phường 9, Quận 10, TP.HCM","ownerId":3,"imageUrl":null,"latitude":10.765,"longitude":106.671,"ratingAvg":4.7}', 'PENDING', NULL, NULL, NULL, '2026-06-10 02:04:21');
 
 -- 11. Categories
 INSERT INTO `categories` (`id`, `restaurant_id`, `name`) VALUES
-(1, 1, 'Mon chinh'),
-(2, 1, 'Nuoc uong'),
-(3, 2, 'Diem tam'),
-(4, 2, 'Com tam'),
-(5, 3, 'Món Chính'),
-(8, 3, 'Mon Phu'),
-(12, 6, 'Com nha lam'),
-(13, 6, 'Canh va mon phu'),
-(14, 6, 'Nuoc giai khat'),
-(15, 7, 'Bun bo'),
-(16, 7, 'Mon an kem'),
-(17, 7, 'Nuoc uong'),
-(18, 8, 'Tra sua'),
-(19, 8, 'Tra trai cay'),
-(20, 8, 'Topping'),
-(21, 9, 'Pizza'),
-(22, 9, 'Pasta'),
-(23, 9, 'Khai vi'),
-(24, 10, 'Ga ran'),
-(25, 10, 'Burger'),
-(26, 10, 'Combo');
+(1, 1, 'Món chính'),
+(2, 1, 'Nước uống'),
+(3, 2, 'Điểm tâm'),
+(4, 2, 'Cơm tấm chay'),
+(5, 3, 'Món chính'),
+(8, 3, 'Món phụ & Canh'),
+(12, 6, 'Cơm nhà làm'),
+(13, 6, 'Canh và món phụ'),
+(14, 6, 'Nước giải khát'),
+(15, 7, 'Bún bò Huế'),
+(16, 7, 'Món ăn kèm'),
+(17, 7, 'Nước uống'),
+(18, 8, 'Trà sữa đặc biệt'),
+(19, 8, 'Trà trái cây tươi'),
+(20, 8, 'Topping thêm'),
+(21, 9, 'Pizza đút lò'),
+(22, 9, 'Mì Ý & Pasta'),
+(23, 9, 'Món khai vị'),
+(24, 10, 'Gà rán giòn rụm'),
+(25, 10, 'Burger đậm vị'),
+(26, 10, 'Combo siêu tiết kiệm');
 
 -- 12. Toppings
 INSERT INTO `toppings` (`id`, `restaurant_id`, `name`, `price`, `is_available`) VALUES
@@ -615,48 +618,48 @@ INSERT INTO `toppings` (`id`, `restaurant_id`, `name`, `price`, `is_available`) 
 
 -- 13. Food Items
 INSERT INTO `food_items` (`id`, `category_id`, `name`, `price`, `is_available`, `default_quantity`, `current_quantity`, `quantity_reset_date`, `deleted_at`, `image_url`) VALUES
-(1, 1, 'Com Tam Chay', 45000.00, 1, 40, 38, '2026-06-18', NULL, 'https://i.ytimg.com/vi/I7IO_xMc4yA/maxresdefault.jpg'),
-(2, 2, 'Tra Da', 5000.00, 1, 120, 120, '2026-06-18', NULL, 'https://tse1.mm.bing.net/th/id/OIP.UmpBdKB2TIJmZIcyRXsY0AHaFj?rs=1&pid=ImgDetMain&o=7&rm=3'),
-(3, 3, 'Hu Tieu Nam Vang', 55000.00, 1, 35, 35, '2026-06-18', NULL, 'https://tse3.mm.bing.net/th/id/OIP.geNSt6WrdCUaHKp_QuzPrgHaEL?rs=1&pid=ImgDetMain&o=7&rm=3'),
-(4, 5, 'Cơm tấm Sườn', 30000.00, 1, 5, 3, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
-(5, 5, 'Cơm Sườn Bì Chả', 45000.00, 1, 5, 3, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
-(6, 5, 'Cơm Sườn Bì', 40000.00, 1, 10, 4, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
-(7, 8, 'Chả', 10000.00, 1, 100, 5, '2026-06-18', NULL, 'https://th.bing.com/th/id/OSK.b0513d6867f39fd7cfc1e204f4dbc936?w=424&h=424&c=7&rs=1&qlt=90&o=6&pid=16.1'),
-(11, 12, 'Com ga xoi mo', 52000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d'),
-(12, 12, 'Com thit kho trung', 48000.00, 1, 40, 40, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'),
-(13, 12, 'Com ca kho to', 55000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512058564366-18510be2db19'),
-(14, 12, 'Com bo luc lac', 68000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1544025162-d76694265947'),
-(15, 13, 'Canh chua ca loc', 39000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1547592180-85f173990554'),
-(16, 13, 'Rau muong xao toi', 28000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd'),
-(17, 14, 'Tra tac mat ong', 18000.00, 1, 80, 80, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1497534446932-c925b458314e'),
-(18, 14, 'Nuoc mia tac', 15000.00, 1, 90, 90, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1622597467836-f3285f2131b8'),
-(19, 15, 'Bun bo dac biet', 65000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1555126634-323283e090fa'),
-(20, 15, 'Bun bo gio heo', 59000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624'),
-(21, 15, 'Bun bo tai nam', 62000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092'),
-(22, 16, 'Cha cua them', 18000.00, 1, 60, 60, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1529042410759-befb1204b468'),
-(23, 16, 'Quay nong', 8000.00, 1, 100, 100, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1509440159596-0249088772ff'),
-(24, 17, 'Sua dau nanh', 12000.00, 1, 80, 80, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc'),
-(25, 18, 'Tra sua tran chau duong den', 39000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1558857563-b371033873b8'),
-(26, 18, 'Tra sua oolong kem cheese', 42000.00, 1, 65, 65, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054'),
-(27, 18, 'Matcha latte tran chau', 45000.00, 1, 55, 55, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1515823064-d6e0c04616a7'),
-(28, 19, 'Tra dao cam sa', 35000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc'),
-(29, 19, 'Tra vai hat chia', 36000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1544145945-f90425340c7e'),
-(30, 20, 'Tran chau den', 7000.00, 1, 120, 120, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e'),
-(31, 20, 'Thach pho mai', 9000.00, 1, 100, 100, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1551024601-bec78aea704b'),
-(32, 21, 'Pizza hai san', 129000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
+(1, 1, 'Cơm tấm sườn bì chả chay', 45000.00, 1, 40, 38, '2026-06-18', NULL, 'https://i.ytimg.com/vi/I7IO_xMc4yA/maxresdefault.jpg'),
+(2, 2, 'Trà đá giải nhiệt', 5000.00, 1, 120, 120, '2026-06-18', NULL, 'https://tse1.mm.bing.net/th/id/OIP.UmpBdKB2TIJmZIcyRXsY0AHaFj?rs=1&pid=ImgDetMain&o=7&rm=3'),
+(3, 3, 'Hủ tiếu Nam Vang chay đặc biệt', 55000.00, 1, 35, 35, '2026-06-18', NULL, 'https://tse3.mm.bing.net/th/id/OIP.geNSt6WrdCUaHKp_QuzPrgHaEL?rs=1&pid=ImgDetMain&o=7&rm=3'),
+(4, 5, 'Cơm tấm sườn nướng mật ong', 30000.00, 1, 5, 3, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
+(5, 5, 'Cơm tấm sườn bì chả đặc biệt', 45000.00, 1, 5, 3, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
+(6, 5, 'Cơm tấm sườn bì', 40000.00, 1, 10, 4, '2026-06-18', NULL, 'https://asianinspirations.com.au/wp-content/uploads/2019/08/R01069_Com-Tam-3.jpg'),
+(7, 8, 'Chả trứng hấp thêm', 10000.00, 1, 100, 5, '2026-06-18', NULL, 'https://th.bing.com/th/id/OSK.b0513d6867f39fd7cfc1e204f4dbc936?w=424&h=424&c=7&rs=1&qlt=90&o=6&pid=16.1'),
+(11, 12, 'Cơm gà xối mỡ giòn da', 52000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d'),
+(12, 12, 'Cơm thịt kho trứng cút đậm đà', 48000.00, 1, 40, 40, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c'),
+(13, 12, 'Cơm cá ba sa kho tộ', 55000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512058564366-18510be2db19'),
+(14, 12, 'Cơm bò lúc lắc khoai tây', 68000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1544025162-d76694265947'),
+(15, 13, 'Canh chua cá lóc Nam Bộ', 39000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1547592180-85f173990554'),
+(16, 13, 'Rau muống xào tỏi xanh giòn', 28000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd'),
+(17, 14, 'Trà tắc mật ong hoa nhài', 18000.00, 1, 80, 80, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1497534446932-c925b458314e'),
+(18, 14, 'Nước mía tắc tươi siêu sạch', 15000.00, 1, 90, 90, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1622597467836-f3285f2131b8'),
+(19, 15, 'Bún bò Huế đặc biệt thập cẩm', 65000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1555126634-323283e090fa'),
+(20, 15, 'Bún bò giò heo hầm mềm', 59000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624'),
+(21, 15, 'Bún bò tái nạm giòn', 62000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1600891964599-f61ba0e24092'),
+(22, 16, 'Chả cua Huế hấp thêm', 18000.00, 1, 60, 60, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1529042410759-befb1204b468'),
+(23, 16, 'Quẩy nóng vàng giòn', 8000.00, 1, 100, 100, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1509440159596-0249088772ff'),
+(24, 17, 'Sữa đậu nành nguyên chất', 12000.00, 1, 80, 80, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc'),
+(25, 18, 'Trà sữa trân châu đường đen', 39000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1558857563-b371033873b8'),
+(26, 18, 'Trà sữa Ô Long kem cheese', 42000.00, 1, 65, 65, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1525385133512-2f3bdd039054'),
+(27, 18, 'Matcha latte trân châu', 45000.00, 1, 55, 55, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1515823064-d6e0c04616a7'),
+(28, 19, 'Trà đào cam sả thanh nhiệt', 35000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc'),
+(29, 19, 'Trà vải hạt chia giải khát', 36000.00, 1, 70, 70, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1544145945-f90425340c7e'),
+(30, 20, 'Trân châu đen dẻo dai', 7000.00, 1, 120, 120, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e'),
+(31, 20, 'Thạch phô mai tươi', 9000.00, 1, 100, 100, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1551024601-bec78aea704b'),
+(32, 21, 'Pizza hải sản sốt Pesto', 129000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1513104890138-7c749659a591'),
 (33, 21, 'Pizza pepperoni', 119000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1628840042765-356cda07504e'),
-(34, 21, 'Pizza bo bam pho mai', 139000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1594007654729-407eedc4be65'),
-(35, 22, 'Mi y sot bo bam', 79000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1551183053-bf91a1d81141'),
-(36, 22, 'Carbonara thit xong khoi', 85000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9'),
-(37, 23, 'Khoai tay chien', 39000.00, 1, 60, 60, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1576107232684-1279f390859f'),
-(38, 23, 'Salad caesar', 49000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd'),
-(39, 24, 'Ga ran truyen thong 2 mieng', 59000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1562967916-eb82221dfb92'),
-(40, 24, 'Ga sot cay Han Quoc', 69000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58'),
-(41, 24, 'Canh ga chien mam', 55000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1527477396000-e27163b481c2'),
-(42, 25, 'Burger ga gion', 49000.00, 1, 40, 40, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd'),
-(43, 25, 'Burger bo pho mai', 59000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1550547660-d9450f859349'),
-(44, 26, 'Combo ga ran burger nuoc', 99000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b'),
-(45, 26, 'Combo gia dinh 6 mieng ga', 189000.00, 1, 20, 20, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f');
+(34, 21, 'Pizza bò bằm phô mai đút lò', 139000.00, 1, 25, 25, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1594007654729-407eedc4be65'),
+(35, 22, 'Mì Ý sốt bò bằm Bolognese', 79000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1551183053-bf91a1d81141'),
+(36, 22, 'Mì Ý Carbonara thịt xông khói', 85000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9'),
+(37, 23, 'Khoai tây chiên giòn lắc phô mai', 39000.00, 1, 60, 60, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1576107232684-1279f390859f'),
+(38, 23, 'Salad Caesar rau củ tươi', 49000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd'),
+(39, 24, 'Gà rán truyền thống giòn rụm (2 miếng)', 59000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1562967916-eb82221dfb92'),
+(40, 24, 'Gà rán sốt cay ngọt Hàn Quốc', 69000.00, 1, 45, 45, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1626645738196-c2a7c87a8f58'),
+(41, 24, 'Cánh gà chiên nước mắm tỏi ớt', 55000.00, 1, 50, 50, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1527477396000-e27163b481c2'),
+(42, 25, 'Burger phi lê gà giòn cay', 49000.00, 1, 40, 40, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd'),
+(43, 25, 'Burger bò Úc nướng phô mai', 59000.00, 1, 35, 35, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1550547660-d9450f859349'),
+(44, 26, 'Combo 1 gà rán + 1 burger + 1 Coca', 99000.00, 1, 30, 30, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b'),
+(45, 26, 'Combo gia đình (6 miếng gà + khoai + 2 Coca)', 189000.00, 1, 20, 20, '2026-06-18', NULL, 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f');
 
 -- 14. Food Toppings Junction
 INSERT INTO `food_toppings` (`food_id`, `topping_id`) VALUES
@@ -697,16 +700,16 @@ INSERT INTO `order_statuses` (`id`, `code`, `label`, `description`, `sort_order`
 
 -- 16. Orders
 INSERT INTO `orders` (`id`, `order_code`, `idempotency_key`, `customer_id`, `restaurant_id`, `driver_id`, `voucher_id`, `receiver_address`, `receiver_lat`, `receiver_lng`, `distance_km`, `subtotal_amount`, `tax_amount`, `shipping_fee`, `discount_amount`, `total_amount`, `status_id`, `version`, `cancel_reason`, `cancelled_by_role`, `cancelled_by_user_id`, `cancelled_at`, `deleted_at`, `created_at`) VALUES
-(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 1, 2, 1, '12 Nguyen Hue, Quan 1', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
-(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
-(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 1, NULL, NULL, '1 Test Address', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
+(1, 'ORD-20260324-001', 'IDEM-CLIENT-20260324-UUID-001', 1, 1, 2, 1, '12 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM', 10.7769, 106.7009, 3.2, 95000.00, 7600.00, 21000.00, 15000.00, 108600.00, 7, 1, NULL, NULL, NULL, NULL, NULL, '2026-03-24 03:00:00'),
+(2, 'ORD-20260610-1781084623774', 'audit-1781084623757', 1, 1, NULL, NULL, '144 Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Hà Nội', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:43:43'),
+(3, 'ORD-20260610-1781084695040', 'audit-1781084695019', 1, 1, NULL, NULL, '144 Xuân Thủy, Phường Dịch Vọng Hậu, Quận Cầu Giấy, Hà Nội', 10.78, 106.7, 2, 45000.00, 0.00, 7000.00, 0.00, 52000.00, 1, 0, NULL, NULL, NULL, NULL, NULL, '2026-06-10 02:44:55');
 
 -- 17. Order Items
 INSERT INTO `order_items` (`id`, `order_id`, `food_id`, `food_name`, `quantity`, `price_at_order`) VALUES
-(1, 1, 1, 'Com Tam Chay', 2, 45000.00),
-(2, 1, 2, 'Tra Da', 1, 5000.00),
-(3, 2, 1, 'Com Tam Chay', 1, 45000.00),
-(4, 3, 1, 'Com Tam Chay', 1, 45000.00);
+(1, 1, 1, 'Cơm tấm sườn bì chả chay', 2, 45000.00),
+(2, 1, 2, 'Trà đá giải nhiệt', 1, 5000.00),
+(3, 2, 1, 'Cơm tấm sườn bì chả chay', 1, 45000.00),
+(4, 3, 1, 'Cơm tấm sườn bì chả chay', 1, 45000.00);
 
 -- 18. Order Item Toppings
 INSERT INTO `order_item_toppings` (`id`, `order_item_id`, `topping_id`, `quantity`, `price`) VALUES
@@ -741,8 +744,16 @@ INSERT INTO `driver_penalties` (`id`, `driver_id`, `type`, `status`, `reason`, `
 
 -- 25. Reviews
 INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `target_type`, `target_id`, `rating`, `comment`, `created_at`) VALUES
-(1, 1, 1, 'RESTAURANT', 1, 5, 'Cơm tấm rất ngon, phục vụ nhanh!', '2026-06-10 08:08:00'),
-(2, 1, 1, 'DRIVER', 2, 5, 'Tài xế lịch sự, giao hàng nhanh chóng.', '2026-06-10 08:08:00');
+(1, 1, 1, 'RESTAURANT', 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '2026-06-10 08:08:00'),
+(2, 1, 1, 'DRIVER', 2, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', '2026-06-10 08:08:00');
+
+-- 26. Chat Messages
+INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES
+(1, 1, 1, 1, 'Chào quán, đơn mình có thể làm ít cay được không ạ?', 'CUSTOMER', 1, '2026-03-24 10:02:00'),
+(2, 3, 1, 1, 'Dạ được ạ, quán đã ghi chú cho bếp rồi bạn yên tâm nhé!', 'MERCHANT', 1, '2026-03-24 10:03:00'),
+(3, 1, 1, 1, 'Cảm ơn quán nhiều nhé!', 'CUSTOMER', 1, '2026-03-24 10:03:30'),
+(4, 1, 3, NULL, 'Shop cho mình hỏi cơm tấm TL hôm nay có sườn cây không?', 'CUSTOMER', 0, '2026-06-10 11:15:00'),
+(5, 6, 3, NULL, 'Dạ còn bạn nhé, bạn đặt sớm giúp quán nha!', 'MERCHANT', 0, '2026-06-10 11:16:00');
 
 -- 26. Chat Messages
 INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES

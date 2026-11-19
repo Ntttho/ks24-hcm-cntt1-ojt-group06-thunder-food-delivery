@@ -107,7 +107,7 @@ public class OrderExpirationScheduler {
     @Transactional
     public void autoCancelExpiredUnassignedConfirmedOrders() {
         LocalDateTime expirationThreshold = LocalDateTime.now().minusMinutes(15);
-        List<Order> expiredOrders = orderRepository.findUnassignedOrdersByStatusCodeAndCreatedAtBefore(
+        List<Order> expiredOrders = orderRepository.findUnassignedOrdersByStatusCodeAndStatusEntryTimeBefore(
                 OrderStatus.CONFIRMED, expirationThreshold
         );
 
@@ -117,8 +117,8 @@ public class OrderExpirationScheduler {
 
         for (Order order : expiredOrders) {
             try {
-                log.info("Tự động hủy đơn hàng #{} do không có tài xế nhận sau 15 phút (createdAt={})",
-                        order.getId(), order.getCreatedAt());
+                log.info("Tự động hủy đơn hàng #{} do không có tài xế nhận sau 15 phút kể từ lúc vào trạng thái CONFIRMED",
+                        order.getId());
                 orderService.cancelOrder(
                         order.getId(),
                         "Hết thời gian tìm tài xế giao hàng sau 15 phút (Hệ thống tự động hủy)",

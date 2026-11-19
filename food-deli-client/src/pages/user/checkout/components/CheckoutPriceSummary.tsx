@@ -13,6 +13,8 @@ interface CheckoutPriceSummaryProps {
   finalTotal: number;
   itemCount?: number;
   paymentMethodDiscount?: number;
+  deliverySpeed?: 'priority' | 'standard' | 'schedule';
+  priorityFee?: number;
 }
 
 export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
@@ -28,6 +30,8 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
   finalTotal,
   itemCount = 1,
   paymentMethodDiscount: _paymentMethodDiscount = 0,
+  deliverySpeed,
+  priorityFee = 0,
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs flex flex-col gap-2.5">
@@ -48,7 +52,14 @@ export const CheckoutPriceSummary: React.FC<CheckoutPriceSummaryProps> = ({
       </div>
 
       <div className="flex items-center justify-between text-xs text-gray-600">
-        <span>Phí giao hàng</span>
+        <div>
+          <span>Phí giao hàng</span>
+          {deliverySpeed === 'priority' && priorityFee > 0 && (
+            <span className="block text-[11px] text-orange-600 font-medium">
+              (Gồm +{priorityFee.toLocaleString('vi-VN')}đ phụ phí hỏa tốc)
+            </span>
+          )}
+        </div>
         <span className="text-gray-900 font-semibold">
           {shippingFee.toLocaleString('vi-VN')}đ
         </span>

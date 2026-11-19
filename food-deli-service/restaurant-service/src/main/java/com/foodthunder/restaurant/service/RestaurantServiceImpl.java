@@ -6,6 +6,7 @@ import com.foodthunder.restaurant.entity.MenuCategory;
 import com.foodthunder.restaurant.entity.Product;
 import com.foodthunder.restaurant.entity.RestaurantChangeRequest;
 import com.foodthunder.restaurant.entity.Shop;
+import com.foodthunder.restaurant.exception.ForbiddenException;
 import com.foodthunder.restaurant.exception.ResourceNotFoundException;
 import com.foodthunder.restaurant.repository.MenuCategoryRepository;
 import com.foodthunder.restaurant.repository.ProductRepository;
@@ -182,18 +183,12 @@ public class RestaurantServiceImpl implements RestaurantService {
         Shop shop = shopRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + id));
 
-        if (request.getName() != null && !request.getName().trim().isEmpty()) {
-            shop.setName(request.getName().trim());
+        // Ownership Guard: Chỉ chủ sở hữu quán mới có quyền cập nhật thông tin
+        if (ownerId != null && !shop.getOwnerId().equals(ownerId)) {
+            throw new ForbiddenException("Bạn không phải chủ sở hữu của quán ăn này, không có quyền chỉnh sửa!");
         }
-        if (request.getAddress() != null && !request.getAddress().trim().isEmpty()) {
-            shop.setAddress(request.getAddress().trim());
-        }
-        if (request.getLatitude() != null) {
-            shop.setLatitude(request.getLatitude());
-        }
-        if (request.getLongitude() != null) {
-            shop.setLongitude(request.getLongitude());
-        }
+
+        // Cập nhật ngay các thông tin vận hành hàng ngày (giờ mở/đóng cửa, ảnh quán)
         if (request.getOpeningTime() != null) {
             shop.setOpeningTime(request.getOpeningTime());
         }
@@ -204,20 +199,37 @@ public class RestaurantServiceImpl implements RestaurantService {
             shop.setImageUrl(request.getImageUrl().trim());
         }
 
+        // Chuẩn bị payload thay đổi
+        Map<String, Object> payloadMap = new LinkedHashMap<>();
+        payloadMap.put("name", request.getName() != null ? request.getName().trim() : shop.getName());
+        payloadMap.put("address", request.getAddress() != null ? request.getAddress().trim() : shop.getAddress());
+        payloadMap.put("ownerId", shop.getOwnerId());
+        payloadMap.put("imageUrl", shop.getImageUrl());
+        payloadMap.put("latitude", request.getLatitude() != null ? request.getLatitude() : shop.getLatitude());
+        payloadMap.put("longitude", request.getLongitude() != null ? request.getLongitude() : shop.getLongitude());
+        payloadMap.put("openingTime", shop.getOpeningTime() != null ? shop.getOpeningTime().toString() : "07:00:00");
+        payloadMap.put("closingTime", shop.getClosingTime() != null ? shop.getClosingTime().toString() : "22:00:00");
+        payloadMap.put("ratingAvg", shop.getRatingAvg());
+
+        // Nếu quán chưa được duyệt (đang PENDING), cho phép cập nhật trực tiếp
+        if (!"APPROVED".equalsIgnoreCase(shop.getApprovalStatus())) {
+            if (request.getName() != null && !request.getName().trim().isEmpty()) {
+                shop.setName(request.getName().trim());
+            }
+            if (request.getAddress() != null && !request.getAddress().trim().isEmpty()) {
+                shop.setAddress(request.getAddress().trim());
+            }
+            if (request.getLatitude() != null) {
+                shop.setLatitude(request.getLatitude());
+            }
+            if (request.getLongitude() != null) {
+                shop.setLongitude(request.getLongitude());
+            }
+        }
+
         Shop updated = shopRepository.save(shop);
 
-        // Lưu thông tin vào bảng restaurant_change_requests an toàn
-        Map<String, Object> payloadMap = new LinkedHashMap<>();
-        payloadMap.put("name", updated.getName());
-        payloadMap.put("address", updated.getAddress());
-        payloadMap.put("ownerId", updated.getOwnerId());
-        payloadMap.put("imageUrl", updated.getImageUrl());
-        payloadMap.put("latitude", updated.getLatitude());
-        payloadMap.put("longitude", updated.getLongitude());
-        payloadMap.put("openingTime", updated.getOpeningTime() != null ? updated.getOpeningTime().toString() : "07:00:00");
-        payloadMap.put("closingTime", updated.getClosingTime() != null ? updated.getClosingTime().toString() : "22:00:00");
-        payloadMap.put("ratingAvg", updated.getRatingAvg());
-
+        // Lưu thông tin vào bảng restaurant_change_requests an toàn ở trạng thái PENDING để Admin phê duyệt
         saveChangeRequestSafely(updated.getId(), ownerId != null ? ownerId : updated.getOwnerId(), "PENDING", payloadMap);
 
         return mapToDto(updated);

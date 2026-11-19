@@ -11,11 +11,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface DriverOfferRepository extends JpaRepository<DriverOffer, Long> {
+
+    boolean existsByDriverIdAndStatusIn(Integer driverId, Collection<String> statuses);
 
     /**
      * Pessimistic Locking query: Acquires an exclusive row-level lock (SELECT ... FOR UPDATE)
