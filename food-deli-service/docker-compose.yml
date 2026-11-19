@@ -84,8 +84,11 @@ services:
     depends_on:
       discovery-service:
         condition: service_healthy
+    volumes:
+      - ./config-server/src/main/resources/config:/config
     environment:
       - SPRING_PROFILES_ACTIVE=native
+      - SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS=file:/config
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://discovery-service:8761/eureka/
       - EUREKA_INSTANCE_PREFER_IP_ADDRESS=true
       - JAVA_TOOL_OPTIONS=-Xms96m -Xmx160m -XX:+UseSerialGC

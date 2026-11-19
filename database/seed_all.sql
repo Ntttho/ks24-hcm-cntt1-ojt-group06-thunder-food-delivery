@@ -484,6 +484,7 @@ CREATE TABLE `reviews` (
   `rating` TINYINT NOT NULL,
   `comment` TEXT,
   `images_json` TEXT,
+  `quick_tags_json` TEXT DEFAULT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_order_target` (`order_id`, `target_type`),
@@ -769,9 +770,9 @@ INSERT INTO `driver_penalties` (`id`, `driver_id`, `type`, `status`, `reason`, `
 (1, 4, 'LATE_PICKUP', 'RESOLVED', 'Trễ lấy hàng 15 phút do kẹt xe', '2026-06-01 10:00:00', '2026-06-01 12:00:00', '2026-06-01 10:00:00', '2026-06-01 12:00:00');
 
 -- 25. Reviews
-INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `customer_name`, `customer_avatar`, `target_type`, `target_id`, `target_name`, `food_item_id`, `rating`, `comment`, `images_json`, `created_at`) VALUES
-(1, 1, 1, 'Nguyễn Văn An', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'RESTAURANT', 1, 'Hạnh Dung - Ẩm Thực Chay Mặn', 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600"]', '2026-06-10 08:08:00'),
-(2, 1, 1, 'Nguyễn Văn An', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'DRIVER', 2, 'Trần Thị Bích (Tài xế Thunder)', NULL, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', NULL, '2026-06-10 08:08:00');
+INSERT INTO `reviews` (`id`, `order_id`, `customer_id`, `customer_name`, `customer_avatar`, `target_type`, `target_id`, `target_name`, `food_item_id`, `rating`, `comment`, `images_json`, `quick_tags_json`, `created_at`) VALUES
+(1, 1, 1, 'Nguyễn Văn An', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'RESTAURANT', 1, 'Hạnh Dung - Ẩm Thực Chay Mặn', 1, 5, 'Cơm tấm sườn nướng rất mềm thơm, đóng hộp sạch sẽ!', '["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600"]', NULL, '2026-06-10 08:08:00'),
+(2, 1, 1, 'Nguyễn Văn An', 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150', 'DRIVER', 2, 'Trần Thị Bích (Tài xế Thunder)', NULL, 5, 'Tài xế lịch sự, giao hàng nhanh chóng còn nóng hổi.', NULL, '["Giao nhanh đúng hẹn", "Thân thiện lịch sự"]', '2026-06-10 08:08:00');
 
 -- 26. Chat Messages
 INSERT INTO `chat_messages` (`id`, `sender_id`, `shop_id`, `order_id`, `message`, `sender_role`, `is_read`, `created_at`) VALUES
