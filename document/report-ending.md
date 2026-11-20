@@ -50,6 +50,8 @@
    - **Task THO-01:** Chuẩn hóa và cố định kiến trúc WebSocket STOMP qua API Gateway: Đảm bảo route `/ws` và `/ws-food-deli` luôn trỏ trực tiếp sang `chat-notification-service` (`lb://chat-notification-service`), loại bỏ triệt để xung đột socket cũ ở `order-service`, tối ưu độ trễ nhận message và chuông báo dưới 50ms.
    - **Task THO-02:** Thiết lập kịch bản kiểm thử liên thông 4 vai trò (Cross-Role E2E Orchestration) trên 4 màn hình song song.
    - **Task THO-03:** Đóng gói Docker Compose Production, tối ưu JVM Heap (`-Xmx`), chuẩn hóa 100% dữ liệu seed [database/seed_all.sql](file:///d:/ojt-food-deli-start/database/seed_all.sql) sang tiếng Việt UTF-8.
+5. **Hổ trợ thành viên các task khó, task chậm trể, task logic mức độ khó cao**
+
 
 #### B. Thẻ Trello & Sprint 4 Phụ Trách:
 - `SP1-1.1`, `SP1-1.2`, `SP1-1.9`: Khởi tạo Hub Microservices, Auth JWT & Gateway (13 SP).
@@ -57,7 +59,7 @@
 - `SP2-CORE-02`: Thiết lập Realtime WebSocket STOMP Hub & Chuông báo quán ăn (4 SP).
 - `SP3-FIX-MERCH-02`: Chuông báo WebSocket STOMP & Doanh thu đa quán (4 SP).
 - `SP3-OPS-01`: Đóng gói Docker Compose Production & Nghiệm thu (7 SP).
-- `THO-01`, `THO-02`, `THO-03` (Sprint 4): Chuẩn hóa STOMP Gateway, kịch bản E2E & Docker Production (10 SP).
+- `THO-01`, `THO-02`, `THO-03`: Chuẩn hóa STOMP Gateway, kịch bản E2E & Docker Production (10 SP).
 - **Tổng cộng: 43 SP**
 
 #### C. Bằng Chứng Mã Nguồn & Vị Trí Demo:

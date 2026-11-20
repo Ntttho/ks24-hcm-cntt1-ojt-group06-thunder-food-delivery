@@ -9,6 +9,8 @@ export * from './user';
 export * from './merchant';
 export * from './order';
 export * from './admin/AdminUserPage';
+export * from './admin/AdminRestaurantPage';
+export * from './admin/AdminDriverApprovalPage';
 export * from './admin/AdminApprovalPage';
 export * from './admin/AdminVoucherPage';
 export * from './admin/AdminAnalyticsPage';

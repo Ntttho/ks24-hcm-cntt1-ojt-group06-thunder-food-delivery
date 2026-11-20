@@ -289,6 +289,37 @@ public class RestaurantController {
         return ResponseEntity.ok(ApiResponse.success("Lấy thống kê quán ăn thành công", restaurantService.getStatsSummary()));
     }
 
+    /**
+     * SP4-ADM-01: Lấy danh sách toàn bộ quán ăn cho Quản trị viên Admin (phân trang, tìm kiếm, lọc trạng thái)
+     * GET /api/v1/restaurants/admin?search=...&isOpen=...&approvalStatus=...&includeDeleted=true&page=0&size=10
+     */
+    @GetMapping("/admin")
+    public ResponseEntity<ApiResponse<PageResponse<RestaurantDto>>> getAdminRestaurants(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean isOpen,
+            @RequestParam(required = false) String approvalStatus,
+            @RequestParam(required = false, defaultValue = "true") Boolean includeDeleted,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        PageResponse<RestaurantDto> response = restaurantService.getAdminRestaurants(search, isOpen, approvalStatus, includeDeleted, page, size);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách quán ăn cho Admin thành công", response));
+    }
+
+    /**
+     * SP4-ADM-02: Khóa / Mở khóa quán ăn (Soft-delete / Restore) dành cho Admin
+     * PATCH /api/v1/restaurants/{id}/toggle-lock
+     */
+    @PatchMapping("/{id}/toggle-lock")
+    public ResponseEntity<ApiResponse<RestaurantDto>> toggleRestaurantLock(
+            @PathVariable Integer id,
+            @RequestBody(required = false) Map<String, String> payload
+    ) {
+        String reason = (payload != null) ? payload.get("reason") : null;
+        RestaurantDto updated = restaurantService.toggleRestaurantLock(id, reason);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật trạng thái khóa quán ăn thành công", updated));
+    }
+
     private void requireAdminRole(String roleHeader, String deniedMessage) {
         if (roleHeader == null || roleHeader.isBlank()) {
             throw new UnauthorizedException("Thiếu thông tin phân quyền vai trò người dùng");

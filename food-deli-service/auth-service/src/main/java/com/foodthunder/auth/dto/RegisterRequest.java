@@ -1,5 +1,6 @@
 package com.foodthunder.auth.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
@@ -16,5 +17,12 @@ public record RegisterRequest(
         @NotBlank(message = "Full name is required")
         String fullName,
 
+        @Email(message = "Invalid email format")
+        String email,
+
         String role
-) {}
+) {
+    public RegisterRequest(String phone, String password, String fullName, String role) {
+        this(phone, password, fullName, null, role);
+    }
+}

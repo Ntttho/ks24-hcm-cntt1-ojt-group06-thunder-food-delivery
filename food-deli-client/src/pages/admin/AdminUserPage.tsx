@@ -10,6 +10,7 @@ import {
   SyncOutlined,
   UserAddOutlined,
   AuditOutlined,
+  CarOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -94,22 +95,12 @@ export const AdminUserPage: React.FC = () => {
     []
   );
 
-  // Fetch real pending approvals count for top shortcut banner
+  // Fetch real pending driver approvals count for top shortcut banner
   const fetchPendingCount = useCallback(async () => {
     try {
-      const [restRes, driverRes] = await Promise.allSettled([
-        adminApprovalApi.getRestaurantChangeRequests('PENDING'),
-        adminApprovalApi.getDriverApprovals('PENDING'),
-      ]);
-      const restCount =
-        restRes.status === 'fulfilled' && Array.isArray(restRes.value.data)
-          ? restRes.value.data.length
-          : 0;
-      const driverCount =
-        driverRes.status === 'fulfilled' && Array.isArray(driverRes.value.data)
-          ? driverRes.value.data.length
-          : 0;
-      setPendingApprovalsTotal(restCount + driverCount);
+      const driverRes = await adminApprovalApi.getDriverApprovals('PENDING');
+      const driverCount = Array.isArray(driverRes?.data) ? driverRes.data.length : 0;
+      setPendingApprovalsTotal(driverCount);
     } catch {
       // Ignore background counter errors
     }
@@ -240,16 +231,16 @@ export const AdminUserPage: React.FC = () => {
           message={
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm">
               <span className="font-semibold text-slate-700">
-                ⚡ Hệ thống hiện có <strong>{pendingApprovalsTotal}</strong> hồ sơ đối tác (Quán ăn & Tài xế) đang chờ Admin xét duyệt.
+                ⚡ Hệ thống hiện có <strong>{pendingApprovalsTotal}</strong> hồ sơ tài xế mới đang chờ Admin xét duyệt.
               </span>
               <Button
                 type="primary"
                 size="small"
-                icon={<AuditOutlined />}
-                onClick={() => navigate(APP_ROUTES.ADMIN_APPROVALS)}
-                className="bg-amber-500 hover:bg-amber-600 border-none font-bold text-xs rounded-lg shadow-2xs self-start sm:self-auto"
+                icon={<CarOutlined />}
+                onClick={() => navigate(APP_ROUTES.ADMIN_DRIVERS)}
+                className="bg-blue-600 hover:bg-blue-700 border-none font-bold text-xs rounded-lg shadow-2xs self-start sm:self-auto"
               >
-                <span>Đến Trung tâm Phê duyệt hồ sơ</span>
+                <span>Kiểm duyệt Tài xế</span>
                 <ArrowRightOutlined />
               </Button>
             </div>

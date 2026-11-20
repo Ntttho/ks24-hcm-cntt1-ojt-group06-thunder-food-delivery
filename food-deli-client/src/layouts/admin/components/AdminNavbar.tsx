@@ -40,24 +40,15 @@ export const AdminNavbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
-  // Load pending approvals count for badge notification (Both restaurants & drivers)
+  // Load pending driver approvals count for badge notification
   useEffect(() => {
     let mounted = true;
-    Promise.allSettled([
-      adminApprovalApi.getRestaurantChangeRequests('PENDING'),
-      adminApprovalApi.getDriverApprovals('PENDING'),
-    ])
-      .then(([resRestaurants, resDrivers]) => {
+    adminApprovalApi
+      .getDriverApprovals('PENDING')
+      .then((res) => {
         if (!mounted) return;
-        const restCount =
-          resRestaurants.status === 'fulfilled' && Array.isArray(resRestaurants.value?.data)
-            ? resRestaurants.value.data.length
-            : 0;
-        const driverCount =
-          resDrivers.status === 'fulfilled' && Array.isArray(resDrivers.value?.data)
-            ? resDrivers.value.data.length
-            : 0;
-        setPendingApprovalsCount(restCount + driverCount);
+        const driverCount = Array.isArray(res?.data) ? res.data.length : 0;
+        setPendingApprovalsCount(driverCount);
       })
       .catch(() => {
         // Fallback silently if network fails
@@ -105,9 +96,16 @@ export const AdminNavbar: React.FC = () => {
       icon: <TeamOutlined className="text-base" />,
     },
     {
-      key: 'approvals',
-      path: '/admin/approvals',
-      label: 'Kiểm duyệt Hồ sơ',
+      key: 'restaurants',
+      path: '/admin/restaurants',
+      label: 'Quản lý Quán ăn',
+      icon: <ShopOutlined className="text-base" />,
+    },
+    {
+      key: 'drivers',
+      path: '/admin/drivers',
+      altPaths: ['/admin/approvals'],
+      label: 'Kiểm duyệt Tài xế',
       icon: <AuditOutlined className="text-base" />,
       badgeCount: pendingApprovalsCount,
     },

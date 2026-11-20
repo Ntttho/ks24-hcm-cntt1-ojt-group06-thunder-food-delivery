@@ -234,6 +234,27 @@ let mockProductToppingsMap: Record<number, number[]> = {
 
 export const restaurantApi = {
   /**
+   * Lấy danh sách toàn bộ quán ăn dành riêng cho Quản trị viên (hỗ trợ tìm kiếm, lọc trạng thái duyệt, xóa mềm)
+   */
+  getAdminRestaurants: async (params?: {
+    page?: number;
+    size?: number;
+    search?: string;
+    isOpen?: boolean;
+    approvalStatus?: string;
+    includeDeleted?: boolean;
+  }): Promise<ApiResponse<PaginatedData<Shop>>> => {
+    return apiClient.get<PaginatedData<Shop>>(API_ENDPOINTS.RESTAURANTS.ADMIN_LIST, { params });
+  },
+
+  /**
+   * Khóa / Mở khóa quán ăn (Soft delete / Restore)
+   */
+  toggleRestaurantLock: async (id: number | string, reason?: string): Promise<ApiResponse<Shop>> => {
+    return apiClient.patch<Shop>(API_ENDPOINTS.RESTAURANTS.ADMIN_TOGGLE_LOCK(id), { reason });
+  },
+
+  /**
    * Lấy danh sách quán ăn có phân trang và tìm kiếm theo tên / danh mục / trạng thái
    */
   getAll: async (params?: {

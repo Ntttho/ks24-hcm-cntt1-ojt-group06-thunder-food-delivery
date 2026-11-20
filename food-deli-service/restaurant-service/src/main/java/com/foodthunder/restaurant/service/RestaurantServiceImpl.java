@@ -286,6 +286,8 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .imageUrl(shop.getImageUrl())
                 .ratingAvg(shop.getRatingAvg())
                 .approvalStatus(shop.getApprovalStatus())
+                .deletedAt(shop.getDeletedAt())
+                .rejectReason(shop.getRejectReason())
                 .build();
     }
 
@@ -463,5 +465,46 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .totalRestaurantsCount(activeRestaurants)
                 .totalFoodItemsCount(activeFoodItems)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<RestaurantDto> getAdminRestaurants(String search, Boolean isOpen, String approvalStatus, Boolean includeDeleted, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+        String statusParam = (approvalStatus != null && !approvalStatus.trim().isEmpty() && !"ALL".equalsIgnoreCase(approvalStatus.trim())) ? approvalStatus.trim().toUpperCase() : null;
+        boolean incDeleted = (includeDeleted == null || includeDeleted);
+
+        Page<Shop> shopPage = shopRepository.searchShopsForAdmin(searchParam, statusParam, isOpen, incDeleted, pageable);
+        List<RestaurantDto> content = shopPage.getContent().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+
+        return PageResponse.<RestaurantDto>builder()
+                .content(content)
+                .pageNumber(shopPage.getNumber())
+                .pageSize(shopPage.getSize())
+                .totalElements(shopPage.getTotalElements())
+                .totalPages(shopPage.getTotalPages())
+                .last(shopPage.isLast())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public RestaurantDto toggleRestaurantLock(Integer id, String reason) {
+        Shop shop = shopRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy quán ăn với ID: " + id));
+
+        if (shop.getDeletedAt() == null) {
+            shop.setDeletedAt(LocalDateTime.now());
+            shop.setIsOpen(false);
+            shop.setTemporaryClosedReason(reason != null && !reason.trim().isEmpty() ? reason.trim() : "Quán bị tạm khóa bởi Quản trị viên");
+        } else {
+            shop.setDeletedAt(null);
+            shop.setTemporaryClosedReason(null);
+        }
+
+        return mapToDto(shopRepository.save(shop));
     }
 }

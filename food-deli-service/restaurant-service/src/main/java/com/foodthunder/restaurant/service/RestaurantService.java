@@ -39,4 +39,8 @@ public interface RestaurantService {
     com.foodthunder.restaurant.dto.RestaurantStatsSummaryDto getStatsSummary();
 
     RestaurantAnalyticsCountsDto getAnalyticsCounts();
+
+    PageResponse<RestaurantDto> getAdminRestaurants(String search, Boolean isOpen, String approvalStatus, Boolean includeDeleted, int page, int size);
+
+    RestaurantDto toggleRestaurantLock(Integer id, String reason);
 }

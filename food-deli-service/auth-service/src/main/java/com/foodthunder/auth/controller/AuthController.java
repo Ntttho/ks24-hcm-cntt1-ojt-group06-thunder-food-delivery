@@ -61,21 +61,21 @@ public class AuthController {
 
     @PostMapping("/register/customer")
     public ResponseEntity<ApiResponse<AuthResponse>> registerCustomer(@Valid @RequestBody RegisterRequest request) {
-        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), "CUSTOMER");
+        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), request.email(), "CUSTOMER");
         AuthResponse response = authService.register(reqWithRole);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created("Customer registered", response));
     }
 
     @PostMapping("/register/merchant")
     public ResponseEntity<ApiResponse<AuthResponse>> registerMerchant(@Valid @RequestBody RegisterRequest request) {
-        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), "MERCHANT");
+        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), request.email(), "MERCHANT");
         AuthResponse response = authService.register(reqWithRole);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created("Merchant registered", response));
     }
 
     @PostMapping({"/register/driver", "/register/shipper"})
     public ResponseEntity<ApiResponse<AuthResponse>> registerDriver(@Valid @RequestBody RegisterRequest request) {
-        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), "DRIVER");
+        RegisterRequest reqWithRole = new RegisterRequest(request.phone(), request.password(), request.fullName(), request.email(), "DRIVER");
         AuthResponse response = authService.register(reqWithRole);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created("Driver registered", response));
     }

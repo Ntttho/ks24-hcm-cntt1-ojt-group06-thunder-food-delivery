@@ -22,6 +22,8 @@ import {
   OrdersPage,
   OrderDetailPage,
   AdminUserPage,
+  AdminRestaurantPage,
+  AdminDriverApprovalPage,
   AdminApprovalPage,
   AdminVoucherPage,
   AdminAnalyticsPage,
@@ -156,8 +158,16 @@ export const router = createBrowserRouter([
         element: <AdminUserPage />,
       },
       {
+        path: 'restaurants',
+        element: <AdminRestaurantPage />,
+      },
+      {
+        path: 'drivers',
+        element: <AdminDriverApprovalPage />,
+      },
+      {
         path: 'approvals',
-        element: <AdminApprovalPage />,
+        element: <Navigate to="/admin/drivers" replace />,
       },
       {
         path: 'vouchers',

@@ -41,4 +41,19 @@ public interface ShopRepository extends JpaRepository<Shop, Integer> {
     );
 
     long countByDeletedAtIsNull();
+
+    @Query("""
+        SELECT s FROM Shop s
+        WHERE (:includeDeleted = true OR s.deletedAt IS NULL)
+          AND (:approvalStatus IS NULL OR :approvalStatus = '' OR :approvalStatus = 'ALL' OR s.approvalStatus = :approvalStatus)
+          AND (:isOpen IS NULL OR s.isOpen = :isOpen)
+          AND (:search IS NULL OR :search = '' OR LOWER(s.name) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.address) LIKE LOWER(CONCAT('%', :search, '%')) OR CONCAT('', s.id) LIKE CONCAT('%', :search, '%'))
+    """)
+    Page<Shop> searchShopsForAdmin(
+        @Param("search") String search,
+        @Param("approvalStatus") String approvalStatus,
+        @Param("isOpen") Boolean isOpen,
+        @Param("includeDeleted") boolean includeDeleted,
+        Pageable pageable
+    );
 }

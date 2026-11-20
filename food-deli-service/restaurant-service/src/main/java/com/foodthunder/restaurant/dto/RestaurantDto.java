@@ -33,4 +33,8 @@ public class RestaurantDto {
     private String imageUrl;
     private BigDecimal ratingAvg;
     private String approvalStatus;
+    private String rejectReason;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private java.time.LocalDateTime deletedAt;
 }

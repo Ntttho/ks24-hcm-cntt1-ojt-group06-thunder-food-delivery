@@ -66,6 +66,11 @@ public class JwtUtil {
         return phone != null ? String.valueOf(phone) : "";
     }
 
+    public String extractEmail(Claims claims) {
+        Object email = claims.get("email");
+        return email != null ? String.valueOf(email) : "";
+    }
+
     public String extractRole(Claims claims) {
         Object role = claims.get("role");
         if (role != null) {

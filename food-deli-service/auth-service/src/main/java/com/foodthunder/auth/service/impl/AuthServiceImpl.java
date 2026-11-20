@@ -42,8 +42,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByPhone(request.phone())
-                .orElseThrow(() -> new UnauthorizedException("Invalid phone number or password"));
+        String identifier = request.phone() != null ? request.phone().trim() : "";
+        User user = userRepository.findByPhoneOrEmail(identifier)
+                .orElseThrow(() -> new UnauthorizedException("Invalid phone number, email or password"));
 
         boolean matches = passwordEncoder.matches(request.password(), user.getPassword());
         // Support legacy plain text migration if seed data was inserted unhashed
@@ -55,7 +56,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (!matches) {
-            throw new UnauthorizedException("Invalid phone number or password");
+            throw new UnauthorizedException("Invalid phone number, email or password");
         }
 
         Set<String> roleNames = user.getRoles().stream()
@@ -91,8 +92,17 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByPhone(request.phone())) {
-            throw new ConflictException("Phone number " + request.phone() + " is already registered");
+        String phone = request.phone().trim();
+        if (userRepository.existsByPhone(phone)) {
+            throw new ConflictException("Phone number " + phone + " is already registered");
+        }
+
+        String cleanedEmail = (request.email() != null && !request.email().isBlank())
+                ? request.email().trim().toLowerCase()
+                : null;
+
+        if (cleanedEmail != null && userRepository.existsByEmail(cleanedEmail)) {
+            throw new ConflictException("Email " + cleanedEmail + " is already registered");
         }
 
         String rawRole = (request.role() != null && !request.role().isBlank())
@@ -112,9 +122,10 @@ public class AuthServiceImpl implements AuthService {
                 .orElseGet(() -> roleRepository.save(Role.builder().name(roleName).build()));
 
         User user = User.builder()
-                .phone(request.phone())
+                .phone(phone)
+                .email(cleanedEmail)
                 .password(passwordEncoder.encode(request.password()))
-                .fullName(request.fullName())
+                .fullName(request.fullName().trim())
                 .ratingAvg(new BigDecimal("5.00"))
                 .build();
 

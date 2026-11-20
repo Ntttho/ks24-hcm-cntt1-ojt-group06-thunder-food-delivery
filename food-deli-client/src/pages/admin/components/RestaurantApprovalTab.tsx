@@ -1,5 +1,6 @@
 import React from 'react';
-import { Table, Button, Input, Select, Tag, Space, Popconfirm, Tooltip } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Table, Button, Input, Select, Tag, Space, Popconfirm, Tooltip, Alert } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   SearchOutlined,
@@ -9,6 +10,7 @@ import {
   CloseCircleOutlined,
   ClockCircleOutlined,
   EyeOutlined,
+  ShopOutlined,
 } from '@ant-design/icons';
 import type { RestaurantChangeRequestItem } from '@/services/modules/adminApprovalApi';
 
@@ -37,6 +39,8 @@ export const RestaurantApprovalTab: React.FC<RestaurantApprovalTabProps> = ({
   onApprove,
   onReject,
 }) => {
+  const navigate = useNavigate();
+
   const getStatusBadge = (status?: string) => {
     switch (status?.toUpperCase()) {
       case 'APPROVED':
@@ -192,6 +196,29 @@ export const RestaurantApprovalTab: React.FC<RestaurantApprovalTabProps> = ({
 
   return (
     <div className="space-y-4 pt-2">
+      <Alert
+        message={
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span>
+              <b>Mẹo quản trị:</b> Đây là danh sách các <b>Yêu cầu thay đổi thông tin quán ăn</b>. Để xem và quản lý toàn bộ <b>11 Quán ăn</b> trên hệ thống, vui lòng truy cập trang Quản lý Quán ăn.
+            </span>
+            <Button
+              size="small"
+              type="primary"
+              ghost
+              icon={<ShopOutlined />}
+              onClick={() => navigate('/admin/restaurants')}
+              className="rounded-lg text-xs font-semibold shrink-0"
+            >
+              Xem tất cả Quán ăn
+            </Button>
+          </div>
+        }
+        type="info"
+        showIcon
+        className="rounded-xl border-blue-200 bg-blue-50/60"
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex flex-wrap items-center gap-3 flex-1">
           <Input

@@ -161,7 +161,7 @@ class OrderLiveTrackingWebSocketService {
         this.activeSubIds.add(chatSubId);
       }
 
-      const locSubId = `sub-loc-${orderId}`;
+      const locSubId = `sub-loc-${orderId}`; // location
       if (!this.activeSubIds.has(locSubId)) {
         this.socket?.send(`SUBSCRIBE\nid:${locSubId}\ndestination:/topic/orders/${orderId}/location\n\n\0`);
         this.activeSubIds.add(locSubId);

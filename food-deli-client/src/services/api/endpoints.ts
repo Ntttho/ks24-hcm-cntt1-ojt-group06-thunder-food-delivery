@@ -26,6 +26,8 @@ export const API_ENDPOINTS = {
   // Restaurant & Catalog Service
   RESTAURANTS: {
     LIST: '/restaurants',
+    ADMIN_LIST: '/restaurants/admin',
+    ADMIN_TOGGLE_LOCK: (id: number | string) => `/restaurants/${id}/toggle-lock`,
     DETAIL: (id: number | string) => `/restaurants/${id}`,
     CATEGORIES: '/categories',
     PRODUCTS: (shopId: number | string) => `/restaurants/${shopId}/products`,

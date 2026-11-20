@@ -16,6 +16,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByPhone(String phone);
     boolean existsByPhoneAndIdNot(String phone, Long id);
 
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+    boolean existsByEmailAndIdNot(String email, Long id);
+
+    @Query("SELECT u FROM User u WHERE (u.phone = :identifier OR (u.email IS NOT NULL AND LOWER(u.email) = LOWER(:identifier))) AND u.deletedAt IS NULL")
+    Optional<User> findByPhoneOrEmail(@Param("identifier") String identifier);
+
     @Query("""
         SELECT DISTINCT u FROM User u
         LEFT JOIN u.roles r

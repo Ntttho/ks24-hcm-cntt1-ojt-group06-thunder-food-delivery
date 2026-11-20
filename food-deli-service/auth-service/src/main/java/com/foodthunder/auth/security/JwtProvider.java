@@ -57,6 +57,7 @@ public class JwtProvider {
                 .subject(String.valueOf(user.getId()))
                 .claim("userId", user.getId())
                 .claim("phone", user.getPhone())
+                .claim("email", user.getEmail() != null ? user.getEmail() : "")
                 .claim("role", roleToUse)
                 .claim("roles", roleNames)
                 .issuedAt(now)

@@ -108,7 +108,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                             request,
                             jwtUtil.extractUserId(claims),
                             jwtUtil.extractRole(claims),
-                            jwtUtil.extractPhone(claims)
+                            jwtUtil.extractPhone(claims),
+                            jwtUtil.extractEmail(claims)
                     );
                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
                 }
@@ -119,6 +120,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                         headers.remove("X-User-Id");
                         headers.remove("X-User-Role");
                         headers.remove("X-User-Phone");
+                        headers.remove("X-User-Email");
                     })
                     .build();
             return chain.filter(exchange.mutate().request(sanitizedRequest).build());
@@ -141,6 +143,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String userId = jwtUtil.extractUserId(claims);
         String role = jwtUtil.extractRole(claims);
         String phone = jwtUtil.extractPhone(claims);
+        String email = jwtUtil.extractEmail(claims);
 
         if (isAdminPath(path)) {
             if (!jwtUtil.hasAdminRole(claims)) {
@@ -152,16 +155,19 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             }
         }
 
-        ServerHttpRequest mutatedRequest = mutateWithIdentity(request, userId, role, phone);
+        ServerHttpRequest mutatedRequest = mutateWithIdentity(request, userId, role, phone, email);
         return chain.filter(exchange.mutate().request(mutatedRequest).build());
     }
 
-    private ServerHttpRequest mutateWithIdentity(ServerHttpRequest request, String userId, String role, String phone) {
+    private ServerHttpRequest mutateWithIdentity(ServerHttpRequest request, String userId, String role, String phone, String email) {
         return request.mutate()
                 .headers(headers -> {
                     headers.set("X-User-Id", userId);
                     headers.set("X-User-Role", role);
                     headers.set("X-User-Phone", phone);
+                    if (email != null && !email.isBlank()) {
+                        headers.set("X-User-Email", email);
+                    }
                 })
                 .build();
     }
