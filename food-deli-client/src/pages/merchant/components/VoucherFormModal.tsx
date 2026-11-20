@@ -48,6 +48,15 @@ interface VoucherFormModalProps {
   onSubmit: (values: CreateVoucherPayload | UpdateVoucherPayload) => Promise<void>;
 }
 
+const formatNumberWithCommas = (val: string | number | undefined): string => {
+  if (val === undefined || val === null || val === '') return '';
+  return `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+
+const parseDigitsOnly = (val: string | undefined): string => {
+  return (val ?? '').replace(/[^\d]/g, '');
+};
+
 export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
   isOpen,
   editingVoucher,
@@ -227,6 +236,14 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
               rules={[{ required: true, message: 'Chọn loại giảm giá!' }]}
             >
               <Select
+                onChange={(nextType) => {
+                  const currentVal = Number(form.getFieldValue('discountValue'));
+                  if (nextType === 'PERCENTAGE' && currentVal > 100) {
+                    form.setFieldValue('discountValue', 10);
+                  } else if (nextType === 'FIXED') {
+                    form.setFieldValue('maxDiscountAmount', undefined);
+                  }
+                }}
                 options={[
                   {
                     value: 'FIXED',
@@ -276,12 +293,12 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             >
               <InputNumber
                 className="w-full"
-                formatter={(val) =>
-                  discountType === 'PERCENTAGE'
-                    ? `${val}%`
-                    : `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-                }
-                parser={(val) => Number(val?.replace(/\$\s?|(,*)|(%*)/g, '')) as any}
+                min={1}
+                max={discountType === 'PERCENTAGE' ? 100 : 10000000}
+                precision={0}
+                suffix={discountType === 'PERCENTAGE' ? '%' : 'đ'}
+                formatter={discountType === 'PERCENTAGE' ? undefined : formatNumberWithCommas}
+                parser={parseDigitsOnly}
                 placeholder={discountType === 'PERCENTAGE' ? 'Ví dụ: 15' : 'Ví dụ: 20,000'}
               />
             </Form.Item>
@@ -301,9 +318,11 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             >
               <InputNumber
                 className="w-full"
+                min={0}
+                precision={0}
                 disabled={discountType !== 'PERCENTAGE'}
-                formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(val) => Number(val?.replace(/\$\s?|(,*)/g, '')) as any}
+                formatter={formatNumberWithCommas}
+                parser={parseDigitsOnly}
                 placeholder="Ví dụ: 50,000"
               />
             </Form.Item>
@@ -318,8 +337,10 @@ export const VoucherFormModal: React.FC<VoucherFormModalProps> = ({
             >
               <InputNumber
                 className="w-full"
-                formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                parser={(val) => Number(val?.replace(/\$\s?|(,*)/g, '')) as any}
+                min={0}
+                precision={0}
+                formatter={formatNumberWithCommas}
+                parser={parseDigitsOnly}
                 placeholder="Ví dụ: 50,000 (0 = Không yêu cầu)"
               />
             </Form.Item>
